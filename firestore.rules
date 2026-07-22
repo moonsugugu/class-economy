@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /classes/{classId} {
+      // 학급 문서: 누구나 읽기(학생이 코드로 조회), 생성은 로그인한 교사만,
+      // 수정/삭제는 학급을 만든 교사만
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.teacherUid == request.auth.uid;
+      allow update, delete: if request.auth != null
+        && resource.data.teacherUid == request.auth.uid;
+
+      // 하위 컬렉션(학생, 상품, 구매, 계좌, 주식, 자리, 경매/입찰):
+      // 학생은 로그인 없이 참여하는 구조라 열어 둡니다.
+      // (교실 신뢰 모델 — 학급 코드를 아는 사람만 접근한다고 가정)
+      // {path=**} 재귀 매칭: auctions/{id}/bids/{seat} 같은 2단계 하위까지 포함
+      match /{path=**} {
+        allow read, write: if true;
+      }
+    }
+  }
+}
