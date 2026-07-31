@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { signInWithPopup } from 'firebase/auth';
 import {
   collection, query, where, getDocs, addDoc, serverTimestamp,
@@ -10,7 +10,10 @@ import { useApp } from '../context/AppContext';
 export default function Landing() {
   const navigate = useNavigate();
   const { teacher, session, saveSession } = useApp();
-  const [code, setCode] = useState('');
+  const [params] = useSearchParams();
+  // 선생님이 만든 초대 QR/링크로 들어오면 학급 코드가 미리 채워져요
+  const invitedCode = (params.get('code') || '').trim().toUpperCase().slice(0, 6);
+  const [code, setCode] = useState(invitedCode);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -80,7 +83,9 @@ export default function Landing() {
         {/* 학생 입장 */}
         <div className="bg-white rounded-3xl shadow-xl p-8 border-4 border-yellow-200">
           <h2 className="text-2xl text-amber-600 mb-1">🧑‍🎓 학생 입장</h2>
-          <p className="text-gray-400 text-sm mb-5">선생님이 알려준 학급 코드로 들어와요</p>
+          <p className="text-gray-400 text-sm mb-5">
+            {invitedCode ? '학급 코드가 채워졌어요! 이름만 쓰면 돼요' : '선생님이 알려준 학급 코드로 들어와요'}
+          </p>
           <form onSubmit={studentJoin} className="space-y-3">
             <input
               value={code}
@@ -93,6 +98,7 @@ export default function Landing() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="내 이름 (또는 번호+이름)"
+              autoFocus={!!invitedCode}
               className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-lg focus:border-amber-400 outline-none"
             />
             <button

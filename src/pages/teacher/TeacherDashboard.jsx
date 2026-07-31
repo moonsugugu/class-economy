@@ -11,6 +11,7 @@ import { fmt, makeClassCode } from '../../lib/util';
 import { STOCK_SEED, nextPrice, changePct } from '../../lib/stocks';
 import { SHOP_PRESETS } from '../../lib/shopPresets';
 import SeatsTab from './SeatsTab.jsx';
+import InviteQR from '../../components/InviteQR.jsx';
 
 const card = 'bg-white rounded-3xl shadow p-6';
 const input = 'rounded-xl border-2 border-gray-200 px-3 py-2 focus:border-indigo-400 outline-none';
@@ -24,6 +25,7 @@ export default function TeacherDashboard() {
   const [tab, setTab] = useState('students');
   const [pendingCount, setPendingCount] = useState(0);
   const [newClassName, setNewClassName] = useState('');
+  const [showInvite, setShowInvite] = useState(false);
 
   useEffect(() => {
     if (!teacher) return;
@@ -101,6 +103,13 @@ export default function TeacherDashboard() {
                 >
                   🔑 {klass.code}
                 </button>
+                <button
+                  onClick={() => setShowInvite(true)}
+                  title="학생 초대 QR 코드 보기"
+                  className="bg-white text-indigo-600 rounded-2xl px-4 py-2 shadow hover:scale-105 transition"
+                >
+                  📱 초대 QR
+                </button>
                 <span className="bg-white/20 backdrop-blur rounded-2xl px-4 py-2">💰 {klass.currency}</span>
               </>
             )}
@@ -159,6 +168,10 @@ export default function TeacherDashboard() {
           {tab === 'seats' && <SeatsTab klass={klass} />}
           {tab === 'settings' && <SettingsTab klass={klass} />}
         </>
+      )}
+
+      {showInvite && klass && (
+        <InviteQR klass={klass} onClose={() => setShowInvite(false)} />
       )}
     </div>
   );
