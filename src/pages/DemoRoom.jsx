@@ -38,7 +38,24 @@ const DEMO_GARDEN = {
   '2-4': { id: 'garden_well', rot: 0 },
 };
 
-const DEMO_AVATAR = { base: '🐰', hat: 'hat_crown', face: null, acc: 'acc_balloon' };
+const DEMO_CLASS = {
+  '0-0': { id: 'class_board', rot: 0 },
+  '0-3': { id: 'class_tdesk', rot: 0 },
+  '0-6': { id: 'class_notice', rot: 0 },
+  '2-0': { id: 'class_desk2', rot: 0 },
+  '2-3': { id: 'class_desk2', rot: 0 },
+  '2-6': { id: 'class_locker', rot: 0 },
+  '3-1': { id: 'class_podium', rot: 0 },
+  '4-0': { id: 'class_desk2', rot: 0 },
+  '4-3': { id: 'class_water', rot: 0 },
+  '4-5': { id: 'class_flag', rot: 0 },
+  '5-2': { id: 'light_mood', rot: 0 },
+  '1-4': { id: 'light_fluor', rot: 0 },
+  '5-6': { id: 'class_recycle', rot: 0 },
+  '3-6': { id: 'class_clock', rot: 0 },
+};
+
+const DEMO_AVATAR = { base: '🐬', hat: 'hat_crown', face: null, acc: 'acc_balloon' };
 
 export default function DemoRoom() {
   const [space, setSpace] = useState('room');
@@ -46,9 +63,11 @@ export default function DemoRoom() {
     <div className="max-w-4xl mx-auto p-4 space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         <Link to="/" className="text-2xl">🏦</Link>
-        <h1 className="text-2xl text-purple-600">{space === 'garden' ? '🌳 3D 정원' : '🛋️ 3D 마이룸'} 미리보기</h1>
+        <h1 className="text-2xl text-purple-600">
+          {space === 'garden' ? '🌳 3D 정원' : space === 'classroom' ? '🏫 3D 교실' : '🛋️ 3D 마이룸'} 미리보기
+        </h1>
         <div className="flex rounded-2xl bg-white shadow overflow-hidden">
-          {[['room', '🛋️ 방'], ['garden', '🌳 정원']].map(([id, label]) => (
+          {[['room', '🛋️ 방'], ['garden', '🌳 정원'], ['classroom', '🏫 교실']].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setSpace(id)}
@@ -64,7 +83,7 @@ export default function DemoRoom() {
         key={space}
         mode={space}
         avatar={DEMO_AVATAR}
-        roomMap={space === 'garden' ? DEMO_GARDEN : DEMO_ROOM}
+        roomMap={space === 'garden' ? DEMO_GARDEN : space === 'classroom' ? DEMO_CLASS : DEMO_ROOM}
         wallId="wall_sky"
         floorId="floor_wood"
         height="70vh"

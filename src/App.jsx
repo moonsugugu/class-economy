@@ -8,6 +8,7 @@ import ShopPage from './pages/student/ShopPage.jsx';
 import BankPage from './pages/student/BankPage.jsx';
 import StocksPage from './pages/student/StocksPage.jsx';
 import SeatsPage from './pages/student/SeatsPage.jsx';
+import ReportPage from './pages/student/ReportPage.jsx';
 import RoomPage from './pages/student/RoomPage.jsx';
 import DemoRoom from './pages/DemoRoom.jsx';
 
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="bank" element={<BankPage />} />
         <Route path="stocks" element={<StocksPage />} />
         <Route path="seats" element={<SeatsPage />} />
+        <Route path="report" element={<ReportPage />} />
         <Route path="room" element={<RoomPage />} />
       </Route>
       <Route path="/demo" element={<DemoRoom />} />

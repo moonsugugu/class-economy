@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { B, Cy, Sp, Co } from './prims.jsx';
 import { HAT_MODELS, FACE_MODELS, HAND_MODELS } from './models.jsx';
-import { SPECIES, ITEM_MAP } from '../lib/items';
+import { speciesOf, ITEM_MAP } from '../lib/items';
 
 /* 귀 모양 */
 function Ears({ sp }) {
@@ -64,6 +64,37 @@ function Ears({ sp }) {
       </group>
     );
   }
+  if (ear === 'small') {
+    return (
+      <group>
+        {[-0.16, 0.16].map((x) => (
+          <group key={x}>
+            <Sp p={[x, 1.14, 0]} rad={0.07} sc={[1, 1, 0.6]} c={body} />
+            <Sp p={[x, 1.14, 0.04]} rad={0.04} sc={[1, 1, 0.4]} c={earIn} />
+          </group>
+        ))}
+      </group>
+    );
+  }
+  if (ear === 'fin') { // 돌고래·상어·고래 — 등지느러미 + 옆지느러미
+    return (
+      <group>
+        <Co p={[0, 1.2, -0.12]} rad={0.11} h={0.3} c={body} r={[-0.35, 0, 0]} />
+        {[-0.3, 0.3].map((x, i) => (
+          <Sp key={x} p={[x, 0.42, -0.05]} rad={0.12} sc={[0.8, 0.3, 1.1]} c={body} r={[0, 0, i ? -0.5 : 0.5]} />
+        ))}
+      </group>
+    );
+  }
+  if (ear === 'beak') { // 펭귄 — 귀 없이 부리
+    return (
+      <group>
+        <Co p={[0, 0.95, 0.3]} rad={0.07} h={0.16} c={earIn} r={[Math.PI / 2, 0, 0]} />
+        <Sp p={[0, 1.12, -0.06]} rad={0.06} sc={[0.7, 1.1, 0.7]} c={body} />
+      </group>
+    );
+  }
+  if (ear === 'none') return null;
   // top (개구리 눈)
   return (
     <group>
@@ -77,10 +108,90 @@ function Ears({ sp }) {
   );
 }
 
+/* 종족별 특징 — 갈기·뿔·등껍질·촉수 등 */
+function Extras({ sp }) {
+  const e = sp.extra;
+  return (
+    <group>
+      {/* 호랑이·얼룩말 줄무늬 */}
+      {sp.stripes && [0.55, 0.42, 0.3].map((y, i) => (
+        <Sp key={i} p={[0, y, -0.22]} rad={0.07} sc={[2.2, 0.28, 0.5]} c="#26262b" />
+      ))}
+      {/* 너구리 눈가 무늬 */}
+      {sp.mask && [-0.1, 0.1].map((x) => (
+        <Sp key={x} p={[x, 1.04, 0.2]} rad={0.075} sc={[1, 0.9, 0.35]} c="#3f4655" />
+      ))}
+      {e === 'mane' && [...Array(10)].map((_, i) => {
+        const a = (i / 10) * Math.PI * 2;
+        return <Sp key={i} p={[Math.cos(a) * 0.3, 0.97 + Math.sin(a) * 0.3, -0.04]} rad={0.12} sc={[1, 1, 0.7]} c="#b45309" />;
+      })}
+      {e === 'horn' && (
+        <group>
+          <Co p={[0, 1.36, 0.1]} rad={0.055} h={0.34} c="#fde047" r={[-0.25, 0, 0]} />
+          <Sp p={[0, 1.5, 0.06]} rad={0.03} c="#fef9c3" e="#fde047" />
+        </group>
+      )}
+      {e === 'antler' && [-0.13, 0.13].map((x, i) => (
+        <group key={x}>
+          <Cy p={[x, 1.3, 0]} rad={0.022} h={0.3} c="#8a5f36" r={[0, 0, i ? -0.3 : 0.3]} />
+          <Cy p={[x + (i ? 0.1 : -0.1), 1.45, 0]} rad={0.016} h={0.16} c="#8a5f36" r={[0, 0, i ? -0.9 : 0.9]} />
+          <Cy p={[x + (i ? 0.05 : -0.05), 1.5, 0.02]} rad={0.016} h={0.14} c="#8a5f36" r={[0.3, 0, i ? -0.3 : 0.3]} />
+        </group>
+      ))}
+      {e === 'wing' && [-1, 1].map((s) => (
+        <group key={s}>
+          <Sp p={[s * 0.42, 0.62, -0.2]} rad={0.22} sc={[0.5, 1.3, 0.15]} c="#a7f3d0" r={[0, 0, s * 0.4]} />
+        </group>
+      ))}
+      {e === 'shell' && (
+        <group>
+          <Sp p={[0, 0.5, -0.14]} rad={0.33} sc={[1, 0.95, 0.75]} c="#8a5f36" />
+          {[[0, 0.62], [-0.16, 0.48], [0.16, 0.48], [0, 0.36]].map(([x, y], i) => (
+            <Sp key={i} p={[x, y, 0.04]} rad={0.08} sc={[1, 1, 0.35]} c="#a97142" />
+          ))}
+        </group>
+      )}
+      {e === 'tentacle' && [...Array(6)].map((_, i) => {
+        const a = (i / 6) * Math.PI * 2;
+        return (
+          <group key={i}>
+            <Sp p={[Math.cos(a) * 0.26, 0.12, Math.sin(a) * 0.26]} rad={0.07} sc={[1, 0.8, 2.0]} c={sp.body} r={[0, -a, 0]} />
+            <Sp p={[Math.cos(a) * 0.4, 0.07, Math.sin(a) * 0.4]} rad={0.05} c={sp.belly} />
+          </group>
+        );
+      })}
+      {e === 'ringtail' && [...Array(7)].map((_, i) => (
+        <Sp key={i} p={[0.05, 0.42 + i * 0.11, -0.34 - i * 0.02]} rad={0.075} c={i % 2 ? '#f8fafc' : '#26262b'} />
+      ))}
+      {e === 'spike' && [0, 1, 2, 3].map((i) => (
+        <Co key={i} p={[0, 0.72 - i * 0.13, -0.24]} rad={0.045} h={0.12} c="#4d7c0f" r={[-0.5, 0, 0]} />
+      ))}
+      {e === 'whisker' && [-1, 1].map((s) => (
+        <group key={s}>
+          {[0, 1].map((j) => (
+            <Cy key={j} p={[s * 0.2, 0.9 - j * 0.03, 0.24]} rad={0.006} h={0.2} c="#f8fafc" r={[0, 0, s * (1.3 + j * 0.2)]} />
+          ))}
+        </group>
+      ))}
+      {e === 'teeth' && [-0.06, 0.06].map((x) => (
+        <Co key={x} p={[x, 0.86, 0.26]} rad={0.025} h={0.07} c="#ffffff" r={[Math.PI, 0, 0]} />
+      ))}
+      {e === 'spout' && (
+        <group>
+          <Sp p={[0, 1.32, 0]} rad={0.05} c="#dbeafe" o={0.8} />
+          <Sp p={[-0.07, 1.44, 0.03]} rad={0.045} c="#dbeafe" o={0.6} />
+          <Sp p={[0.08, 1.5, -0.02]} rad={0.04} c="#dbeafe" o={0.5} />
+        </group>
+      )}
+    </group>
+  );
+}
+
 /* 아바타 본체 — 정면 = +z */
 export function Character({ avatar = {} }) {
-  const sp = SPECIES[avatar.base] || SPECIES['🐰'];
+  const sp = speciesOf(avatar.base);
   const frog = sp.ear === 'top';
+  const noSnout = sp.ear === 'beak' || sp.extra === 'tentacle';
 
   const hatItem = avatar.hat ? ITEM_MAP[avatar.hat] : null;
   const faceItem = avatar.face ? ITEM_MAP[avatar.face] : null;
@@ -118,7 +229,7 @@ export function Character({ avatar = {} }) {
           <Sp p={[-0.03, 0.94, 0.3]} rad={0.015} c="#9d3b63" />
           <Sp p={[0.03, 0.94, 0.3]} rad={0.015} c="#9d3b63" />
         </group>
-      ) : (
+      ) : noSnout ? null : (
         <group>
           {!frog && <Sp p={[0, 0.91, 0.22]} rad={0.11} sc={[1, 0.72, 0.6]} c={sp.belly === sp.body ? '#f3f3f3' : sp.belly} />}
           <Sp p={[0, 0.955, frog ? 0.27 : 0.3]} rad={0.032} c="#3f2d20" />
@@ -135,6 +246,7 @@ export function Character({ avatar = {} }) {
         <Sp p={[0.17, 0.94, 0.2]} rad={0.04} sc={[1, 0.6, 0.4]} c="#ffb3c1" />
       </group>
       <Ears sp={sp} />
+      <Extras sp={sp} />
       {/* 착용 아이템 */}
       {Hat && <group position={[0, sp.ear === 'long' ? 1.2 : 1.2, 0]}><Hat {...hatItem.colors} /></group>}
       {Face && <group position={[0, 1.04, 0.27]}><Face {...faceItem.colors} /></group>}

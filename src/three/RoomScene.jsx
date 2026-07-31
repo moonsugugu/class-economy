@@ -7,6 +7,7 @@ import { Walker } from './Character3D.jsx';
 import {
   ITEM_MAP, ROOM_COLS as COLS, ROOM_ROWS as ROWS,
   footprintOf, canPlaceAt, DEFAULT_WALL, DEFAULT_FLOOR, GARDEN_FLOOR,
+  CLASS_FLOOR, LIGHT_SPEC,
 } from '../lib/items';
 
 const cx = (c) => c - COLS / 2;
@@ -98,8 +99,41 @@ function GardenShell() {
   );
 }
 
+/* 🏫 교실 — 큰 창문과 나무 마루가 있는 교실 */
+function ClassShell() {
+  const [fa, fb] = CLASS_FLOOR;
+  return (
+    <group>
+      {Array.from({ length: ROWS * COLS }, (_, i) => {
+        const r = Math.floor(i / COLS), c = i % COLS;
+        return (
+          <mesh key={i} rotation-x={-Math.PI / 2} position={[cx(c) + 0.5, 0, cz(r) + 0.5]} receiveShadow>
+            <planeGeometry args={[1, 1]} />
+            <meshStandardMaterial color={(r + c) % 2 ? fa : fb} roughness={0.8} />
+          </mesh>
+        );
+      })}
+      {/* 벽 */}
+      <B p={[0, 1.6, cz(0) - 0.1]} s={[COLS + 0.4, 3.2, 0.2]} c="#eef2f7" />
+      <B p={[cx(0) - 0.1, 1.6, 0]} s={[0.2, 3.2, ROWS + 0.4]} c="#eef2f7" />
+      {/* 아래쪽 나무 굽도리 */}
+      <B p={[0, 0.16, cz(0) + 0.02]} s={[COLS, 0.32, 0.06]} c="#d6bd97" />
+      <B p={[cx(0) + 0.02, 0.16, 0]} s={[0.06, 0.32, ROWS]} c="#d6bd97" />
+      {/* 왼쪽 벽 큰 창문 3개 */}
+      {[-1.6, 0.2, 2.0].map((z) => (
+        <group key={z} position={[cx(0) + 0.03, 1.9, z]}>
+          <B p={[0, 0, 0]} s={[0.06, 1.5, 1.3]} c="#ffffff" />
+          <B p={[0.02, 0, 0]} s={[0.04, 1.3, 1.1]} c="#bfe4f8" e="#a8d8ef" />
+          <B p={[0.05, 0, 0]} s={[0.02, 1.3, 0.05]} c="#ffffff" />
+          <B p={[0.05, 0, 0]} s={[0.02, 0.05, 1.1]} c="#ffffff" />
+        </group>
+      ))}
+    </group>
+  );
+}
+
 /**
- * 3D 마이룸/정원 씬 — mode: 'room' | 'garden'
+ * 3D 마이룸/정원/교실 씬 — mode: 'room' | 'garden' | 'classroom'
  * roomMap: {"r-c": {id, rot}}, placing: 배치 중인 아이템 id 또는 null
  */
 export default function RoomScene({
@@ -129,12 +163,25 @@ export default function RoomScene({
   };
 
   const garden = mode === 'garden';
+  const classroom = mode === 'classroom';
+
+  // 배치된 조명들 (실제로 빛을 냄)
+  const lights = Object.entries(roomMap).map(([key, pl]) => {
+    const item = ITEM_MAP[pl.id];
+    const spec = item && LIGHT_SPEC[item.model];
+    if (!spec) return null;
+    const [r, c] = key.split('-').map(Number);
+    const [w, d] = footprintOf(item, pl.rot || 0);
+    return { key, spec, color: item.colors?.a || '#ffffff', x: cx(c) + w / 2, z: cz(r) + d / 2 };
+  }).filter(Boolean);
 
   return (
     <div
       style={{ height }}
       className={`rounded-3xl overflow-hidden border-4 touch-none ${
-        garden ? 'border-emerald-200 bg-gradient-to-b from-sky-300 via-sky-200 to-emerald-100' : 'border-amber-200 bg-gradient-to-b from-sky-100 to-amber-50'
+        garden ? 'border-emerald-200 bg-gradient-to-b from-sky-300 via-sky-200 to-emerald-100'
+          : classroom ? 'border-sky-200 bg-gradient-to-b from-sky-100 to-slate-100'
+          : 'border-amber-200 bg-gradient-to-b from-sky-100 to-amber-50'
       }`}
     >
       <Canvas
@@ -143,7 +190,18 @@ export default function RoomScene({
         gl={{ preserveDrawingBuffer: true, antialias: true }}
         onCreated={({ gl }) => { if (glRef) glRef.current = gl; }}
       >
-        <ambientLight intensity={0.75} />
+        {/* 조명을 놓으면 주변이 살짝 어두워져서 불빛이 잘 보여요 */}
+        <ambientLight intensity={lights.length ? 0.5 : 0.75} />
+        {lights.map((l) => (
+          <pointLight
+            key={l.key}
+            position={[l.x, l.spec.y, l.z]}
+            color={l.color}
+            intensity={l.spec.i * 2.2}
+            distance={l.spec.d}
+            decay={2}
+          />
+        ))}
         <directionalLight
           position={[6, 10, 5]}
           intensity={1.1}
@@ -155,7 +213,7 @@ export default function RoomScene({
           shadow-camera-top={8}
           shadow-camera-bottom={-8}
         />
-        {garden ? <GardenShell /> : <Shell wall={wall} floors={floors} />}
+        {garden ? <GardenShell /> : classroom ? <ClassShell /> : <Shell wall={wall} floors={floors} />}
 
         {/* 바닥 클릭/호버 레이어 */}
         {Array.from({ length: ROWS * COLS }, (_, i) => {

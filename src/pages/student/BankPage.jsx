@@ -5,10 +5,16 @@ import {
   addDoc, runTransaction, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { fmt, WEEK_MS, DAY_MS } from '../../lib/util';
+import { MARKET_PATH, DEFAULT_FX } from '../../lib/stocks';
+import {
+  fmt, WEEK_MS, DAY_MS, SAVINGS_TERMS, savingsRateFor, savingsPayout,
+} from '../../lib/util';
 
 export default function BankPage() {
   const { klass, student } = useOutletContext();
+  const [fx, setFx] = useState(DEFAULT_FX);
+  const [exAmount, setExAmount] = useState('');
+  const [exDir, setExDir] = useState('buy'); // buy=달러 사기, sell=달러 팔기
   const [amount, setAmount] = useState('');
   const [savAmount, setSavAmount] = useState('');
   const [savDays, setSavDays] = useState(14);
@@ -27,9 +33,41 @@ export default function BankPage() {
     );
   }, [klass.id, student.id]);
 
+  // 환율은 시장 문서에서 실시간으로 받아와요
+  useEffect(() => {
+    return onSnapshot(doc(db, ...MARKET_PATH(klass.id)), (snap) => {
+      if (snap.exists()) setFx(snap.data().fx || DEFAULT_FX);
+    });
+  }, [klass.id]);
+
   const flash = (type, text) => {
     setMsg({ type, text });
     setTimeout(() => setMsg(null), 3500);
+  };
+
+  /* ----- 💱 환전소: 학급 화폐 ↔ 달러 ----- */
+  const exchange = async () => {
+    const v = Math.floor(Number(exAmount));
+    if (!v || v < 1) return flash('err', '바꿀 금액을 입력해 주세요.');
+    try {
+      await runTransaction(db, async (tx) => {
+        const s = (await tx.get(studentRef)).data();
+        if (exDir === 'buy') {
+          const cost = v * fx;                    // v달러를 사려면 필요한 학급 화폐
+          if ((s.cash || 0) < cost) throw new Error('현금이 부족해요!');
+          tx.update(studentRef, { cash: s.cash - cost, usd: (s.usd || 0) + v });
+        } else {
+          if ((s.usd || 0) < v) throw new Error('달러가 부족해요!');
+          tx.update(studentRef, { usd: (s.usd || 0) - v, cash: (s.cash || 0) + v * fx });
+        }
+      });
+      flash('ok', exDir === 'buy'
+        ? `💲 ${fmt(v)}달러로 바꿨어요! 이제 미국 주식을 살 수 있어요.`
+        : `💵 ${fmt(v * fx)} ${klass.currency}로 바꿨어요!`);
+      setExAmount('');
+    } catch (e) {
+      flash('err', e.message);
+    }
   };
 
   /* ----- 예금: 자유 입출금 + 주 단위 이자 ----- */
@@ -96,7 +134,7 @@ export default function BankPage() {
         studentId: student.id,
         type: 'savings',
         amount: amt,
-        rate: klass.savingsRate,
+        rate: savingsRateFor(klass.savingsRate, savDays), // 기간이 길수록 높은 이율로 고정
         days: Number(savDays),
         startAt: Date.now(),
         status: 'active',
@@ -109,7 +147,7 @@ export default function BankPage() {
     }
   };
 
-  const payout = (a) => Math.floor(a.amount * (1 + (a.rate / 100) * (a.days / 7)));
+  const payout = (a) => savingsPayout(a.amount, a.rate, a.days);
 
   const closeSavings = async (a, mature) => {
     const back = mature ? payout(a) : a.amount;
@@ -166,10 +204,61 @@ export default function BankPage() {
         </div>
       </div>
 
+      {/* 💱 환율 거래소 */}
+      <div className="bg-white rounded-3xl shadow p-6">
+        <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+          <h3 className="text-xl">💱 환율 거래소</h3>
+          <div className="text-lg text-emerald-600 tabular-nums">
+            1 달러 = {fmt(fx)} {klass.currency}
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">
+          미국 주식은 <b>달러</b>로만 살 수 있어요. 환율은 아침·오후에 조금씩 바뀌니 쌀 때 바꾸면 이득! 💡
+        </p>
+        <div className="flex gap-2 mb-3">
+          {[['buy', '💲 달러 사기'], ['sell', '💵 달러 팔기']].map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => { setExDir(id); setExAmount(''); }}
+              className={`flex-1 rounded-xl py-2 transition ${
+                exDir === id ? 'bg-emerald-500 text-white shadow' : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2 items-center flex-wrap">
+          <input
+            type="number"
+            value={exAmount}
+            onChange={(e) => setExAmount(e.target.value)}
+            placeholder={exDir === 'buy' ? '살 달러(개수)' : '팔 달러(개수)'}
+            className="rounded-xl border-2 border-gray-200 px-3 py-2 w-36 focus:border-emerald-400 outline-none"
+          />
+          <span className="text-gray-400">달러</span>
+          <button onClick={exchange} className="rounded-xl px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white">
+            바꾸기
+          </button>
+          <span className="ml-auto text-sm text-gray-500">
+            내 달러 <b className="text-emerald-600">${fmt(student.usd || 0)}</b>
+          </span>
+        </div>
+        {Number(exAmount) > 0 && (
+          <p className="text-sm text-gray-500 mt-2">
+            {exDir === 'buy'
+              ? <>💵 {fmt(Math.floor(Number(exAmount)) * fx)} {klass.currency} → 💲 {fmt(Math.floor(Number(exAmount)))}달러</>
+              : <>💲 {fmt(Math.floor(Number(exAmount)))}달러 → 💵 {fmt(Math.floor(Number(exAmount)) * fx)} {klass.currency}</>}
+          </p>
+        )}
+      </div>
+
       {/* 적금 가입 */}
       <div className="bg-white rounded-3xl shadow p-6">
-        <h3 className="text-xl mb-1">🐷 적금 가입 <span className="text-sm text-gray-400">(주 {klass.savingsRate}% 이자)</span></h3>
-        <p className="text-xs text-gray-400 mb-3">기간 동안 돈을 맡기면 예금보다 이자를 많이 줘요. 중간에 해지하면 이자는 없어요!</p>
+        <h3 className="text-xl mb-1">🐷 적금 가입 <span className="text-sm text-gray-400">(오래 맡길수록 이율 UP!)</span></h3>
+        <p className="text-xs text-gray-400 mb-3">
+          기간이 한 주 늘어날 때마다 이율이 1%p씩 높아져요. 중간에 해지하면 이자 없이 원금만 돌려받아요!
+        </p>
         <div className="flex gap-2 flex-wrap items-center">
           <input
             type="number"
@@ -178,22 +267,42 @@ export default function BankPage() {
             placeholder="금액"
             className="rounded-xl border-2 border-gray-200 px-3 py-2 w-32 focus:border-pink-400 outline-none"
           />
-          <select
-            value={savDays}
-            onChange={(e) => setSavDays(e.target.value)}
-            className="rounded-xl border-2 border-gray-200 px-3 py-2"
-          >
-            <option value={7}>7일</option>
-            <option value={14}>14일</option>
-            <option value={28}>28일</option>
-          </select>
           <button onClick={openSavings} className="rounded-xl px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white">가입하기</button>
-          {Number(savAmount) > 0 && (
-            <span className="text-sm text-gray-400">
-              만기에 {fmt(Math.floor(Number(savAmount) * (1 + (klass.savingsRate / 100) * (savDays / 7))))} {klass.currency}를 받아요
-            </span>
-          )}
         </div>
+
+        {/* 기간 선택 — 오래 맡길수록 이율이 높아져요 */}
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          {SAVINGS_TERMS.map((d) => {
+            const r = savingsRateFor(klass.savingsRate, d);
+            const on = Number(savDays) === d;
+            const amt = Number(savAmount) || 0;
+            return (
+              <button
+                key={d}
+                onClick={() => setSavDays(d)}
+                className={`rounded-2xl border-2 p-3 text-center transition ${
+                  on ? 'border-pink-500 bg-pink-50 scale-105' : 'border-gray-200 hover:border-pink-300'
+                }`}
+              >
+                <div className="text-lg">{d}일</div>
+                <div className="text-pink-500">주 {r}%</div>
+                {amt > 0 && (
+                  <div className="text-[11px] text-gray-400 tabular-nums">
+                    → {fmt(savingsPayout(amt, r, d))}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {Number(savAmount) > 0 && (
+          <p className="text-sm text-gray-500 mt-2 text-center">
+            {savDays}일 뒤에 <b className="text-pink-600">
+              {fmt(savingsPayout(Number(savAmount), savingsRateFor(klass.savingsRate, savDays), savDays))} {klass.currency}
+            </b>
+            를 받아요! (이자 +{fmt(savingsPayout(Number(savAmount), savingsRateFor(klass.savingsRate, savDays), savDays) - Number(savAmount))})
+          </p>
+        )}
       </div>
 
       {/* 내 적금 목록 */}

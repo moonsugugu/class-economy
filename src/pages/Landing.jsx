@@ -49,12 +49,14 @@ export default function Landing() {
         const created = await addDoc(studentsRef, {
           name: n,
           cash: 0,
+          usd: 0,
           deposit: 0,
           depositLastAt: Date.now(),
-          avatar: { base: '🐰', hat: null, face: null, acc: null },
+          avatar: { base: null, hat: null, face: null, acc: null }, // 캐릭터는 상점에서 사요
           inventory: [],
           room: {},
           garden: {},
+          classroom: {},
           holdings: {},
           createdAt: serverTimestamp(),
         });

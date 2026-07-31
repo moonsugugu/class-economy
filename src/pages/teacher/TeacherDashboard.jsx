@@ -2,15 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import {
   collection, doc, query, where, orderBy, onSnapshot,
-  addDoc, updateDoc, deleteDoc, getDocs, writeBatch,
-  increment, serverTimestamp,
+  addDoc, updateDoc, deleteDoc, getDocs, setDoc, writeBatch,
+  runTransaction, increment, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 import { fmt, makeClassCode } from '../../lib/util';
-import { STOCK_SEED, nextPrice, changePct } from '../../lib/stocks';
+import {
+  changePct, advance, usedTicks, makeInitialMarket, makeCustomStock,
+  MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, todayKey,
+  pendingSchedule, SCHEDULE_LABEL,
+} from '../../lib/stocks';
+import { applyScheduledTicks } from '../../lib/marketSync';
 import { SHOP_PRESETS } from '../../lib/shopPresets';
 import SeatsTab from './SeatsTab.jsx';
+import ReportsTab from './ReportsTab.jsx';
 import InviteQR from '../../components/InviteQR.jsx';
 
 const card = 'bg-white rounded-3xl shadow p-6';
@@ -78,6 +84,7 @@ export default function TeacherDashboard() {
     ['alerts', '🔔', pendingCount ? `알림 ${pendingCount}` : '알림', 'from-rose-400 to-pink-500'],
     ['stocks', '📈', '주식', 'from-blue-400 to-indigo-500'],
     ['seats', '🪑', '자리', 'from-teal-400 to-cyan-500'],
+    ['reports', '🐞', '건의함', 'from-fuchsia-400 to-rose-500'],
     ['settings', '⚙️', '설정', 'from-slate-400 to-gray-500'],
   ];
 
@@ -166,6 +173,7 @@ export default function TeacherDashboard() {
           {tab === 'alerts' && <AlertsTab klass={klass} />}
           {tab === 'stocks' && <StocksTab klass={klass} />}
           {tab === 'seats' && <SeatsTab klass={klass} />}
+          {tab === 'reports' && <ReportsTab klass={klass} />}
           {tab === 'settings' && <SettingsTab klass={klass} />}
         </>
       )}
@@ -565,106 +573,289 @@ function AlertsTab({ klass }) {
   );
 }
 
-/* ---------- 주식 관리 (시뮬레이션) ---------- */
+/* ---------- 주식 관리 (시뮬레이션 · 시장 전체가 문서 1개) ---------- */
 function StocksTab({ klass }) {
-  const [stocks, setStocks] = useState(null);
+  const [market, setMarket] = useState(undefined); // undefined=불러오는 중, null=시장 없음
   const [auto, setAuto] = useState(false);
+  const [filter, setFilter] = useState('ALL');
+  const [edit, setEdit] = useState(null);          // 편집 중인 종목
+  const [editPrice, setEditPrice] = useState('');
+  const [cName, setCName] = useState('');
+  const [cPrice, setCPrice] = useState('');
+  const [msg, setMsg] = useState('');
   const timer = useRef(null);
+  const migrated = useRef(false);
+
+  const mref = doc(db, ...MARKET_PATH(klass.id));
+  const limit = Number(klass.tickLimit ?? DEFAULT_TICK_LIMIT);
+  const used = usedTicks(market);
+  const left = Math.max(0, limit - used);
+
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000); };
 
   useEffect(() => {
-    const q = query(collection(db, 'classes', klass.id, 'stocks'), orderBy('market'));
-    return onSnapshot(q, (snap) => setStocks(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    migrated.current = false;
+    return onSnapshot(mref, (snap) => setMarket(snap.exists() ? snap.data() : null));
   }, [klass.id]);
 
-  const initStocks = async () => {
-    const batch = writeBatch(db);
-    STOCK_SEED.forEach((s) => {
-      batch.set(doc(db, 'classes', klass.id, 'stocks', s.symbol), {
-        name: s.name, market: s.market, price: s.base, prevClose: s.base,
-        history: [s.base], updatedAt: Date.now(),
-      });
-    });
-    await batch.commit();
-  };
-
-  const tick = async () => {
-    const snap = await getDocs(collection(db, 'classes', klass.id, 'stocks'));
-    const batch = writeBatch(db);
-    snap.docs.forEach((d) => {
-      const s = d.data();
-      const p = nextPrice(s.price);
-      batch.update(d.ref, {
-        prevClose: s.price,
-        price: p,
-        history: [...(s.history || []).slice(-39), p],
-        updatedAt: Date.now(),
-      });
-    });
-    await batch.commit();
-  };
-
+  // 예전 구조(종목마다 문서 1개)가 남아 있으면 새 구조로 자동 이전
   useEffect(() => {
-    if (auto) timer.current = setInterval(tick, 45000);
+    if (market !== null || migrated.current) return;
+    migrated.current = true;
+    (async () => {
+      const old = await getDocs(collection(db, 'classes', klass.id, 'stocks'));
+      if (old.empty) return;
+      const stocks = old.docs.map((d) => {
+        const s = d.data();
+        return {
+          symbol: d.id, name: s.name, market: s.market,
+          price: s.price, prevClose: s.prevClose ?? s.price,
+          history: s.history || [s.price],
+        };
+      });
+      await setDoc(mref, { stocks, tickCount: 0, tickDate: todayKey(), updatedAt: Date.now() });
+      const batch = writeBatch(db);
+      old.docs.forEach((d) => batch.delete(d.ref)); // 옛 문서 정리
+      await batch.commit();
+      flash('✅ 주식 데이터를 새 구조로 옮겼어요! (데이터 사용량 약 1/20로 절약)');
+    })();
+  }, [market, klass.id]);
+
+  // 예약 시세 변동(아침 8:30 · 오후 3:00)이 밀려 있으면 적용
+  useEffect(() => {
+    if (market && pendingSchedule(market).length) applyScheduledTicks(klass.id);
+  }, [market, klass.id]);
+
+  const initMarket = () => setDoc(mref, makeInitialMarket());
+
+  // 시세 변동 — 트랜잭션으로 하루 횟수를 정확히 차감
+  const tick = async () => {
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(mref);
+        if (!snap.exists()) throw new Error('시장이 아직 열리지 않았어요.');
+        const m = snap.data();
+        const today = todayKey();
+        const u = m.tickDate === today ? (m.tickCount || 0) : 0;
+        if (u >= limit) throw new Error(`오늘 시세 변동을 모두 사용했어요! (${limit}회) 내일 다시 할 수 있어요.`);
+        tx.update(mref, {
+          stocks: (m.stocks || []).map((s) => advance(s)),
+          tickCount: u + 1,
+          tickDate: today,
+          updatedAt: Date.now(),
+        });
+      });
+    } catch (e) {
+      flash('⚠️ ' + e.message);
+      setAuto(false);
+    }
+  };
+
+  // 자동 변동: 3분 간격, 남은 횟수가 0이면 스스로 꺼짐
+  useEffect(() => {
+    if (!auto) return;
+    if (left <= 0) { setAuto(false); flash('오늘 횟수를 다 써서 자동 변동을 껐어요.'); return; }
+    timer.current = setInterval(tick, 180000);
     return () => clearInterval(timer.current);
-  }, [auto, klass.id]);
+  }, [auto, left <= 0, klass.id]);
 
-  if (stocks === null) return <div className={card}>불러오는 중...</div>;
+  const addCustom = async (e) => {
+    e.preventDefault();
+    const name = cName.trim();
+    const price = Math.max(1, Math.floor(Number(cPrice)));
+    if (!name || !price) return flash('종목 이름과 시작 가격을 모두 입력해 주세요.');
+    await updateDoc(mref, {
+      stocks: [...market.stocks, makeCustomStock(name, price)],
+      updatedAt: Date.now(),
+    });
+    setCName(''); setCPrice('');
+    flash(`🏫 '${name}' 종목을 만들었어요!`);
+  };
 
-  if (!stocks.length) {
+  const savePrice = async () => {
+    const p = Math.max(1, Math.floor(Number(editPrice)));
+    if (!p) return;
+    await updateDoc(mref, {
+      stocks: market.stocks.map((s) => (s.symbol === edit.symbol ? advance(s, p) : s)),
+      updatedAt: Date.now(),
+    });
+    setEdit(null);
+    flash('💰 가격을 바꿨어요! 학생 화면에 바로 반영돼요.');
+  };
+
+  const delStock = async () => {
+    if (!confirm(`'${edit.name}' 종목을 없앨까요?\n이 종목을 가진 학생의 평가액에서도 사라져요.`)) return;
+    await updateDoc(mref, {
+      stocks: market.stocks.filter((s) => s.symbol !== edit.symbol),
+      updatedAt: Date.now(),
+    });
+    setEdit(null);
+  };
+
+  if (market === undefined) return <div className={card}>불러오는 중...</div>;
+
+  if (market === null) {
     return (
       <div className={card + ' text-center py-10'}>
-        <p className="text-gray-500 mb-4">아직 주식 시장이 열리지 않았어요.<br />한국 대표주 10개 + 미국 대표주 10개로 시장을 열어 보세요!</p>
-        <button onClick={initStocks} className={btn + ' bg-indigo-500 hover:bg-indigo-600 text-lg'}>📈 주식 시장 열기</button>
+        <p className="text-gray-500 mb-4">
+          아직 주식 시장이 열리지 않았어요.<br />
+          한국 대표주 10개 + 미국 대표주 10개로 시장을 열어 보세요!
+        </p>
+        <button onClick={initMarket} className={btn + ' bg-indigo-500 hover:bg-indigo-600 text-lg'}>📈 주식 시장 열기</button>
+        {msg && <p className="mt-4 text-indigo-600">{msg}</p>}
       </div>
     );
   }
 
+  const list = (market.stocks || []).filter((s) => filter === 'ALL' || s.market === filter);
+  const customCount = (market.stocks || []).filter((s) => s.market === 'CUSTOM').length;
+
   return (
-    <div className={card}>
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <h3 className="text-xl">📈 모의 주식 시장</h3>
-        <button onClick={tick} className={btn + ' bg-indigo-500 hover:bg-indigo-600'}>🎲 지금 시세 변동</button>
-        <label className="flex items-center gap-2 text-gray-600">
-          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} className="w-5 h-5" />
-          자동 변동 (45초마다, 이 화면이 켜져 있는 동안)
+    <div className="space-y-4">
+      {/* 시세 변동 + 남은 횟수 */}
+      <div className={card}>
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="text-xl">📈 우리 반 주식 시장</h3>
+          <button
+            onClick={tick}
+            disabled={left <= 0}
+            className={btn + ' bg-indigo-500 hover:bg-indigo-600 text-lg'}
+          >
+            🎲 지금 시세 변동
+          </button>
+          <div className="flex items-center gap-2">
+            <span className={`px-3 py-1.5 rounded-xl tabular-nums ${
+              left === 0 ? 'bg-rose-100 text-rose-600' : left <= 3 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+            }`}>
+              오늘 {used} / {limit}회 사용
+            </span>
+            <span className="text-sm text-gray-400">{left > 0 ? `${left}회 남음` : '내일 다시 충전돼요'}</span>
+          </div>
+        </div>
+        {/* 사용량 막대 */}
+        <div className="h-2 bg-gray-100 rounded-full mt-3 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${left === 0 ? 'bg-rose-400' : left <= 3 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+            style={{ width: `${Math.min(100, (used / limit) * 100)}%` }}
+          />
+        </div>
+        <label className="flex items-center gap-2 text-gray-600 mt-3">
+          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} disabled={left <= 0} className="w-5 h-5" />
+          자동 변동 (3분마다 · 이 화면이 켜져 있는 동안 · 남은 횟수를 사용해요)
         </label>
+        {msg && <div className="mt-3 text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2">{msg}</div>}
+        <p className="text-xs text-gray-400 mt-2">
+          ⏰ 버튼을 누르지 않아도 <b>{SCHEDULE_LABEL}</b>에 한 번씩 저절로 변동돼요 (이건 횟수에 포함되지 않아요).<br />
+          하루 변동 횟수는 ⚙️설정에서 바꿀 수 있어요. (횟수를 제한하면 무료 사용량을 아낄 수 있어요)
+        </p>
       </div>
-      <div className="grid md:grid-cols-2 gap-x-8">
-        {stocks.map((s) => {
-          const pct = changePct(s);
-          return (
-            <div key={s.id} className="flex items-center gap-2 border-b border-gray-100 py-2">
-              <span>{s.market === 'KR' ? '🇰🇷' : '🇺🇸'}</span>
-              <span className="flex-1">{s.name}</span>
-              <span className="tabular-nums">{fmt(s.price)} {klass.currency}</span>
-              <span className={`w-20 text-right tabular-nums ${pct > 0 ? 'text-red-500' : pct < 0 ? 'text-blue-500' : 'text-gray-400'}`}>
-                {pct > 0 ? '▲' : pct < 0 ? '▼' : '−'} {Math.abs(pct).toFixed(1)}%
-              </span>
+
+      {/* 우리 반 종목 만들기 */}
+      <form onSubmit={addCustom} className={card + ' flex flex-wrap items-end gap-3'}>
+        <div>
+          <h3 className="text-lg">🏫 우리 반 종목 만들기</h3>
+          <p className="text-xs text-gray-400">예: 급식왕 주식회사, 3반 문구점 — 우리 반만의 종목을 만들어요 ({customCount}개)</p>
+        </div>
+        <div className="flex-1 min-w-40">
+          <label className="text-xs text-gray-400 block">종목 이름</label>
+          <input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="예: 급식왕 주식회사" className={input + ' w-full'} />
+        </div>
+        <div>
+          <label className="text-xs text-gray-400 block">시작 가격</label>
+          <input type="number" value={cPrice} onChange={(e) => setCPrice(e.target.value)} placeholder="100" className={input + ' w-28'} />
+        </div>
+        <button className={btn + ' bg-teal-500 hover:bg-teal-600'}>+ 종목 추가</button>
+      </form>
+
+      {/* 종목 목록 */}
+      <div className={card}>
+        <div className="flex gap-2 mb-3 flex-wrap">
+          {[['ALL', '전체'], ['KR', '🇰🇷 한국'], ['US', '🇺🇸 미국'], ['CUSTOM', '🏫 우리반']].map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setFilter(id)}
+              className={`px-3 py-1 rounded-xl text-sm ${filter === id ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-500'}`}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="ml-auto text-sm text-gray-400 self-center">종목을 누르면 가격을 직접 바꿀 수 있어요 ✏️</span>
+        </div>
+        <div className="grid md:grid-cols-2 gap-x-8">
+          {list.map((s) => {
+            const pct = changePct(s);
+            return (
+              <button
+                key={s.symbol}
+                onClick={() => { setEdit(s); setEditPrice(String(s.price)); }}
+                className="flex items-center gap-2 border-b border-gray-100 py-2 text-left hover:bg-indigo-50/50 rounded-lg px-1"
+              >
+                <span>{MARKET_LABEL[s.market] || '🏫'}</span>
+                <span className="flex-1">{s.name}</span>
+                <span className="tabular-nums">{fmt(s.price)} {klass.currency}</span>
+                <span className={`w-20 text-right tabular-nums ${pct > 0 ? 'text-red-500' : pct < 0 ? 'text-blue-500' : 'text-gray-400'}`}>
+                  {pct > 0 ? '▲' : pct < 0 ? '▼' : '−'} {Math.abs(pct).toFixed(1)}%
+                </span>
+              </button>
+            );
+          })}
+          {!list.length && <div className="text-gray-400 py-6 col-span-full text-center">이 분류에는 종목이 없어요.</div>}
+        </div>
+        <p className="text-xs text-gray-400 mt-4">
+          * 교육용 모의 시세입니다. 실제 주가와 다르며, 여기서 시세를 바꾸면 모든 학생 화면에 실시간 반영돼요.
+        </p>
+      </div>
+
+      {/* 가격 편집 모달 */}
+      {edit && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50" onClick={() => setEdit(null)}>
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-3" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl">{MARKET_LABEL[edit.market] || '🏫'} {edit.name}</h3>
+            <p className="text-sm text-gray-400">현재 가격 {fmt(edit.price)} {klass.currency}</p>
+            <div>
+              <label className="text-xs text-gray-400 block">새 가격</label>
+              <input
+                type="number"
+                value={editPrice}
+                onChange={(e) => setEditPrice(e.target.value)}
+                className={input + ' w-full text-xl text-center'}
+              />
             </div>
-          );
-        })}
-      </div>
-      <p className="text-xs text-gray-400 mt-4">
-        * 교육용 모의 시세입니다. 실제 주가와 다르며, 시세는 이 대시보드에서 변동시킬 때 모든 학생 화면에 실시간 반영돼요.
-      </p>
+            <div className="flex gap-2 flex-wrap">
+              {[-20, -10, +10, +20].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setEditPrice(String(Math.max(1, Math.round(edit.price * (1 + p / 100)))))}
+                  className={`flex-1 rounded-xl py-2 text-sm ${p > 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500'}`}
+                >
+                  {p > 0 ? '+' : ''}{p}%
+                </button>
+              ))}
+            </div>
+            <button onClick={savePrice} className={btn + ' bg-indigo-500 hover:bg-indigo-600 w-full text-lg'}>💰 가격 바꾸기</button>
+            {edit.market === 'CUSTOM' && (
+              <button onClick={delStock} className="w-full text-sm text-rose-500 underline">이 종목 없애기</button>
+            )}
+            <button onClick={() => setEdit(null)} className="w-full text-sm text-gray-400">닫기</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /* ---------- 학급 설정: 화폐 단위 / 월급 / 이율 ---------- */
 function SettingsTab({ klass }) {
-  const [form, setForm] = useState({
+  const init = () => ({
     name: klass.name, currency: klass.currency, salary: klass.salary,
     depositRate: klass.depositRate, savingsRate: klass.savingsRate,
+    tickLimit: klass.tickLimit ?? DEFAULT_TICK_LIMIT,
   });
+  const [form, setForm] = useState(init);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    setForm({
-      name: klass.name, currency: klass.currency, salary: klass.salary,
-      depositRate: klass.depositRate, savingsRate: klass.savingsRate,
-    });
-  }, [klass.id]);
+  useEffect(() => { setForm(init()); }, [klass.id]);
 
   const save = async (e) => {
     e.preventDefault();
@@ -674,6 +865,7 @@ function SettingsTab({ klass }) {
       salary: Number(form.salary) || 0,
       depositRate: Number(form.depositRate) || 0,
       savingsRate: Number(form.savingsRate) || 0,
+      tickLimit: Math.max(1, Math.min(100, Number(form.tickLimit) || DEFAULT_TICK_LIMIT)),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -699,7 +891,14 @@ function SettingsTab({ klass }) {
       {field('화폐 단위', 'currency', 'text', '예: 미소, 달란트, 별, 포인트 — 자유롭게 정해요.')}
       {field('월급 금액', 'salary', 'number', '월급 지급 버튼을 누를 때 1인당 지급되는 금액이에요.')}
       {field('예금 이율 (주당 %)', 'depositRate', 'number', '학생이 예금에 넣어둔 돈에 7일마다 붙는 이자예요.')}
-      {field('적금 이율 (주당 %)', 'savingsRate', 'number', '만기까지 돈을 묶어두는 적금에 적용되는 더 높은 이율이에요.')}
+      {field(
+        '적금 기본 이율 (7일 기준, 주당 %)', 'savingsRate', 'number',
+        `오래 맡길수록 1%p씩 우대해요 → 7일 ${form.savingsRate}% · 14일 ${Number(form.savingsRate) + 1}% · 21일 ${Number(form.savingsRate) + 2}%`
+      )}
+      {field(
+        '하루 시세 변동 횟수', 'tickLimit', 'number',
+        '주식 시세를 하루에 몇 번까지 바꿀 수 있는지 정해요. (기본 10회 — 낮출수록 무료 사용량을 아껴요)'
+      )}
       <button className={btn + ' bg-indigo-500 hover:bg-indigo-600 text-lg w-full'}>저장하기</button>
       {saved && <p className="text-emerald-600 text-center">✅ 저장되었어요!</p>}
     </form>

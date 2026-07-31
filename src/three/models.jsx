@@ -962,6 +962,324 @@ function Scarecrow({ a = '#d6a05c' }) {
   );
 }
 
+/* =========================================================
+   🏫 교실 가구
+   ========================================================= */
+function Schooldesk({ a = '#e8d5b7' }) {
+  return (
+    <group>
+      <B p={[0, 0.55, -0.05]} s={[0.7, 0.05, 0.5]} c={a} />
+      <B p={[0, 0.42, -0.28]} s={[0.7, 0.22, 0.04]} c={a} />
+      {[[-0.3, -0.2], [0.3, -0.2], [-0.3, 0.15], [0.3, 0.15]].map(([x, z], i) => (
+        <Cy key={i} p={[x, 0.27, z]} rad={0.025} h={0.54} c="#94a3b8" m={0.5} />
+      ))}
+      <B p={[0, 0.3, 0.3]} s={[0.42, 0.04, 0.36]} c="#60a5fa" />
+      <B p={[0, 0.52, 0.46]} s={[0.42, 0.4, 0.04]} c="#60a5fa" />
+      {[[-0.17, 0.16], [0.17, 0.16], [-0.17, 0.44], [0.17, 0.44]].map(([x, z], i) => (
+        <Cy key={i} p={[x, 0.14, z]} rad={0.02} h={0.28} c="#94a3b8" m={0.5} />
+      ))}
+    </group>
+  );
+}
+function Deskpair({ a = '#e8d5b7' }) {
+  return (
+    <group>
+      <group position={[-0.5, 0, 0]}><Schooldesk a={a} /></group>
+      <group position={[0.5, 0, 0]}><Schooldesk a={a} /></group>
+    </group>
+  );
+}
+function Teacherdesk({ a = '#a16207' }) {
+  return (
+    <group>
+      <B p={[0, 0.72, 0]} s={[1.7, 0.07, 0.75]} c={a} />
+      <B p={[-0.55, 0.36, 0]} s={[0.5, 0.72, 0.7]} c={a} />
+      <B p={[-0.55, 0.55, 0.36]} s={[0.42, 0.16, 0.03]} c={DARKWOOD} />
+      <B p={[-0.55, 0.32, 0.36]} s={[0.42, 0.16, 0.03]} c={DARKWOOD} />
+      <B p={[0.75, 0.36, 0]} s={[0.08, 0.72, 0.7]} c={a} />
+      <B p={[0.3, 0.78, -0.1]} s={[0.35, 0.06, 0.26]} c="#e2e8f0" />
+      <B p={[0.3, 0.94, -0.22]} s={[0.34, 0.26, 0.04]} c="#26262b" />
+    </group>
+  );
+}
+function Podium({ a = '#b5834f' }) {
+  return (
+    <group>
+      <B p={[0, 0.45, 0]} s={[0.62, 0.9, 0.42]} c={a} />
+      <B p={[0, 0.93, 0.02]} s={[0.7, 0.06, 0.5]} c={DARKWOOD} r={[0.18, 0, 0]} />
+      <B p={[0, 0.98, 0.06]} s={[0.4, 0.02, 0.3]} c="#fffaf2" r={[0.18, 0, 0]} />
+      <Cy p={[0.24, 1.05, -0.1]} rad={0.03} h={0.22} c="#26262b" />
+      <Sp p={[0.24, 1.17, -0.1]} rad={0.05} c="#475569" />
+    </group>
+  );
+}
+function Chalkboard({ a = '#2f6b4f' }) {
+  return (
+    <group>
+      <B p={[0, 1.3, -0.12]} s={[1.95, 1.1, 0.09]} c="#a16207" />
+      <B p={[0, 1.3, -0.05]} s={[1.8, 0.95, 0.03]} c={a} />
+      <B p={[0, 0.74, 0.0]} s={[1.95, 0.09, 0.16]} c="#c9a468" />
+      <B p={[-0.5, 0.8, 0.04]} s={[0.16, 0.05, 0.05]} c="#ffffff" />
+      <B p={[-0.3, 0.8, 0.04]} s={[0.12, 0.05, 0.05]} c="#fde047" />
+      <Sp p={[0.45, 0.81, 0.04]} rad={0.06} sc={[1.4, 0.5, 0.8]} c="#f1f5f9" />
+      {/* 칠판 글씨 느낌 */}
+      <B p={[-0.45, 1.5, -0.03]} s={[0.6, 0.03, 0.01]} c="#e2e8f0" />
+      <B p={[-0.25, 1.36, -0.03]} s={[1.0, 0.03, 0.01]} c="#cbd5e1" />
+      <B p={[-0.35, 1.22, -0.03]} s={[0.8, 0.03, 0.01]} c="#cbd5e1" />
+    </group>
+  );
+}
+function Locker({ a = '#7dd3fc' }) {
+  return (
+    <group>
+      <B p={[0, 0.85, 0]} s={[1.9, 1.7, 0.42]} c={a} />
+      {[0, 1, 2].map((r) => [0, 1, 2, 3].map((c) => (
+        <group key={`${r}-${c}`}>
+          <B p={[-0.71 + c * 0.47, 0.35 + r * 0.55, 0.22]} s={[0.42, 0.5, 0.02]} c="#f8fafc" />
+          <Sp p={[-0.56 + c * 0.47, 0.35 + r * 0.55, 0.25]} rad={0.025} c="#64748b" m={0.6} />
+        </group>
+      )))}
+    </group>
+  );
+}
+function Shoerack({ a = '#d6bd97' }) {
+  return (
+    <group>
+      <B p={[0, 0.5, 0]} s={[1.9, 1.0, 0.36]} c={a} />
+      {[0.22, 0.55, 0.85].map((y) => (
+        <B key={y} p={[0, y, 0.02]} s={[1.8, 0.04, 0.34]} c={DARKWOOD} />
+      ))}
+      {[[-0.6, 0.3], [-0.1, 0.3], [0.45, 0.63], [0.7, 0.63]].map(([x, y], i) => (
+        <Sp key={i} p={[x, y + 0.06, 0.1]} rad={0.08} sc={[1.6, 0.55, 1]} c={['#ef4444', '#3b82f6', '#f8fafc', '#facc15'][i]} />
+      ))}
+    </group>
+  );
+}
+function Noticeboard({ a = '#c9a468' }) {
+  return (
+    <group>
+      <B p={[0, 1.25, -0.06]} s={[1.9, 1.15, 0.07]} c={a} />
+      <B p={[0, 1.25, -0.01]} s={[1.75, 1.0, 0.02]} c="#fdf3df" />
+      {[['#fca5a5', -0.55, 1.45], ['#93c5fd', 0.0, 1.5], ['#fde047', 0.55, 1.42],
+        ['#86efac', -0.35, 1.08], ['#f9a8d4', 0.35, 1.05]].map(([c, x, y], i) => (
+        <group key={i}>
+          <B p={[x, y, 0.01]} s={[0.42, 0.32, 0.01]} c={c} r={[0, 0, (i % 2 ? 1 : -1) * 0.06]} />
+          <Sp p={[x, y + 0.14, 0.03]} rad={0.02} c="#ef4444" />
+        </group>
+      ))}
+    </group>
+  );
+}
+function Screen({ a = '#f8fafc' }) {
+  return (
+    <group>
+      <Cy p={[0, 2.35, 0]} rad={0.07} h={1.9} c="#475569" r={[0, 0, Math.PI / 2]} />
+      <B p={[0, 1.5, 0]} s={[1.8, 1.5, 0.03]} c={a} />
+      <B p={[0, 0.75, 0]} s={[1.85, 0.05, 0.05]} c="#475569" />
+    </group>
+  );
+}
+function Projector({ a = '#94a3b8' }) {
+  return (
+    <group>
+      <B p={[0, 0.7, 0]} s={[0.5, 0.06, 0.5]} c="#cbd5e1" />
+      {[[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]].map(([x, z], i) => (
+        <Cy key={i} p={[x, 0.35, z]} rad={0.02} h={0.7} c="#94a3b8" />
+      ))}
+      <B p={[0, 0.83, 0]} s={[0.42, 0.2, 0.34]} c={a} />
+      <Cy p={[0, 0.83, 0.2]} rad={0.07} h={0.05} c="#26262b" r={[Math.PI / 2, 0, 0]} />
+      <Sp p={[0, 0.83, 0.24]} rad={0.05} c="#a5f3fc" e="#67e8f9" />
+      <Sp p={[0.14, 0.93, 0]} rad={0.02} c="#22c55e" e="#22c55e" />
+    </group>
+  );
+}
+function Wallclock({ a = '#f8fafc' }) {
+  return (
+    <group>
+      <Cy p={[0, 1.9, -0.05]} rad={0.28} h={0.07} c="#334155" r={[Math.PI / 2, 0, 0]} />
+      <Cy p={[0, 1.9, -0.01]} rad={0.24} h={0.02} c={a} r={[Math.PI / 2, 0, 0]} />
+      <B p={[0, 1.98, 0.01]} s={[0.025, 0.15, 0.01]} c="#26262b" />
+      <B p={[0.07, 1.9, 0.01]} s={[0.13, 0.025, 0.01]} c="#ef4444" />
+      <Sp p={[0, 1.9, 0.02]} rad={0.022} c="#26262b" />
+    </group>
+  );
+}
+function Flagpole({ a = '#f8fafc' }) {
+  return (
+    <group>
+      <Cy p={[0, 0.05, 0]} rad={0.16} h={0.1} c="#475569" />
+      <Cy p={[0, 0.9, 0]} rad={0.025} h={1.8} c="#94a3b8" m={0.5} />
+      <Sp p={[0, 1.83, 0]} rad={0.05} c="#fbbf24" m={0.6} />
+      <B p={[0.3, 1.45, 0]} s={[0.55, 0.37, 0.01]} c={a} />
+      <Sp p={[0.3, 1.45, 0.008]} rad={0.09} sc={[1, 1, 0.1]} c="#dc2626" />
+      <Sp p={[0.3, 1.42, 0.012]} rad={0.06} sc={[1, 1, 0.1]} c="#1d4ed8" />
+      {[[-0.14, 0.1], [0.14, -0.1]].map(([dx, dy], i) => (
+        <B key={i} p={[0.3 + dx, 1.45 + dy, 0.012]} s={[0.07, 0.02, 0.01]} c="#26262b" />
+      ))}
+    </group>
+  );
+}
+function Waterdisp({ a = '#e2e8f0' }) {
+  return (
+    <group>
+      <B p={[0, 0.45, 0]} s={[0.45, 0.9, 0.4]} c={a} />
+      <Cy p={[0, 1.08, 0]} rad={0.17} h={0.36} c="#7dd3fc" o={0.75} />
+      <Cy p={[0, 1.28, 0]} rad={0.13} h={0.05} c="#38bdf8" />
+      <B p={[0, 0.68, 0.22]} s={[0.16, 0.05, 0.06]} c="#3b82f6" />
+      <B p={[0, 0.6, 0.22]} s={[0.16, 0.05, 0.06]} c="#ef4444" />
+      <Cy p={[0.13, 0.85, 0.21]} rad={0.045} h={0.12} c="#f8fafc" />
+    </group>
+  );
+}
+function Cleanbox({ a = '#9ca3af' }) {
+  return (
+    <group>
+      <B p={[0, 0.6, 0]} s={[0.5, 1.2, 0.4]} c={a} />
+      <B p={[0, 0.6, 0.21]} s={[0.02, 1.1, 0.02]} c="#64748b" />
+      <Sp p={[-0.07, 0.6, 0.22]} rad={0.03} c="#475569" />
+      <Cy p={[0.35, 0.5, 0.1]} rad={0.02} h={1.0} c="#b45309" r={[0, 0, 0.12]} />
+      <B p={[0.29, 0.06, 0.1]} s={[0.22, 0.12, 0.1]} c="#facc15" />
+    </group>
+  );
+}
+function Recyclebin({ a = '#22c55e' }) {
+  return (
+    <group>
+      {[-0.22, 0.22].map((x, i) => (
+        <group key={x}>
+          <Cy p={[x, 0.28, 0]} rTop={0.2} rBot={0.16} h={0.56} c={i ? '#3b82f6' : a} />
+          <Cy p={[x, 0.58, 0]} rad={0.21} h={0.04} c="#e2e8f0" />
+          <To p={[x, 0.62, 0]} rad={0.08} tube={0.02} c="#f8fafc" r={[Math.PI / 2, 0, 0]} />
+        </group>
+      ))}
+    </group>
+  );
+}
+function Milkbox({ a = '#f1f5f9' }) {
+  return (
+    <group>
+      <B p={[0, 0.16, 0]} s={[0.62, 0.32, 0.45]} c="#c9a468" />
+      {[[-0.16, 0.06], [0, 0.06], [0.16, 0.06]].map(([x], i) => (
+        <group key={i} position={[x, 0.42, 0]}>
+          <B p={[0, 0, 0]} s={[0.13, 0.2, 0.13]} c={a} />
+          <Co p={[0, 0.13, 0]} rad={0.1} h={0.09} c={a} seg={4} r={[0, Math.PI / 4, 0]} />
+          <B p={[0, 0, 0.07]} s={[0.09, 0.09, 0.01]} c="#60a5fa" />
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/* =========================================================
+   💡 조명 — LIGHT_SPEC 에 등록된 모델은 실제 빛을 냅니다
+   ========================================================= */
+function Fluorescent({ a = '#ffffff' }) {
+  return (
+    <group position={[0, 2.5, 0]}>
+      {[-0.6, 0.6].map((x) => (
+        <Cy key={x} p={[x, 0.16, 0]} rad={0.012} h={0.32} c="#94a3b8" />
+      ))}
+      <B p={[0, 0, 0]} s={[1.7, 0.09, 0.3]} c="#cbd5e1" />
+      <B p={[0, -0.06, 0]} s={[1.6, 0.04, 0.24]} c={a} e={a} />
+    </group>
+  );
+}
+function Moodlamp({ a = '#fbbf24' }) {
+  return (
+    <group>
+      <Cy p={[0, 0.04, 0]} rad={0.16} h={0.08} c="#475569" />
+      <Cy p={[0, 0.3, 0]} rad={0.03} h={0.5} c="#64748b" />
+      <Sp p={[0, 0.66, 0]} rad={0.19} c={a} e={a} o={0.9} />
+    </group>
+  );
+}
+function Chandelier({ a = '#fde047' }) {
+  return (
+    <group position={[0, 1.5, 0]}>
+      <Cy p={[0, 0.85, 0]} rad={0.02} h={0.7} c="#a16207" />
+      <Cy p={[0, 0.45, 0]} rad={0.1} h={0.14} c="#d4af37" m={0.8} />
+      <To p={[0, 0.3, 0]} rad={0.42} tube={0.028} c="#d4af37" r={[Math.PI / 2, 0, 0]} m={0.8} />
+      <To p={[0, 0.1, 0]} rad={0.26} tube={0.022} c="#d4af37" r={[Math.PI / 2, 0, 0]} m={0.8} />
+      {[...Array(6)].map((_, i) => {
+        const ang = (i / 6) * Math.PI * 2;
+        return (
+          <group key={i} position={[Math.cos(ang) * 0.42, 0.3, Math.sin(ang) * 0.42]}>
+            <Cy p={[0, 0.08, 0]} rad={0.035} h={0.16} c="#fffaf2" />
+            <Sp p={[0, 0.2, 0]} rad={0.055} c={a} e={a} />
+          </group>
+        );
+      })}
+      {[...Array(6)].map((_, i) => {
+        const ang = (i / 6) * Math.PI * 2 + 0.5;
+        return <Co key={`c${i}`} p={[Math.cos(ang) * 0.26, 0.02, Math.sin(ang) * 0.26]} rad={0.03} h={0.12} c="#e0f2fe" o={0.8} r={[Math.PI, 0, 0]} />;
+      })}
+    </group>
+  );
+}
+function Neon({ a = '#22d3ee' }) {
+  return (
+    <group position={[0, 1.4, 0]}>
+      <B p={[0, 0, -0.06]} s={[1.0, 0.6, 0.05]} c="#1e293b" />
+      <To p={[-0.2, 0.02, 0]} rad={0.16} tube={0.028} c={a} e={a} />
+      <B p={[0.18, -0.06, 0]} s={[0.05, 0.34, 0.05]} c={a} e={a} />
+      <B p={[0.31, 0.06, 0]} s={[0.3, 0.05, 0.05]} c={a} e={a} r={[0, 0, -0.5]} />
+      <Sp p={[0.3, -0.2, 0]} rad={0.045} c={a} e={a} />
+    </group>
+  );
+}
+function Starlight({ a = '#a5b4fc' }) {
+  return (
+    <group position={[0, 1.7, 0]}>
+      <Cy p={[0, 0.35, 0]} rad={0.012} h={0.7} c="#64748b" />
+      {[[0, 0, 0], [0.3, -0.18, 0.1], [-0.28, -0.1, -0.1], [0.15, -0.35, 0.2], [-0.18, -0.4, 0.05]].map(([x, y, z], i) => (
+        <group key={i} position={[x, y, z]}>
+          <Co p={[0, 0.055, 0]} rad={0.04} h={0.06} c={a} e={a} />
+          <Co p={[0, -0.055, 0]} rad={0.04} h={0.06} c={a} e={a} r={[Math.PI, 0, 0]} />
+          <Co p={[0.055, 0, 0]} rad={0.04} h={0.06} c={a} e={a} r={[0, 0, -Math.PI / 2]} />
+          <Co p={[-0.055, 0, 0]} rad={0.04} h={0.06} c={a} e={a} r={[0, 0, Math.PI / 2]} />
+        </group>
+      ))}
+    </group>
+  );
+}
+function Xmastree({ a = '#22c55e' }) {
+  const balls = ['#ef4444', '#fde047', '#38bdf8', '#f472b6'];
+  return (
+    <group>
+      <Cy p={[0, 0.1, 0]} rad={0.16} h={0.2} c="#b45309" />
+      <Co p={[0, 0.5, 0]} rad={0.45} h={0.6} c={a} />
+      <Co p={[0, 0.85, 0]} rad={0.34} h={0.52} c={a} />
+      <Co p={[0, 1.15, 0]} rad={0.22} h={0.42} c={a} />
+      <Co p={[0, 1.42, 0]} rad={0.09} h={0.16} c="#fde047" e="#fde047" />
+      {[...Array(10)].map((_, i) => {
+        const ang = (i / 10) * Math.PI * 2 * 1.6;
+        const y = 0.4 + i * 0.09;
+        const r = 0.4 - i * 0.03;
+        return <Sp key={i} p={[Math.cos(ang) * r, y, Math.sin(ang) * r]} rad={0.045} c={balls[i % 4]} e={balls[i % 4]} />;
+      })}
+    </group>
+  );
+}
+function Floorlantern({ a = '#fb923c' }) {
+  return (
+    <group>
+      <Cy p={[0, 0.03, 0]} rad={0.14} h={0.06} c="#475569" />
+      <Cy p={[0, 0.28, 0]} rad={0.16} h={0.4} c={a} e={a} o={0.85} />
+      <Cy p={[0, 0.5, 0]} rad={0.13} h={0.05} c="#334155" />
+      <To p={[0, 0.56, 0]} rad={0.05} tube={0.012} c="#334155" r={[Math.PI / 2, 0, 0]} />
+    </group>
+  );
+}
+
+Object.assign(MODELS, {
+  schooldesk: Schooldesk, deskpair: Deskpair, teacherdesk: Teacherdesk, podium: Podium,
+  chalkboard: Chalkboard, locker: Locker, shoerack: Shoerack, noticeboard: Noticeboard,
+  screen: Screen, projector: Projector, wallclock: Wallclock, flagpole: Flagpole,
+  waterdisp: Waterdisp, cleanbox: Cleanbox, recyclebin: Recyclebin, milkbox: Milkbox,
+  fluorescent: Fluorescent, moodlamp: Moodlamp, chandelier: Chandelier, neon: Neon,
+  starlight: Starlight, xmastree: Xmastree, floorlantern: Floorlantern,
+});
+
 Object.assign(MODELS, {
   mirror: Mirror, dresser: Dresser, kitchenset: Kitchenset, cattower: Cattower,
   globe: Globe, telescope: Telescope, robotoy: Robotoy, dollhouse: Dollhouse,

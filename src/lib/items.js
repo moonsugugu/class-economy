@@ -1,19 +1,57 @@
-// ===== 아바타 기본 캐릭터 (무료, 언제든 변경) =====
-export const AVATAR_BASES = ['🐰', '🐻', '🐱', '🐶', '🦊', '🐼', '🐯', '🐸', '🐷', '🐨'];
-
-// 3D 캐릭터 생김새 정의
+/* =====================================================================
+   3D 캐릭터 — 28종. 모두 상점에서 구입해야 쓸 수 있어요(무료 없음).
+   ear: 귀/머리 모양, extra: 특징(갈기·등껍질 등), group: 상점 분류
+   ===================================================================== */
 export const SPECIES = {
-  '🐰': { name: '토끼', body: '#ffffff', belly: '#ffe4ec', ear: 'long', earIn: '#ffb3c8' },
-  '🐻': { name: '곰', body: '#b07d51', belly: '#eed3ae', ear: 'round', earIn: '#8a5a3b' },
-  '🐱': { name: '고양이', body: '#f8b26a', belly: '#fff1dc', ear: 'pointy', earIn: '#fddcb2' },
-  '🐶': { name: '강아지', body: '#e8d3b0', belly: '#fff8ea', ear: 'floppy', earIn: '#c9a97e' },
-  '🦊': { name: '여우', body: '#f8813c', belly: '#fff7ed', ear: 'pointy', earIn: '#ffffff' },
-  '🐼': { name: '판다', body: '#ffffff', belly: '#ffffff', ear: 'round', earIn: '#26262b', panda: true },
-  '🐯': { name: '호랑이', body: '#fb923c', belly: '#fff7ed', ear: 'round', earIn: '#fdba74' },
-  '🐸': { name: '개구리', body: '#4ade80', belly: '#d9f99d', ear: 'top', earIn: '#166534' },
-  '🐷': { name: '돼지', body: '#f9a8d4', belly: '#fce7f3', ear: 'pointy', earIn: '#f472b6', pig: true },
-  '🐨': { name: '코알라', body: '#9ca3af', belly: '#e5e7eb', ear: 'biground', earIn: '#d1d5db' },
+  // ── 숲속 친구들 ──
+  '🐰': { name: '토끼', body: '#ffffff', belly: '#ffe4ec', ear: 'long', earIn: '#ffb3c8', price: 60, group: 'land' },
+  '🐻': { name: '곰', body: '#b07d51', belly: '#eed3ae', ear: 'round', earIn: '#8a5a3b', price: 60, group: 'land' },
+  '🐱': { name: '고양이', body: '#f8b26a', belly: '#fff1dc', ear: 'pointy', earIn: '#fddcb2', price: 60, group: 'land' },
+  '🐶': { name: '강아지', body: '#e8d3b0', belly: '#fff8ea', ear: 'floppy', earIn: '#c9a97e', price: 60, group: 'land' },
+  '🐹': { name: '햄스터', body: '#f5d7a1', belly: '#fffaf0', ear: 'small', earIn: '#e0b088', price: 70, group: 'land' },
+  '🐸': { name: '개구리', body: '#4ade80', belly: '#d9f99d', ear: 'top', earIn: '#166534', price: 60, group: 'land' },
+  '🐷': { name: '돼지', body: '#f9a8d4', belly: '#fce7f3', ear: 'pointy', earIn: '#f472b6', pig: true, price: 60, group: 'land' },
+  '🦊': { name: '여우', body: '#f8813c', belly: '#fff7ed', ear: 'pointy', earIn: '#ffffff', price: 80, group: 'land' },
+  '🐨': { name: '코알라', body: '#9ca3af', belly: '#e5e7eb', ear: 'biground', earIn: '#d1d5db', price: 80, group: 'land' },
+  '🐵': { name: '원숭이', body: '#a97142', belly: '#f0d6b8', ear: 'biground', earIn: '#f0d6b8', price: 80, group: 'land' },
+  '🦝': { name: '너구리', body: '#8f9bb3', belly: '#e8ecf5', ear: 'pointy', earIn: '#5c6680', mask: true, price: 90, group: 'land' },
+  '🐺': { name: '늑대', body: '#7c8798', belly: '#e2e8f0', ear: 'pointy', earIn: '#4b5563', price: 100, group: 'land' },
+  '🐼': { name: '판다', body: '#ffffff', belly: '#ffffff', ear: 'round', earIn: '#26262b', panda: true, price: 100, group: 'land' },
+  '🐯': { name: '호랑이', body: '#fb923c', belly: '#fff7ed', ear: 'round', earIn: '#fdba74', stripes: true, price: 100, group: 'land' },
+  '🦥': { name: '나무늘보', body: '#b9a184', belly: '#e8dcc8', ear: 'small', earIn: '#8a7660', price: 110, group: 'land' },
+  '🦁': { name: '사자', body: '#f0b45e', belly: '#fdf0d5', ear: 'round', earIn: '#c98b3a', extra: 'mane', price: 120, group: 'land' },
+  '🦌': { name: '사슴', body: '#c98b5e', belly: '#f5e0cd', ear: 'pointy', earIn: '#a86f45', extra: 'antler', price: 120, group: 'land' },
+  '🦓': { name: '얼룩말', body: '#f8fafc', belly: '#ffffff', ear: 'round', earIn: '#26262b', stripes: true, price: 130, group: 'land' },
+
+  // ── 바다 친구들 ──
+  '🐧': { name: '펭귄', body: '#2f3b52', belly: '#ffffff', ear: 'beak', earIn: '#fbbf24', price: 120, group: 'sea' },
+  '🐢': { name: '바다거북', body: '#5cb85c', belly: '#d9f99d', ear: 'small', earIn: '#3d8b3d', extra: 'shell', price: 130, group: 'sea' },
+  '🐙': { name: '문어', body: '#f472b6', belly: '#fce7f3', ear: 'none', earIn: '#ec4899', extra: 'tentacle', price: 140, group: 'sea' },
+  '🦭': { name: '물범', body: '#a8b8c8', belly: '#e8eef5', ear: 'none', earIn: '#8fa0b3', extra: 'whisker', price: 140, group: 'sea' },
+  '🐬': { name: '돌고래', body: '#7fc7e8', belly: '#e8f6fd', ear: 'fin', earIn: '#5aa8cc', price: 150, group: 'sea' },
+  '🦈': { name: '상어', body: '#8fa3b8', belly: '#f1f5f9', ear: 'fin', earIn: '#5b6b7d', extra: 'teeth', price: 160, group: 'sea' },
+  '🐳': { name: '고래', body: '#5b8fd6', belly: '#dbeafe', ear: 'fin', earIn: '#3d6fb5', extra: 'spout', price: 180, group: 'sea' },
+
+  // ── 신비한 친구들 ──
+  '🦎': { name: '도마뱀', body: '#84cc16', belly: '#ecfccb', ear: 'none', earIn: '#4d7c0f', extra: 'spike', price: 90, group: 'myth' },
+  '🦄': { name: '유니콘', body: '#fdf2ff', belly: '#ffffff', ear: 'pointy', earIn: '#f0abfc', extra: 'horn', price: 200, group: 'myth' },
+  '🐲': { name: '드래곤', body: '#34d399', belly: '#a7f3d0', ear: 'pointy', earIn: '#059669', extra: 'wing', price: 250, group: 'myth' },
 };
+
+// 여우원숭이(레무르)는 이모지 키가 없어 원숭이 계열로 별도 등록
+SPECIES['🐒'] = {
+  name: '여우원숭이', body: '#b8bcc4', belly: '#f1f5f9',
+  ear: 'biground', earIn: '#4b5563', extra: 'ringtail', price: 150, group: 'land',
+};
+
+export const AVATAR_BASES = Object.keys(SPECIES);
+export const SPECIES_GROUP = { land: '🌳 숲속 친구', sea: '🌊 바다 친구', myth: '✨ 신비한 친구' };
+
+/** 캐릭터를 아직 하나도 안 샀을 때 보이는 기본 모습 (상점에는 없어요) */
+export const DEFAULT_SPECIES = {
+  name: '기본 캐릭터', body: '#cbd5e1', belly: '#f1f5f9', ear: 'round', earIn: '#94a3b8',
+};
+export const speciesOf = (base) => SPECIES[base] || DEFAULT_SPECIES;
 
 // ===== 마이룸 격자 =====
 export const ROOM_COLS = 8;
@@ -27,6 +65,9 @@ export const FOOTPRINT = {
   // 정원
   pond: [2, 2], pool: [2, 2], swingset: [2, 1], slide: [1, 2],
   picnic: [2, 1], tent: [2, 2], vegpatch: [2, 1], bigtree: [2, 2], gtrampoline: [2, 2],
+  // 교실·조명
+  deskpair: [2, 1], teacherdesk: [2, 1], chalkboard: [2, 1], locker: [2, 1],
+  shoerack: [2, 1], noticeboard: [2, 1], screen: [2, 1], fluorescent: [2, 1],
 };
 
 // ===== 아이템 카탈로그 =====
@@ -193,6 +234,42 @@ export const ITEMS = [
   I('garden_windmill', 'garden', 'windmill', '🎡', '바람개비', 32, { a: '#f472b6', b: '#60a5fa' }),
   I('garden_scarecrow', 'garden', 'scarecrow', '🌾', '허수아비', 50, { a: '#d6a05c' }),
 
+  // ---------- 🏫 교실 가구 ----------
+  I('class_desk', 'class', 'schooldesk', '🪑', '학생 책상', 45, { a: '#e8d5b7' }),
+  I('class_desk2', 'class', 'deskpair', '🪑', '짝꿍 책상 2개', 80, { a: '#e8d5b7' }),
+  I('class_tdesk', 'class', 'teacherdesk', '🧑‍🏫', '선생님 책상', 110, { a: '#a16207' }),
+  I('class_podium', 'class', 'podium', '🎤', '교탁', 70, { a: '#b5834f' }),
+  I('class_board', 'class', 'chalkboard', '📗', '칠판', 130, { a: '#2f6b4f' }),
+  I('class_whiteboard', 'class', 'chalkboard', '⬜', '화이트보드', 130, { a: '#f8fafc' }),
+  I('class_locker', 'class', 'locker', '🗄️', '사물함', 120, { a: '#7dd3fc' }),
+  I('class_shoerack', 'class', 'shoerack', '👟', '신발장', 90, { a: '#d6bd97' }),
+  I('class_notice', 'class', 'noticeboard', '📌', '학급 게시판', 85, { a: '#c9a468' }),
+  I('class_screen', 'class', 'screen', '📽️', '빔 스크린', 100, { a: '#f8fafc' }),
+  I('class_projector', 'class', 'projector', '📽️', '프로젝터', 95, { a: '#94a3b8' }),
+  I('class_clock', 'class', 'wallclock', '🕐', '교실 벽시계', 40, { a: '#f8fafc' }),
+  I('class_flag', 'class', 'flagpole', '🇰🇷', '태극기', 50, { a: '#f8fafc' }),
+  I('class_water', 'class', 'waterdisp', '🚰', '정수기', 75, { a: '#e2e8f0' }),
+  I('class_clean', 'class', 'cleanbox', '🧹', '청소도구함', 55, { a: '#9ca3af' }),
+  I('class_recycle', 'class', 'recyclebin', '♻️', '분리수거함', 45, { a: '#22c55e' }),
+  I('class_milk', 'class', 'milkbox', '🥛', '우유 상자', 30, { a: '#f1f5f9' }),
+  I('class_library', 'class', 'bookshelf', '📚', '학급 문고', 80, { a: '#b45309' }),
+  I('class_plant', 'class', 'plant_big', '🪴', '교실 화분', 45, { a: '#16a34a', b: '#92400e' }),
+  I('class_piano', 'class', 'piano', '🎹', '교실 피아노', 180, { a: '#26262b' }),
+  I('class_aquarium', 'class', 'aquarium', '🐠', '교실 어항', 70, { a: '#7dd3fc' }),
+  I('class_medal', 'class', 'trophy', '🏆', '상장 진열장', 90, { a: '#a16207' }),
+
+  // ---------- 💡 조명 (진짜로 빛이 나요) ----------
+  I('light_fluor', 'light', 'fluorescent', '💡', '교실 형광등', 60, { a: '#ffffff' }),
+  I('light_mood', 'light', 'moodlamp', '🕯️', '무드등', 55, { a: '#fbbf24' }),
+  I('light_mood_pink', 'light', 'moodlamp', '🕯️', '핑크 무드등', 55, { a: '#f472b6' }),
+  I('light_chandelier', 'light', 'chandelier', '✨', '샹들리에', 220, { a: '#fde047' }),
+  I('light_neon', 'light', 'neon', '🌈', '네온사인', 130, { a: '#22d3ee' }),
+  I('light_neon_pink', 'light', 'neon', '🌈', '핑크 네온', 130, { a: '#f472b6' }),
+  I('light_star', 'light', 'starlight', '⭐', '별빛 조명', 90, { a: '#a5b4fc' }),
+  I('light_xmas', 'light', 'xmastree', '🎄', '크리스마스 트리', 160, { a: '#22c55e' }),
+  I('light_lantern', 'light', 'floorlantern', '🏮', '바닥 랜턴', 70, { a: '#fb923c' }),
+  I('light_campfire', 'light', 'campfire', '🔥', '모닥불 조명', 80, { a: '#f97316' }),
+
   // ---------- 벽지 ----------
   I('wall_cream', 'wall', null, '🏳️', '크림 벽지', 30, { a: '#fdf3df' }),
   I('wall_sky', 'wall', null, '🩵', '하늘 벽지', 30, { a: '#d3ecfb' }),
@@ -214,13 +291,84 @@ export const ITEMS = [
   I('floor_dark', 'floor', null, '⬛', '진한 원목', 40, { a: '#8f6b48', b: '#7d5c3c' }),
 ];
 
+/* ===== 캐릭터도 상점에서 사는 아이템이에요 (무료 없음) ===== */
+export const CHAR_ITEMS = Object.entries(SPECIES).map(([base, sp]) => ({
+  id: `char_${base.codePointAt(0).toString(16)}`,
+  slot: 'char',
+  model: null,
+  emoji: base,
+  name: sp.name,
+  price: sp.price,
+  colors: {},
+  base,                 // 구입 후 avatar.base 에 넣을 값
+  group: sp.group,
+}));
+ITEMS.push(...CHAR_ITEMS);
+
 export const ITEM_MAP = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
+export const CHAR_BY_BASE = Object.fromEntries(CHAR_ITEMS.map((i) => [i.base, i]));
 
 export const SLOT_LABEL = {
-  hat: '모자', face: '얼굴', acc: '손 아이템', room: '가구·소품', garden: '정원', wall: '벽지', floor: '바닥',
+  char: '캐릭터', hat: '모자', face: '얼굴', acc: '손 아이템',
+  room: '가구·소품', garden: '정원', class: '교실', light: '조명',
+  wall: '벽지', floor: '바닥',
 };
 
 export const GARDEN_FLOOR = ['#a5db7c', '#97d16d'];
+export const CLASS_FLOOR = ['#e4cfa8', '#dcc59b'];
+
+/* ===== 💡 조명 스펙 — 이 모델들은 3D 공간에서 진짜로 빛을 냅니다 ===== */
+export const LIGHT_SPEC = {
+  fluorescent: { y: 2.5, i: 1.3, d: 8 },
+  moodlamp: { y: 0.7, i: 0.9, d: 4 },
+  chandelier: { y: 2.2, i: 1.7, d: 9 },
+  neon: { y: 1.4, i: 1.1, d: 5 },
+  starlight: { y: 1.7, i: 0.8, d: 5 },
+  xmastree: { y: 0.9, i: 1.0, d: 4.5 },
+  floorlantern: { y: 0.5, i: 0.8, d: 3.5 },
+  campfire: { y: 0.4, i: 1.2, d: 4 },
+};
+
+/* ===== 🎁 아이템 세트 — 묶어서 사면 할인! ===== */
+export const SETS = [
+  {
+    id: 'set_class_basic', name: '🏫 교실 기본 세트', off: 0.15,
+    desc: '책상·교탁·칠판·사물함·벽시계로 교실의 기본을 한 번에!',
+    items: ['class_desk2', 'class_tdesk', 'class_podium', 'class_board', 'class_locker', 'class_clock'],
+  },
+  {
+    id: 'set_class_full', name: '🏫 교실 풀옵션 세트', off: 0.2,
+    desc: '게시판·스크린·정수기·청소함·분리수거함까지 완벽하게!',
+    items: ['class_notice', 'class_screen', 'class_projector', 'class_water', 'class_clean', 'class_recycle', 'class_shoerack'],
+  },
+  {
+    id: 'set_light_basic', name: '💡 조명 세트', off: 0.15,
+    desc: '형광등·무드등·별빛 조명으로 공간이 확 달라져요',
+    items: ['light_fluor', 'light_mood', 'light_star', 'light_lantern'],
+  },
+  {
+    id: 'set_light_party', name: '✨ 파티 조명 세트', off: 0.2,
+    desc: '샹들리에·네온사인·크리스마스 트리로 화려하게!',
+    items: ['light_chandelier', 'light_neon', 'light_neon_pink', 'light_xmas'],
+  },
+  {
+    id: 'set_room_cozy', name: '🛋️ 아늑한 내 방 세트', off: 0.15,
+    desc: '침대·소파·러그·책장·전등으로 포근한 방 완성',
+    items: ['room_bed', 'room_sofa', 'room_rug_pink', 'room_books', 'room_lamp', 'room_bear'],
+  },
+  {
+    id: 'set_garden_play', name: '🌳 신나는 놀이터 세트', off: 0.2,
+    desc: '그네·미끄럼틀·시소·모래놀이터로 정원을 놀이터로!',
+    items: ['garden_swing', 'garden_slide', 'garden_seesaw', 'garden_sandbox', 'garden_tree'],
+  },
+];
+
+/** 세트 가격 계산 — 이미 가진 아이템은 빼고 계산해요 */
+export function setPrice(set, inventory = []) {
+  const need = set.items.filter((id) => !inventory.includes(id) && ITEM_MAP[id]);
+  const full = need.reduce((a, id) => a + ITEM_MAP[id].price, 0);
+  return { need, full, price: Math.floor(full * (1 - set.off)), saved: full - Math.floor(full * (1 - set.off)) };
+}
 
 // 기본 벽/바닥 (스킨 미보유 시)
 export const DEFAULT_WALL = '#fdf3df';
