@@ -59,6 +59,9 @@ export default function Landing() {
           classroom: {},
           cafe: {},
           walking: [],
+          jobId: null,
+          jobSalary: 0,
+          roomLikes: [],
           holdings: {},
           createdAt: serverTimestamp(),
         });

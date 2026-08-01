@@ -10,8 +10,10 @@ const NAV = [
   ['/student/shop', '🏪', '상점'],
   ['/student/bank', '🏦', '은행'],
   ['/student/stocks', '📈', '주식'],
+  ['/student/class', '🏛️', '학급'],
   ['/student/seats', '🪑', '자리'],
-  ['/student/room', '🛋️', '마이룸'],
+  ['/student/room', '🛋️', '내방'],
+  ['/student/visit', '🏠', '놀러가기'],
 ];
 
 export default function StudentLayout() {
@@ -86,8 +88,8 @@ export default function StudentLayout() {
                 }`
               }
             >
-              <div className="text-2xl leading-none pt-1">{icon}</div>
-              <div className="text-[11px] pb-0.5">{label}</div>
+              <div className="text-xl leading-none pt-1">{icon}</div>
+              <div className="text-[10px] pb-0.5 leading-tight">{label}</div>
             </NavLink>
           ))}
         </div>

@@ -98,12 +98,26 @@ export default function MyPage() {
           <div className="text-purple-700">마이룸 & 정원 꾸미기</div>
           <div className="text-[11px] text-purple-400">3D 방과 정원을 꾸며 보세요!</div>
         </Link>
-        <Link to="/student/seats" className="rounded-3xl bg-gradient-to-br from-teal-100 to-cyan-100 shadow-md p-4 text-center hover:scale-[1.03] transition">
-          <div className="text-3xl mb-1">🪑🔨</div>
-          <div className="text-teal-700">자리 부동산</div>
-          <div className="text-[11px] text-teal-500">경매로 내 자리를 사 보세요!</div>
+        <Link to="/student/visit" className="rounded-3xl bg-gradient-to-br from-pink-100 to-rose-100 shadow-md p-4 text-center hover:scale-[1.03] transition">
+          <div className="text-3xl mb-1">🏠✍️</div>
+          <div className="text-pink-700">친구 방 놀러가기</div>
+          <div className="text-[11px] text-pink-500">구경하고 방명록 남기기!</div>
         </Link>
       </div>
+
+      {student.jobName && (
+        <div className="rounded-3xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-md p-4 flex items-center gap-3">
+          <span className="text-3xl">{student.jobEmoji}</span>
+          <div className="flex-1">
+            <div className="text-xs text-white/70">내 직업</div>
+            <div className="text-lg">{student.jobName}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-white/70">직업 수당</div>
+            <div className="text-lg tabular-nums">+{fmt(student.jobSalary || 0)}</div>
+          </div>
+        </div>
+      )}
 
       <Link
         to="/student/report"

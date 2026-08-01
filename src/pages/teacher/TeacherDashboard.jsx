@@ -15,8 +15,11 @@ import {
 } from '../../lib/stocks';
 import { applyScheduledTicks } from '../../lib/marketSync';
 import { SHOP_PRESETS } from '../../lib/shopPresets';
+import { grossPay, taxOf } from '../../lib/jobs';
 import SeatsTab from './SeatsTab.jsx';
 import ReportsTab from './ReportsTab.jsx';
+import JobsTab from './JobsTab.jsx';
+import FundTab from './FundTab.jsx';
 import InviteQR from '../../components/InviteQR.jsx';
 
 const card = 'bg-white rounded-3xl shadow p-6';
@@ -83,6 +86,8 @@ export default function TeacherDashboard() {
     ['shop', '🏪', '상점', 'from-amber-400 to-orange-500'],
     ['alerts', '🔔', pendingCount ? `알림 ${pendingCount}` : '알림', 'from-rose-400 to-pink-500'],
     ['stocks', '📈', '주식', 'from-blue-400 to-indigo-500'],
+    ['jobs', '🧑‍🍳', '직업', 'from-teal-400 to-emerald-500'],
+    ['fund', '🏛️', '공동기금', 'from-emerald-400 to-green-500'],
     ['seats', '🪑', '자리', 'from-teal-400 to-cyan-500'],
     ['reports', '🐞', '건의함', 'from-fuchsia-400 to-rose-500'],
     ['settings', '⚙️', '설정', 'from-slate-400 to-gray-500'],
@@ -172,6 +177,8 @@ export default function TeacherDashboard() {
           {tab === 'shop' && <ShopTab klass={klass} />}
           {tab === 'alerts' && <AlertsTab klass={klass} />}
           {tab === 'stocks' && <StocksTab klass={klass} />}
+          {tab === 'jobs' && <JobsTab klass={klass} />}
+          {tab === 'fund' && <FundTab klass={klass} />}
           {tab === 'seats' && <SeatsTab klass={klass} />}
           {tab === 'reports' && <ReportsTab klass={klass} />}
           {tab === 'settings' && <SettingsTab klass={klass} />}
@@ -213,12 +220,34 @@ function StudentsTab({ klass }) {
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
 
+  // 월급 = 기본 월급 + 직업 수당, 세금은 자동으로 학급 공동기금에 적립돼요
   const paySalary = async () => {
     if (!targets.length) return flash('먼저 학생을 선택해 주세요.');
+    const rate = Number(klass.taxRate ?? 10);
     const batch = writeBatch(db);
-    targets.forEach((s) => batch.update(doc(db, 'classes', klass.id, 'students', s.id), { cash: increment(klass.salary) }));
+    let totalTax = 0, totalNet = 0;
+    targets.forEach((s) => {
+      const gross = grossPay(klass, { salary: s.jobSalary || 0 });
+      const { tax, net } = taxOf(gross, rate);
+      totalTax += tax; totalNet += net;
+      batch.update(doc(db, 'classes', klass.id, 'students', s.id), { cash: increment(net) });
+    });
+    if (totalTax > 0) {
+      batch.update(doc(db, 'classes', klass.id), { fund: increment(totalTax) });
+      batch.set(doc(collection(db, 'classes', klass.id, 'fundLog')), {
+        type: 'tax',
+        amount: totalTax,
+        memo: `월급 세금 (${targets.length}명 · ${rate}%)`,
+        at: Date.now(),
+        createdAt: serverTimestamp(),
+      });
+    }
     await batch.commit();
-    flash(`💰 ${targets.length}명에게 월급 ${fmt(klass.salary)}${klass.currency}씩 지급했어요!`);
+    flash(
+      totalTax > 0
+        ? `💰 ${targets.length}명 월급 지급! 실수령 ${fmt(totalNet)} · 세금 ${fmt(totalTax)}${klass.currency}가 🏛️공동기금에 쌓였어요.`
+        : `💰 ${targets.length}명에게 월급 ${fmt(totalNet)}${klass.currency}를 지급했어요!`
+    );
   };
 
   const adjust = async (sign) => {
@@ -251,8 +280,13 @@ function StudentsTab({ klass }) {
       <div className={card + ' space-y-4'}>
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={paySalary} className={btn + ' bg-gradient-to-r from-emerald-400 to-teal-500 hover:opacity-90 text-lg'}>
-            💰 월급 지급 ({fmt(klass.salary)}{klass.currency})
+            💰 월급 지급 (기본 {fmt(klass.salary)}{klass.currency} + 직업 수당)
           </button>
+          {(klass.taxRate ?? 10) > 0 && (
+            <span className="text-xs bg-emerald-50 text-emerald-700 rounded-xl px-3 py-1.5">
+              세금 {klass.taxRate ?? 10}% → 🏛️공동기금
+            </span>
+          )}
           <span className="text-sm text-gray-400">
             {selected.size ? `✅ ${selected.size}명 선택됨` : '👇 아래에서 학생을 선택하세요'}
           </span>
@@ -309,7 +343,14 @@ function StudentsTab({ klass }) {
             {students.map((s) => (
               <tr key={s.id} className="border-b border-gray-100 hover:bg-indigo-50/40">
                 <td className="py-2"><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="w-5 h-5" /></td>
-                <td className="text-lg">{s.avatar?.base || '🙂'} {s.name}</td>
+                <td className="text-lg">
+                  {s.avatar?.base || '🙂'} {s.name}
+                  {s.jobName && (
+                    <span className="ml-2 text-xs bg-teal-50 text-teal-700 rounded-lg px-2 py-0.5 align-middle">
+                      {s.jobEmoji} {s.jobName} +{fmt(s.jobSalary || 0)}
+                    </span>
+                  )}
+                </td>
                 <td className="text-right">{fmt(s.cash)} {klass.currency}</td>
                 <td className="text-right text-gray-500">{fmt(s.deposit)} {klass.currency}</td>
                 <td className="text-right">
@@ -851,6 +892,7 @@ function SettingsTab({ klass }) {
     name: klass.name, currency: klass.currency, salary: klass.salary,
     depositRate: klass.depositRate, savingsRate: klass.savingsRate,
     tickLimit: klass.tickLimit ?? DEFAULT_TICK_LIMIT,
+    taxRate: klass.taxRate ?? 10,
   });
   const [form, setForm] = useState(init);
   const [saved, setSaved] = useState(false);
@@ -866,6 +908,7 @@ function SettingsTab({ klass }) {
       depositRate: Number(form.depositRate) || 0,
       savingsRate: Number(form.savingsRate) || 0,
       tickLimit: Math.max(1, Math.min(100, Number(form.tickLimit) || DEFAULT_TICK_LIMIT)),
+      taxRate: Math.max(0, Math.min(50, Number(form.taxRate) || 0)),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -894,6 +937,10 @@ function SettingsTab({ klass }) {
       {field(
         '적금 기본 이율 (7일 기준, 주당 %)', 'savingsRate', 'number',
         `오래 맡길수록 1%p씩 우대해요 → 7일 ${form.savingsRate}% · 14일 ${Number(form.savingsRate) + 1}% · 21일 ${Number(form.savingsRate) + 2}%`
+      )}
+      {field(
+        '세율 (%)', 'taxRate', 'number',
+        `월급을 줄 때 이 비율만큼 세금을 떼서 🏛️학급 공동기금에 모아요. (0이면 세금 없음) 예: 월급 ${fmt(form.salary)} → 세금 ${fmt(Math.floor(Number(form.salary) * (Number(form.taxRate) || 0) / 100))}`
       )}
       {field(
         '하루 시세 변동 횟수', 'tickLimit', 'number',
