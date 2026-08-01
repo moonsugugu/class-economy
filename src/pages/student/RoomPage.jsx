@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { doc, updateDoc, runTransaction, arrayUnion, deleteField } from 'firebase/firestore';
+import { doc, updateDoc, runTransaction, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import {
-  SPECIES, SPECIES_GROUP, CHAR_ITEMS, CHAR_BY_BASE, speciesOf,
+  SPECIES_GROUP, CHAR_ITEMS, FRIEND_ITEMS, isCompanion,
   ITEMS, ITEM_MAP, SLOT_LABEL, SETS, setPrice,
   normalizeRoom, canPlaceAt,
 } from '../../lib/items';
@@ -15,19 +15,26 @@ const SPACES = [
   ['room', '🛋️ 내 방'],
   ['garden', '🌳 정원'],
   ['classroom', '🏫 교실'],
+  ['cafe', '☕ 카페'],
 ];
+const SPACE_KEYS = SPACES.map(([id]) => id);
 
 // 상점 분류 → 아이템 슬롯
 const CATS = [
   ['char', '🐰 캐릭터', ['char']],
+  ['friend', '👫 친구', ['friend']],
+  ['pet', '🐾 애완동물', ['pet']],
   ['deco', '👑 꾸미기', ['hat', 'face', 'acc']],
   ['room', '🛋️ 가구', ['room']],
   ['garden', '🌳 정원', ['garden']],
   ['class', '🏫 교실', ['class']],
+  ['cafe', '☕ 카페', ['cafe']],
   ['light', '💡 조명', ['light']],
   ['skin', '🎨 벽지·바닥', ['wall', 'floor']],
   ['set', '🎁 세트', null],
 ];
+
+const MAX_WALKING = 8; // 한 번에 데리고 다닐 수 있는 수
 
 export default function RoomPage() {
   const ctx = useOutletContext();
@@ -54,9 +61,17 @@ function RoomInner({ klass, student }) {
     room: normalizeRoom(student.room),
     garden: normalizeRoom(student.garden),
     classroom: normalizeRoom(student.classroom),
+    cafe: normalizeRoom(student.cafe),
   };
   const activeMap = maps[space];
   const skin = student.roomSkin || {};
+
+  // 함께 다니는 친구·애완동물 (없으면 가진 것 전부)
+  const walking = student.walking || [];
+  const companions = walking
+    .map((id) => ITEM_MAP[id])
+    .filter((i) => i && inventory.includes(i.id))
+    .slice(0, MAX_WALKING);
 
   const flash = (type, text) => {
     setMsg({ type, text });
@@ -75,6 +90,10 @@ function RoomInner({ klass, student }) {
         const upd = { cash: s.cash - item.price, inventory: arrayUnion(item.id) };
         // 캐릭터를 처음 사면 바로 그 모습으로 바뀌어요
         if (item.slot === 'char' && !s.avatar?.base) upd['avatar.base'] = item.base;
+        // 친구·애완동물은 사자마자 함께 다녀요
+        if (isCompanion(item.slot) && (s.walking || []).length < MAX_WALKING) {
+          upd.walking = arrayUnion(item.id);
+        }
         tx.update(studentRef, upd);
       });
       flash('ok', `🛍️ '${item.name}' 구매 완료!`);
@@ -115,7 +134,7 @@ function RoomInner({ klass, student }) {
     }
     const updates = { [`${space}.${key}`]: { id: placing, rot: 0 } };
     // 다른 공간에 놓여 있던 같은 아이템은 회수해요
-    for (const sp of ['room', 'garden', 'classroom']) {
+    for (const sp of SPACE_KEYS) {
       const prev = Object.keys(maps[sp]).find((k) => maps[sp][k].id === placing);
       if (prev && !(sp === space && prev === key)) updates[`${sp}.${prev}`] = deleteField();
     }
@@ -141,13 +160,22 @@ function RoomInner({ klass, student }) {
   };
 
   // 아이템 종류에 맞는 공간으로 자동 전환하며 배치 시작
+  const SLOT_SPACE = { garden: 'garden', class: 'classroom', cafe: 'cafe' };
   const startPlacing = (item) => {
-    const target = item.slot === 'garden' ? 'garden' : item.slot === 'class' ? 'classroom' : space;
-    if (item.slot === 'room' && space === 'garden') { /* 가구는 실내로 */ }
-    const dest = item.slot === 'room' ? (space === 'garden' ? 'room' : space) : target;
+    const dest = SLOT_SPACE[item.slot]
+      || (item.slot === 'room' && space === 'garden' ? 'room' : space); // 조명은 지금 공간에 그대로
     if (dest !== space) setSpace(dest);
     setPlacing(placing === item.id ? null : item.id);
     setSelected(null);
+  };
+
+  /* ----- 👫🐾 함께 다니기 켜고 끄기 ----- */
+  const toggleWalking = async (item) => {
+    const on = walking.includes(item.id);
+    if (!on && walking.length >= MAX_WALKING) {
+      return flash('err', `한 번에 ${MAX_WALKING}마리까지만 데리고 다닐 수 있어요!`);
+    }
+    await updateDoc(studentRef, { walking: on ? arrayRemove(item.id) : arrayUnion(item.id) });
   };
 
   /* ----- 아바타 / 스킨 ----- */
@@ -230,6 +258,7 @@ function RoomInner({ klass, student }) {
           onPlace={onPlace}
           selectedKey={selected}
           onSelectFurniture={setSelected}
+          companions={companions}
           glRef={glRef}
         />
         {placing && (
@@ -264,13 +293,50 @@ function RoomInner({ klass, student }) {
       {/* 인벤토리 */}
       {tab === 'inv' && (
         <div className="bg-white rounded-3xl shadow p-5 space-y-5">
-          {[['room', '🛋️ 가구·소품'], ['garden', '🌳 정원'], ['class', '🏫 교실'], ['light', '💡 조명']].map(([slot, label]) => (
+          {/* 👫🐾 함께 다니는 친구·애완동물 */}
+          <div>
+            <h4 className="text-gray-500 mb-2">
+              👫🐾 친구 · 애완동물
+              <span className="text-xs text-gray-300 ml-2">
+                눌러서 함께 다니기 ON/OFF ({walking.length}/{MAX_WALKING})
+              </span>
+            </h4>
+            {[...owned('friend'), ...owned('pet')].length ? (
+              <div className="flex flex-wrap gap-2">
+                {[...owned('friend'), ...owned('pet')].map((item) => {
+                  const on = walking.includes(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => toggleWalking(item)}
+                      className={`rounded-2xl border-2 p-2 text-center transition ${
+                        on ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 opacity-60 hover:opacity-100'
+                      }`}
+                      style={{ width: 92 }}
+                    >
+                      <ItemThumb id={item.id} size={48} />
+                      <div className="text-[11px] mt-0.5 leading-tight">{item.name}</div>
+                      <div className={`text-[10px] ${on ? 'text-emerald-600' : 'text-gray-400'}`}>
+                        {on ? '🚶 함께 다니는 중' : '집에서 쉬는 중'}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-gray-400 text-sm">
+                아직 친구가 없어요. 상점의 👫친구 · 🐾애완동물에서 데려오면 내 공간을 돌아다녀요!
+              </p>
+            )}
+          </div>
+
+          {[['room', '🛋️ 가구·소품'], ['garden', '🌳 정원'], ['class', '🏫 교실'], ['cafe', '☕ 카페'], ['light', '💡 조명']].map(([slot, label]) => (
             <div key={slot}>
               <h4 className="text-gray-500 mb-2">{label} <span className="text-xs text-gray-300">누르고 바닥을 클릭하면 배치돼요</span></h4>
               {owned(slot).length ? (
                 <div className="flex flex-wrap gap-2">
                   {owned(slot).map((item) => {
-                    const placedIn = ['room', 'garden', 'classroom'].find((sp) =>
+                    const placedIn = SPACE_KEYS.find((sp) =>
                       Object.values(maps[sp]).some((p) => p.id === item.id));
                     return (
                       <button

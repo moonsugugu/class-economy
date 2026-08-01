@@ -68,6 +68,8 @@ export const FOOTPRINT = {
   // 교실·조명
   deskpair: [2, 1], teacherdesk: [2, 1], chalkboard: [2, 1], locker: [2, 1],
   shoerack: [2, 1], noticeboard: [2, 1], screen: [2, 1], fluorescent: [2, 1],
+  // 카페
+  cafecounter: [2, 1], cafeshelf: [2, 1], cafesofa: [2, 1], cafeawning: [2, 1],
 };
 
 // ===== 아이템 카탈로그 =====
@@ -270,6 +272,65 @@ export const ITEMS = [
   I('light_lantern', 'light', 'floorlantern', '🏮', '바닥 랜턴', 70, { a: '#fb923c' }),
   I('light_campfire', 'light', 'campfire', '🔥', '모닥불 조명', 80, { a: '#f97316' }),
 
+  // ---------- 실내 추가 (인기 아이템) ----------
+  I('room_bunkbed', 'room', 'bunkbed', '🛏️', '2층 침대', 170, { a: '#60a5fa' }),
+  I('room_hammock', 'room', 'hammock', '🏝️', '해먹', 95, { a: '#fbbf24' }),
+  I('room_swingchair', 'room', 'swingchair', '🪺', '행잉 의자', 130, { a: '#f8fafc' }),
+  I('room_guitar', 'room', 'guitarstand', '🎸', '기타 스탠드', 90, { a: '#d97706' }),
+  I('room_basketballrug', 'room', 'rug', '🏀', '농구 코트 러그', 60, { a: '#f59e0b' }),
+  I('room_treadmill', 'room', 'treadmill', '🏃', '러닝머신', 160, { a: '#334155' }),
+  I('room_vending', 'room', 'vending', '🥤', '자판기', 190, { a: '#ef4444' }),
+  I('room_arcade', 'room', 'arcade', '🕹️', '오락기', 220, { a: '#7c3aed' }),
+  I('room_camera', 'room', 'tripodcam', '📷', '삼각대 카메라', 85, { a: '#26262b' }),
+  I('room_moon', 'room', 'moonlamp', '🌙', '달 조명', 100, { a: '#fef3c7' }),
+
+  // ---------- 정원 추가 ----------
+  I('garden_greenhouse', 'garden', 'greenhouse', '🏡', '유리 온실', 210, { a: '#a7f3d0' }),
+  I('garden_bridge', 'garden', 'gbridge', '🌉', '작은 다리', 95, { a: '#b5834f' }),
+  I('garden_treehouse', 'garden', 'treehouse', '🌲', '트리하우스', 260, { a: '#8a5f36' }),
+  I('garden_hopscotch', 'garden', 'hopscotch', '🔢', '땅따먹기 판', 40, { a: '#f8fafc' }),
+  I('garden_basketball', 'garden', 'hoop', '🏀', '야외 농구대', 90, { a: '#ef4444' }),
+  I('garden_stage', 'garden', 'ministage', '🎤', '미니 무대', 180, { a: '#a78bfa' }),
+
+  // ---------- ☕ 카페 ----------
+  I('cafe_counter', 'cafe', 'cafecounter', '🧾', '카페 카운터', 160, { a: '#8a5a3b' }),
+  I('cafe_machine', 'cafe', 'espresso', '☕', '에스프레소 머신', 140, { a: '#cbd5e1' }),
+  I('cafe_grinder', 'cafe', 'grinder', '⚙️', '원두 그라인더', 80, { a: '#ef4444' }),
+  I('cafe_shelf', 'cafe', 'cafeshelf', '🫙', '원두 진열장', 110, { a: '#a16207' }),
+  I('cafe_cake', 'cafe', 'cakecase', '🍰', '케이크 진열대', 130, { a: '#f8fafc' }),
+  I('cafe_table', 'cafe', 'cafetable', '🪑', '카페 테이블', 70, { a: '#b5834f' }),
+  I('cafe_table_marble', 'cafe', 'cafetable', '🪑', '대리석 테이블', 90, { a: '#f1f5f9' }),
+  ...vary('cafe_chair', 'cafe', 'cafechair', '💺', '카페 의자', 45, ['pink', 'mint', 'yellow']),
+  I('cafe_sofa', 'cafe', 'cafesofa', '🛋️', '카페 소파석', 150, { a: '#8b5e3c' }),
+  I('cafe_menu', 'cafe', 'menuboard', '📋', '메뉴판', 65, { a: '#26262b' }),
+  I('cafe_barstool', 'cafe', 'barstool', '🪑', '바 의자', 40, { a: '#f59e0b' }),
+  I('cafe_plantpot', 'cafe', 'cafeplant', '🌿', '카페 화분', 50, { a: '#22c55e' }),
+  I('cafe_awning', 'cafe', 'cafeawning', '⛱️', '차양막', 120, { a: '#ef4444' }),
+  I('cafe_sign', 'cafe', 'cafesign', '🪧', '카페 간판', 100, { a: '#7c4a21' }),
+  I('cafe_fridge', 'cafe', 'drinkfridge', '🥤', '음료 냉장고', 135, { a: '#38bdf8' }),
+  I('cafe_juicer', 'cafe', 'juicer', '🧃', '주스 기계', 95, { a: '#fb923c' }),
+  I('cafe_cup', 'cafe', 'cupstack', '🥤', '컵 타워', 35, { a: '#f8fafc' }),
+  I('cafe_board', 'cafe', 'standboard', '✍️', '입간판', 75, { a: '#26262b' }),
+  I('cafe_speaker', 'cafe', 'speaker', '🔊', '음악 스피커', 85, { a: '#334155' }),
+  I('cafe_tip', 'cafe', 'tipjar', '💰', '팁 항아리', 40, { a: '#fbbf24' }),
+
+  // ---------- 🐾 애완동물 (돌아다녀요!) ----------
+  I('pet_dog', 'pet', 'petDog', '🐕', '강아지', 120, { a: '#e8d3b0' }),
+  I('pet_cat', 'pet', 'petCat', '🐈', '고양이', 120, { a: '#f8b26a' }),
+  I('pet_hamster', 'pet', 'petHamster', '🐹', '햄스터', 80, { a: '#f5d7a1' }),
+  I('pet_rabbit', 'pet', 'petRabbit', '🐇', '토끼', 100, { a: '#ffffff' }),
+  I('pet_chick', 'pet', 'petChick', '🐤', '병아리', 60, { a: '#fde047' }),
+  I('pet_parrot', 'pet', 'petParrot', '🦜', '앵무새', 140, { a: '#ef4444' }),
+  I('pet_turtle', 'pet', 'petTurtle', '🐢', '거북이', 110, { a: '#5cb85c' }),
+  I('pet_hedgehog', 'pet', 'petHedgehog', '🦔', '고슴도치', 130, { a: '#b98a5e' }),
+  I('pet_squirrel', 'pet', 'petSquirrel', '🐿️', '다람쥐', 110, { a: '#c2703d' }),
+  I('pet_penguin', 'pet', 'petPenguin', '🐧', '아기 펭귄', 150, { a: '#2f3b52' }),
+  I('pet_butterfly', 'pet', 'petButterfly', '🦋', '나비', 70, { a: '#60a5fa' }),
+  I('pet_ladybug', 'pet', 'petLadybug', '🐞', '무당벌레', 55, { a: '#ef4444' }),
+  I('pet_fish', 'pet', 'petFish', '🐠', '금붕어', 90, { a: '#fb923c' }),
+  I('pet_dragon', 'pet', 'petDragon', '🐲', '아기 드래곤', 300, { a: '#34d399' }),
+  I('pet_ghost', 'pet', 'petGhost', '👻', '꼬마 유령', 200, { a: '#e0e7ff' }),
+
   // ---------- 벽지 ----------
   I('wall_cream', 'wall', null, '🏳️', '크림 벽지', 30, { a: '#fdf3df' }),
   I('wall_sky', 'wall', null, '🩵', '하늘 벽지', 30, { a: '#d3ecfb' }),
@@ -305,17 +366,37 @@ export const CHAR_ITEMS = Object.entries(SPECIES).map(([base, sp]) => ({
 }));
 ITEMS.push(...CHAR_ITEMS);
 
+/* ===== 👫 함께 다니는 친구 — 사면 내 공간을 자유롭게 돌아다녀요 ===== */
+export const FRIEND_ITEMS = Object.entries(SPECIES).map(([base, sp]) => ({
+  id: `friend_${base.codePointAt(0).toString(16)}`,
+  slot: 'friend',
+  model: null,
+  emoji: base,
+  name: `${sp.name} 친구`,
+  price: Math.round(sp.price * 1.6),
+  colors: {},
+  base,
+  group: sp.group,
+}));
+ITEMS.push(...FRIEND_ITEMS);
+
 export const ITEM_MAP = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 export const CHAR_BY_BASE = Object.fromEntries(CHAR_ITEMS.map((i) => [i.base, i]));
+export const PET_ITEMS = ITEMS.filter((i) => i.slot === 'pet');
+
+/** 공간을 돌아다니는 것들(친구·애완동물) */
+export const isCompanion = (slot) => slot === 'friend' || slot === 'pet';
 
 export const SLOT_LABEL = {
-  char: '캐릭터', hat: '모자', face: '얼굴', acc: '손 아이템',
-  room: '가구·소품', garden: '정원', class: '교실', light: '조명',
+  char: '캐릭터', friend: '친구', pet: '애완동물',
+  hat: '모자', face: '얼굴', acc: '손 아이템',
+  room: '가구·소품', garden: '정원', class: '교실', cafe: '카페', light: '조명',
   wall: '벽지', floor: '바닥',
 };
 
 export const GARDEN_FLOOR = ['#a5db7c', '#97d16d'];
-export const CLASS_FLOOR = ['#e4cfa8', '#dcc59b'];
+export const CLASS_FLOOR = ['#d9b98f', '#d2b085'];
+export const CAFE_FLOOR = ['#6b4a34', '#5d4030'];
 
 /* ===== 💡 조명 스펙 — 이 모델들은 3D 공간에서 진짜로 빛을 냅니다 ===== */
 export const LIGHT_SPEC = {
@@ -360,6 +441,21 @@ export const SETS = [
     id: 'set_garden_play', name: '🌳 신나는 놀이터 세트', off: 0.2,
     desc: '그네·미끄럼틀·시소·모래놀이터로 정원을 놀이터로!',
     items: ['garden_swing', 'garden_slide', 'garden_seesaw', 'garden_sandbox', 'garden_tree'],
+  },
+  {
+    id: 'set_cafe_start', name: '☕ 카페 창업 세트', off: 0.2,
+    desc: '카운터·머신·테이블·의자·메뉴판 — 오늘부터 나도 사장님!',
+    items: ['cafe_counter', 'cafe_machine', 'cafe_table', 'cafe_chair_pink', 'cafe_menu', 'cafe_cup'],
+  },
+  {
+    id: 'set_cafe_deluxe', name: '☕ 디저트 카페 세트', off: 0.2,
+    desc: '케이크 진열대·음료 냉장고·소파석까지 갖춘 진짜 카페',
+    items: ['cafe_cake', 'cafe_fridge', 'cafe_sofa', 'cafe_shelf', 'cafe_sign', 'cafe_speaker'],
+  },
+  {
+    id: 'set_pet_friends', name: '🐾 첫 반려동물 세트', off: 0.15,
+    desc: '강아지·고양이·햄스터가 내 공간을 함께 돌아다녀요!',
+    items: ['pet_dog', 'pet_cat', 'pet_hamster', 'pet_chick'],
   },
 ];
 

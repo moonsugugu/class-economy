@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { B, Sp } from './prims.jsx';
-import { FurnitureModel } from './models.jsx';
-import { Walker } from './Character3D.jsx';
+import { B, Sp, Cy, Co } from './prims.jsx';
+import { FurnitureModel, PET_MODELS, FLYING_PETS } from './models.jsx';
+import { Walker, Wanderer, Character } from './Character3D.jsx';
 import {
   ITEM_MAP, ROOM_COLS as COLS, ROOM_ROWS as ROWS,
   footprintOf, canPlaceAt, DEFAULT_WALL, DEFAULT_FLOOR, GARDEN_FLOOR,
-  CLASS_FLOOR, LIGHT_SPEC,
+  CLASS_FLOOR, CAFE_FLOOR, LIGHT_SPEC,
 } from '../lib/items';
 
 const cx = (c) => c - COLS / 2;
@@ -99,35 +99,145 @@ function GardenShell() {
   );
 }
 
-/* 🏫 교실 — 큰 창문과 나무 마루가 있는 교실 */
+/* 🏫 교실 — 앞 칠판·마루·창가·천장 형광등이 있는 진짜 교실 */
 function ClassShell() {
-  const [fa, fb] = CLASS_FLOOR;
+  const [fa] = CLASS_FLOOR;
   return (
     <group>
+      {/* 나무 마루 (긴 널판) */}
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[COLS, ROWS]} />
+        <meshStandardMaterial color={fa} roughness={0.7} />
+      </mesh>
+      {Array.from({ length: COLS + 1 }, (_, i) => (
+        <B key={`p${i}`} p={[cx(i), 0.004, 0]} s={[0.035, 0.008, ROWS]} c="#bd9868" />
+      ))}
+      {Array.from({ length: 4 }, (_, i) => (
+        <B key={`q${i}`} p={[cx(i * 2 + 1), 0.004, cz(i % 2 ? 2 : 4)]} s={[2, 0.008, 0.03]} c="#bd9868" />
+      ))}
+
+      {/* 교실 벽 (연한 미색) */}
+      <B p={[0, 1.75, cz(0) - 0.1]} s={[COLS + 0.4, 3.5, 0.2]} c="#f2ede2" />
+      <B p={[cx(0) - 0.1, 1.75, 0]} s={[0.2, 3.5, ROWS + 0.4]} c="#f2ede2" />
+      {/* 아래 나무 굽도리 + 허리 몰딩 */}
+      <B p={[0, 0.2, cz(0) + 0.03]} s={[COLS, 0.4, 0.07]} c="#c9a97e" />
+      <B p={[cx(0) + 0.03, 0.2, 0]} s={[0.07, 0.4, ROWS]} c="#c9a97e" />
+      <B p={[0, 0.95, cz(0) + 0.02]} s={[COLS, 0.05, 0.05]} c="#dcd0bb" />
+
+      {/* ▶ 앞 칠판 — 기존 칠판 디자인 그대로 벽에 붙였어요 */}
+      <group position={[-0.6, 0.05, cz(0) + 0.22]}>
+        <FurnitureModel model="chalkboard" colors={{ a: '#2f6b4f' }} />
+      </group>
+
+      {/* 칠판 옆 게시판 */}
+      <group position={[2.6, 0.05, cz(0) + 0.2]} scale={0.85}>
+        <FurnitureModel model="noticeboard" colors={{ a: '#c9a468' }} />
+      </group>
+
+      {/* 태극기 + 급훈 (칠판 위쪽 벽) */}
+      <group position={[-2.6, 2.55, cz(0) + 0.06]}>
+        <B p={[0, 0, 0]} s={[0.66, 0.44, 0.03]} c="#ffffff" />
+        <Sp p={[0, 0.02, 0.02]} rad={0.1} sc={[1, 1, 0.12]} c="#cd2e3a" />
+        <Sp p={[0, -0.03, 0.025]} rad={0.07} sc={[1, 1, 0.12]} c="#0047a0" />
+        {[[-0.2, 0.12], [0.2, -0.12]].map(([dx, dy], i) => (
+          <B key={i} p={[dx, dy, 0.02]} s={[0.09, 0.025, 0.01]} c="#26262b" />
+        ))}
+      </group>
+      <group position={[1.1, 2.55, cz(0) + 0.06]}>
+        <B p={[0, 0, 0]} s={[1.5, 0.35, 0.04]} c="#8a5f36" />
+        <B p={[0, 0, 0.03]} s={[1.4, 0.26, 0.01]} c="#fdf8ec" />
+        {[-0.45, -0.1, 0.3].map((x, i) => (
+          <B key={i} p={[x, 0, 0.04]} s={[0.24, 0.05, 0.01]} c="#334155" />
+        ))}
+      </group>
+
+      {/* 벽시계 */}
+      <group position={[3.3, 0.6, cz(0) + 0.08]}>
+        <FurnitureModel model="wallclock" colors={{ a: '#f8fafc' }} />
+      </group>
+
+      {/* ▶ 창가 — 왼쪽 벽 전체가 큰 창문 (교실 특유의 창가 줄) */}
+      {[-2.0, -0.5, 1.0, 2.5].map((z) => (
+        <group key={z} position={[cx(0) + 0.04, 1.75, z]}>
+          <B p={[0, 0, 0]} s={[0.07, 1.9, 1.35]} c="#e8e2d5" />
+          <B p={[0.03, 0, 0]} s={[0.04, 1.7, 1.15]} c="#cfeaf8" e="#b6dcf0" />
+          <B p={[0.06, 0, 0]} s={[0.02, 1.7, 0.05]} c="#ffffff" />
+          <B p={[0.06, 0.15, 0]} s={[0.02, 0.05, 1.15]} c="#ffffff" />
+          <B p={[0.02, -1.0, 0]} s={[0.16, 0.08, 1.35]} c="#c9a97e" />
+        </group>
+      ))}
+
+      {/* ▶ 천장 형광등 (교실 특유의 긴 등) — 시야를 가리지 않게 높고 얇게 */}
+      {[-1.2, 1.6].map((z) => (
+        <group key={z} position={[-0.5, 3.32, z]}>
+          <B p={[0, 0, 0]} s={[3.6, 0.05, 0.2]} c="#dbe2ea" />
+          <B p={[0, -0.04, 0]} s={[3.4, 0.03, 0.15]} c="#ffffff" e="#fffdf0" />
+          {[-1.4, 1.4].map((x) => (
+            <Cy key={x} p={[x, 0.09, 0]} rad={0.008} h={0.18} c="#94a3b8" />
+          ))}
+        </group>
+      ))}
+
+      {/* 스피커 (교실 앞 위쪽 모서리) */}
+      <group position={[3.5, 2.75, cz(0) + 0.12]}>
+        <B p={[0, 0, 0]} s={[0.26, 0.34, 0.18]} c="#94a3b8" />
+        <Cy p={[0, 0.04, 0.1]} rad={0.085} h={0.02} c="#475569" r={[Math.PI / 2, 0, 0]} />
+      </group>
+    </group>
+  );
+}
+
+/* ☕ 카페 — 벽돌 벽, 어두운 원목 바닥, 펜던트 조명 */
+function CafeShell() {
+  const [fa, fb] = CAFE_FLOOR;
+  return (
+    <group>
+      {/* 원목 바닥 (헤링본 느낌) */}
       {Array.from({ length: ROWS * COLS }, (_, i) => {
         const r = Math.floor(i / COLS), c = i % COLS;
         return (
           <mesh key={i} rotation-x={-Math.PI / 2} position={[cx(c) + 0.5, 0, cz(r) + 0.5]} receiveShadow>
             <planeGeometry args={[1, 1]} />
-            <meshStandardMaterial color={(r + c) % 2 ? fa : fb} roughness={0.8} />
+            <meshStandardMaterial color={(r + c) % 2 ? fa : fb} roughness={0.6} />
           </mesh>
         );
       })}
-      {/* 벽 */}
-      <B p={[0, 1.6, cz(0) - 0.1]} s={[COLS + 0.4, 3.2, 0.2]} c="#eef2f7" />
-      <B p={[cx(0) - 0.1, 1.6, 0]} s={[0.2, 3.2, ROWS + 0.4]} c="#eef2f7" />
-      {/* 아래쪽 나무 굽도리 */}
-      <B p={[0, 0.16, cz(0) + 0.02]} s={[COLS, 0.32, 0.06]} c="#d6bd97" />
-      <B p={[cx(0) + 0.02, 0.16, 0]} s={[0.06, 0.32, ROWS]} c="#d6bd97" />
-      {/* 왼쪽 벽 큰 창문 3개 */}
-      {[-1.6, 0.2, 2.0].map((z) => (
-        <group key={z} position={[cx(0) + 0.03, 1.9, z]}>
-          <B p={[0, 0, 0]} s={[0.06, 1.5, 1.3]} c="#ffffff" />
-          <B p={[0.02, 0, 0]} s={[0.04, 1.3, 1.1]} c="#bfe4f8" e="#a8d8ef" />
-          <B p={[0.05, 0, 0]} s={[0.02, 1.3, 0.05]} c="#ffffff" />
-          <B p={[0.05, 0, 0]} s={[0.02, 0.05, 1.1]} c="#ffffff" />
+      {/* 벽돌 뒷벽 */}
+      <B p={[0, 1.7, cz(0) - 0.12]} s={[COLS + 0.4, 3.4, 0.24]} c="#8d5b45" />
+      {Array.from({ length: 11 }, (_, row) =>
+        Array.from({ length: 9 }, (_, col) => (
+          <B
+            key={`${row}-${col}`}
+            p={[cx(0) + 0.5 + col * 0.95 + (row % 2 ? 0.45 : 0), 0.3 + row * 0.29, cz(0) + 0.02]}
+            s={[0.86, 0.22, 0.04]}
+            c={row % 3 === 0 ? '#9c6650' : row % 3 === 1 ? '#87553f' : '#a06e56'}
+          />
+        ))
+      )}
+      {/* 왼쪽 통유리 창 */}
+      <B p={[cx(0) - 0.1, 1.7, 0]} s={[0.2, 3.4, ROWS + 0.4]} c="#5c4033" />
+      {[-1.8, 0.3, 2.4].map((z) => (
+        <group key={z} position={[cx(0) + 0.04, 1.5, z]}>
+          <B p={[0, 0, 0]} s={[0.07, 2.3, 1.8]} c="#3f2d20" />
+          <B p={[0.03, 0, 0]} s={[0.04, 2.1, 1.6]} c="#dbeafe" e="#bfdbfe" o={0.75} />
+          <B p={[0.06, 0.2, 0]} s={[0.02, 0.06, 1.6]} c="#3f2d20" />
         </group>
       ))}
+      {/* 천장 펜던트 조명 3개 */}
+      {[-2.0, 0, 2.0].map((x) => (
+        <group key={x} position={[x, 2.4, 0.4]}>
+          <Cy p={[0, 0.45, 0]} rad={0.012} h={0.9} c="#26262b" />
+          <Co p={[0, 0, 0]} rad={0.26} h={0.28} c="#26262b" />
+          <Sp p={[0, -0.1, 0]} rad={0.11} c="#fff3c4" e="#ffe9a3" />
+        </group>
+      ))}
+      {/* 벽 선반 + 화분 */}
+      <group position={[2.3, 1.9, cz(0) + 0.14]}>
+        <B p={[0, 0, 0]} s={[1.4, 0.06, 0.26]} c="#6b4423" />
+        {[-0.45, 0, 0.45].map((x, i) => (
+          <Cy key={x} p={[x, 0.13, 0]} rad={0.08} h={0.2} c={['#a97142', '#f1f5f9', '#8fbf9f'][i]} />
+        ))}
+      </group>
     </group>
   );
 }
@@ -139,7 +249,7 @@ function ClassShell() {
 export default function RoomScene({
   avatar, roomMap, wallId, floorId, mode = 'room',
   placing, onPlace, selectedKey, onSelectFurniture,
-  glRef, height = '58vh',
+  companions = [], glRef, height = '58vh',
 }) {
   const targetRef = useRef([0.5, 1]);
   const [hover, setHover] = useState(null); // 배치 미리보기 셀
@@ -164,6 +274,13 @@ export default function RoomScene({
 
   const garden = mode === 'garden';
   const classroom = mode === 'classroom';
+  const cafe = mode === 'cafe';
+
+  // 동반자들이 돌아다닐 수 있는 범위
+  const bounds = {
+    minX: cx(0) + 0.6, maxX: cx(COLS) - 0.6,
+    minZ: cz(0) + 0.6, maxZ: cz(ROWS) - 0.6,
+  };
 
   // 배치된 조명들 (실제로 빛을 냄)
   const lights = Object.entries(roomMap).map(([key, pl]) => {
@@ -180,7 +297,8 @@ export default function RoomScene({
       style={{ height }}
       className={`rounded-3xl overflow-hidden border-4 touch-none ${
         garden ? 'border-emerald-200 bg-gradient-to-b from-sky-300 via-sky-200 to-emerald-100'
-          : classroom ? 'border-sky-200 bg-gradient-to-b from-sky-100 to-slate-100'
+          : classroom ? 'border-sky-200 bg-gradient-to-b from-sky-100 to-amber-50'
+          : cafe ? 'border-amber-700 bg-gradient-to-b from-orange-100 to-amber-50'
           : 'border-amber-200 bg-gradient-to-b from-sky-100 to-amber-50'
       }`}
     >
@@ -213,7 +331,10 @@ export default function RoomScene({
           shadow-camera-top={8}
           shadow-camera-bottom={-8}
         />
-        {garden ? <GardenShell /> : classroom ? <ClassShell /> : <Shell wall={wall} floors={floors} />}
+        {garden ? <GardenShell />
+          : classroom ? <ClassShell />
+          : cafe ? <CafeShell />
+          : <Shell wall={wall} floors={floors} />}
 
         {/* 바닥 클릭/호버 레이어 */}
         {Array.from({ length: ROWS * COLS }, (_, i) => {
@@ -277,8 +398,27 @@ export default function RoomScene({
           );
         })}
 
-        {/* 캐릭터 */}
+        {/* 내 캐릭터 */}
         <Walker avatar={avatar} targetRef={targetRef} />
+
+        {/* 👫🐾 내가 산 친구들과 애완동물 — 스스로 돌아다녀요 */}
+        {companions.map((c, i) => {
+          if (c.slot === 'friend') {
+            return (
+              <Wanderer key={c.id} bounds={bounds} seed={i} speed={0.9} scale={0.85}>
+                <Character avatar={{ base: c.base }} />
+              </Wanderer>
+            );
+          }
+          const P = PET_MODELS[c.model];
+          if (!P) return null;
+          const fly = FLYING_PETS.includes(c.model);
+          return (
+            <Wanderer key={c.id} bounds={bounds} seed={i} speed={fly ? 1.5 : 1.2} fly={fly} scale={1}>
+              <P {...c.colors} />
+            </Wanderer>
+          );
+        })}
 
         <OrbitControls
           enablePan={false}

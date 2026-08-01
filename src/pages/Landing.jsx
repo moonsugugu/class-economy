@@ -57,6 +57,8 @@ export default function Landing() {
           room: {},
           garden: {},
           classroom: {},
+          cafe: {},
+          walking: [],
           holdings: {},
           createdAt: serverTimestamp(),
         });

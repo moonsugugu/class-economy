@@ -255,6 +255,65 @@ export function Character({ avatar = {} }) {
   );
 }
 
+/* =====================================================================
+   🚶 스스로 돌아다니는 동반자 (친구·애완동물)
+   무작위 목적지를 정해 걸어가고, 도착하면 잠시 쉬었다가 다시 출발해요.
+   ===================================================================== */
+export function Wanderer({ bounds, speed = 1.1, fly = false, scale = 1, seed = 0, children }) {
+  const g = useRef();
+  const st = useRef({ init: false, tx: 0, tz: 0, wait: 0 });
+  const pick = (lo, hi) => lo + Math.random() * (hi - lo);
+
+  useFrame((state, dt) => {
+    const gp = g.current;
+    if (!gp) return;
+    const s = st.current;
+    const t = state.clock.elapsedTime;
+
+    if (!s.init) {
+      s.init = true;
+      gp.position.set(pick(bounds.minX, bounds.maxX), 0, pick(bounds.minZ, bounds.maxZ));
+      s.tx = gp.position.x;
+      s.tz = gp.position.z;
+      s.wait = (seed % 5) * 0.4; // 같은 순간에 우르르 움직이지 않도록 시차를 둬요
+    }
+
+    const bob = fly
+      ? 0.15 + Math.sin(t * 2.4 + seed) * 0.09
+      : Math.abs(Math.sin(t * 12 + seed)) * 0.045;
+
+    if (s.wait > 0) {
+      s.wait -= dt;
+      gp.position.y += ((fly ? 0.15 + Math.sin(t * 2 + seed) * 0.07 : 0) - gp.position.y) * 0.08;
+      return;
+    }
+
+    const dx = s.tx - gp.position.x;
+    const dz = s.tz - gp.position.z;
+    const d = Math.hypot(dx, dz);
+
+    if (d < 0.1) { // 도착 — 쉬었다가 새 목적지
+      s.wait = 1 + Math.random() * 3.5;
+      s.tx = pick(bounds.minX, bounds.maxX);
+      s.tz = pick(bounds.minZ, bounds.maxZ);
+      return;
+    }
+
+    const step = Math.min(d, speed * dt);
+    gp.position.x += (dx / d) * step;
+    gp.position.z += (dz / d) * step;
+    gp.position.y = bob;
+
+    const targetRot = Math.atan2(dx, dz);
+    let diff = targetRot - gp.rotation.y;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    gp.rotation.y += diff * Math.min(1, dt * 8);
+  });
+
+  return <group ref={g} scale={scale}>{children}</group>;
+}
+
 /* 방 안을 걸어다니는 캐릭터 — targetRef.current = [x, z] */
 export function Walker({ avatar, targetRef, start = [0.5, 0, 1] }) {
   const g = useRef();

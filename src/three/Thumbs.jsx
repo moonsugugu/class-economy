@@ -6,7 +6,7 @@
    ===================================================================== */
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { FurnitureModel, HAT_MODELS, FACE_MODELS, HAND_MODELS } from './models.jsx';
+import { FurnitureModel, HAT_MODELS, FACE_MODELS, HAND_MODELS, PET_MODELS } from './models.jsx';
 import { Character } from './Character3D.jsx';
 import { ITEM_MAP } from '../lib/items';
 
@@ -15,12 +15,16 @@ const ThumbCtx = createContext(null);
 
 /** 슬롯별로 카메라에 예쁘게 담기도록 위치·크기를 맞춰요 */
 function ItemNode({ item }) {
-  if (item.slot === 'char') {
+  if (item.slot === 'char' || item.slot === 'friend') {
     return (
       <group position={[0, -0.75, 0]} scale={1.15}>
         <Character avatar={{ base: item.base }} />
       </group>
     );
+  }
+  if (item.slot === 'pet') {
+    const P = PET_MODELS[item.model];
+    return P ? <group position={[0, -0.3, 0]} scale={2.1}><P {...item.colors} /></group> : null;
   }
   if (item.slot === 'hat') {
     const M = HAT_MODELS[item.model];

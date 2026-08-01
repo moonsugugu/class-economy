@@ -38,22 +38,50 @@ const DEMO_GARDEN = {
   '2-4': { id: 'garden_well', rot: 0 },
 };
 
+// 칠판·게시판·시계는 교실 자체에 이미 있으니 책상·사물함 위주로
 const DEMO_CLASS = {
-  '0-0': { id: 'class_board', rot: 0 },
-  '0-3': { id: 'class_tdesk', rot: 0 },
-  '0-6': { id: 'class_notice', rot: 0 },
-  '2-0': { id: 'class_desk2', rot: 0 },
-  '2-3': { id: 'class_desk2', rot: 0 },
+  '1-3': { id: 'class_tdesk', rot: 0 },
+  '1-1': { id: 'class_podium', rot: 0 },
+  '3-0': { id: 'class_desk2', rot: 0 },
+  '3-3': { id: 'class_desk2', rot: 0 },
+  '3-6': { id: 'class_desk2', rot: 0 },
+  '5-0': { id: 'class_desk2', rot: 0 },
+  '5-3': { id: 'class_desk2', rot: 0 },
   '2-6': { id: 'class_locker', rot: 0 },
-  '3-1': { id: 'class_podium', rot: 0 },
-  '4-0': { id: 'class_desk2', rot: 0 },
-  '4-3': { id: 'class_water', rot: 0 },
-  '4-5': { id: 'class_flag', rot: 0 },
-  '5-2': { id: 'light_mood', rot: 0 },
-  '1-4': { id: 'light_fluor', rot: 0 },
-  '5-6': { id: 'class_recycle', rot: 0 },
-  '3-6': { id: 'class_clock', rot: 0 },
+  '5-6': { id: 'class_water', rot: 0 },
+  '4-5': { id: 'class_recycle', rot: 0 },
+  '0-7': { id: 'class_flag', rot: 0 },
 };
+
+const DEMO_CAFE = {
+  '0-0': { id: 'cafe_counter', rot: 0 },
+  '0-2': { id: 'cafe_machine', rot: 0 },
+  '0-3': { id: 'cafe_grinder', rot: 0 },
+  '0-5': { id: 'cafe_shelf', rot: 0 },
+  '1-0': { id: 'cafe_cake', rot: 0 },
+  '2-1': { id: 'cafe_table', rot: 0 },
+  '2-2': { id: 'cafe_chair_pink', rot: 0 },
+  '3-1': { id: 'cafe_chair_mint', rot: 0 },
+  '2-5': { id: 'cafe_table_marble', rot: 0 },
+  '3-5': { id: 'cafe_chair_yellow', rot: 0 },
+  '4-0': { id: 'cafe_sofa', rot: 0 },
+  '4-4': { id: 'cafe_plantpot', rot: 0 },
+  '5-2': { id: 'cafe_sign', rot: 0 },
+  '5-6': { id: 'cafe_menu', rot: 0 },
+  '1-7': { id: 'cafe_fridge', rot: 0 },
+  '3-7': { id: 'cafe_speaker', rot: 0 },
+  '5-4': { id: 'cafe_board', rot: 0 },
+};
+
+// 데모에 함께 등장하는 친구·애완동물
+const DEMO_COMPANIONS = [
+  { id: 'c1', slot: 'friend', base: '🦊' },
+  { id: 'c2', slot: 'friend', base: '🐧' },
+  { id: 'c3', slot: 'pet', model: 'petDog', colors: { a: '#e8d3b0' } },
+  { id: 'c4', slot: 'pet', model: 'petCat', colors: { a: '#f8b26a' } },
+  { id: 'c5', slot: 'pet', model: 'petButterfly', colors: { a: '#60a5fa' } },
+  { id: 'c6', slot: 'pet', model: 'petChick', colors: { a: '#fde047' } },
+];
 
 const DEMO_AVATAR = { base: '🐬', hat: 'hat_crown', face: null, acc: 'acc_balloon' };
 
@@ -64,10 +92,10 @@ export default function DemoRoom() {
       <div className="flex items-center gap-3 flex-wrap">
         <Link to="/" className="text-2xl">🏦</Link>
         <h1 className="text-2xl text-purple-600">
-          {space === 'garden' ? '🌳 3D 정원' : space === 'classroom' ? '🏫 3D 교실' : '🛋️ 3D 마이룸'} 미리보기
+          {{ garden: '🌳 3D 정원', classroom: '🏫 3D 교실', cafe: '☕ 3D 카페', room: '🛋️ 3D 마이룸' }[space]} 미리보기
         </h1>
         <div className="flex rounded-2xl bg-white shadow overflow-hidden">
-          {[['room', '🛋️ 방'], ['garden', '🌳 정원'], ['classroom', '🏫 교실']].map(([id, label]) => (
+          {[['room', '🛋️ 방'], ['garden', '🌳 정원'], ['classroom', '🏫 교실'], ['cafe', '☕ 카페']].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setSpace(id)}
@@ -83,7 +111,8 @@ export default function DemoRoom() {
         key={space}
         mode={space}
         avatar={DEMO_AVATAR}
-        roomMap={space === 'garden' ? DEMO_GARDEN : space === 'classroom' ? DEMO_CLASS : DEMO_ROOM}
+        roomMap={{ garden: DEMO_GARDEN, classroom: DEMO_CLASS, cafe: DEMO_CAFE, room: DEMO_ROOM }[space]}
+        companions={DEMO_COMPANIONS}
         wallId="wall_sky"
         floorId="floor_wood"
         height="70vh"
