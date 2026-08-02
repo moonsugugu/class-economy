@@ -4,7 +4,7 @@ import { collection, doc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 import { fmt } from '../../lib/util';
-import { MARKET_PATH, DEFAULT_FX } from '../../lib/stocks';
+import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT } from '../../lib/stocks';
 
 const NAV = [
   ['/student', '🏠', '마이', true],
@@ -70,17 +70,23 @@ export default function StudentLayout() {
   // 총자산 = 현금 + 예금 + 적금 + 달러 + 주식 평가액
   const fx = market?.fx || DEFAULT_FX;
   const stockList = market?.stocks || [];
+  const kpu = Number(klass?.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
   const totalAssets = (() => {
     if (!student) return 0;
+    const conv = (amount, market) => {
+      if (market === 'US') return (amount * fx) / kpu;
+      if (market === 'KR') return amount / kpu;
+      return amount;
+    };
     const stockValue = Object.entries(student.holdings || {}).reduce((a, [sym, h]) => {
       const st = stockList.find((s) => s.symbol === sym);
       if (!st || !h.qty) return a;
-      const v = st.price * h.qty;
-      return a + (st.market === 'US' ? v * fx : v);
+      return a + conv(st.price * h.qty, st.market);
     }, 0);
     const savingsSum = savings.reduce((a, s) => a + (s.amount || 0), 0);
     return Math.round(
-      (student.cash || 0) + (student.deposit || 0) + savingsSum + (student.usd || 0) * fx + stockValue
+      (student.cash || 0) + (student.deposit || 0) + savingsSum
+      + (student.krw || 0) / kpu + ((student.usd || 0) * fx) / kpu + stockValue
     );
   })();
 

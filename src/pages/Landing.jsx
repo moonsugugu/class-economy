@@ -65,6 +65,7 @@ export default function Landing() {
           pin: p, // 처음 입장할 때 정한 나만의 비밀번호
           name: n,
           cash: 0,
+          krw: 0,
           usd: 0,
           deposit: 0,
           depositLastAt: Date.now(),

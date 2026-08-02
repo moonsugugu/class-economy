@@ -12,6 +12,7 @@ import {
   changePct, advance, usedTicks, makeInitialMarket, makeCustomStock,
   MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, todayKey,
   pendingSchedule, SCHEDULE_LABEL, fetchRealQuotes, applyRealPrices,
+  DEFAULT_KRW_PER_UNIT,
 } from '../../lib/stocks';
 import { applyScheduledTicks } from '../../lib/marketSync';
 import { SHOP_PRESETS } from '../../lib/shopPresets';
@@ -938,6 +939,7 @@ function SettingsTab({ klass }) {
     depositRate: klass.depositRate, savingsRate: klass.savingsRate,
     tickLimit: klass.tickLimit ?? DEFAULT_TICK_LIMIT,
     taxRate: klass.taxRate ?? 10,
+    krwPerUnit: klass.krwPerUnit ?? DEFAULT_KRW_PER_UNIT,
   });
   const [form, setForm] = useState(init);
   const [saved, setSaved] = useState(false);
@@ -954,6 +956,7 @@ function SettingsTab({ klass }) {
       savingsRate: Number(form.savingsRate) || 0,
       tickLimit: Math.max(1, Math.min(100, Number(form.tickLimit) || DEFAULT_TICK_LIMIT)),
       taxRate: Math.max(0, Math.min(50, Number(form.taxRate) || 0)),
+      krwPerUnit: Math.max(0.01, Number(form.krwPerUnit) || DEFAULT_KRW_PER_UNIT),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -977,6 +980,12 @@ function SettingsTab({ klass }) {
       <h3 className="text-xl">⚙️ 학급 설정</h3>
       {field('학급 이름', 'name')}
       {field('화폐 단위', 'currency', 'text', '예: 미소, 달란트, 별, 포인트 — 자유롭게 정해요.')}
+      {field(
+        `화폐 가치 (1 ${form.currency || '포인트'} = ? 원)`, 'krwPerUnit', 'number',
+        `기본 1 (실제 돈과 1:1). 100으로 하면 1${form.currency || '포인트'} = 100원이 되어, ` +
+        `삼성전자 262,500원짜리 주식이 ${fmt(Math.round(262500 / (Number(form.krwPerUnit) || 1)))} ${form.currency || '포인트'}가 돼요. ` +
+        '숫자를 크게 할수록 주식이 저렴해집니다.'
+      )}
       {field('월급 금액', 'salary', 'number', '월급 지급 버튼을 누를 때 1인당 지급되는 금액이에요.')}
       {field('예금 이율 (주당 %)', 'depositRate', 'number', '학생이 예금에 넣어둔 돈에 7일마다 붙는 이자예요.')}
       {field(

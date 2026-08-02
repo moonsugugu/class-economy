@@ -7,8 +7,8 @@ import {
 import { db } from '../../firebase';
 import { fmt, periodKeys, rankAssets } from '../../lib/util';
 import {
-  changePct, MARKET_PATH, MARKET_LABEL, DEFAULT_FX,
-  pendingSchedule, SCHEDULE_LABEL,
+  changePct, MARKET_PATH, MARKET_LABEL, DEFAULT_FX, DEFAULT_KRW_PER_UNIT,
+  pendingSchedule, SCHEDULE_LABEL, stockCur, WALLET_FIELD,
 } from '../../lib/stocks';
 import { applyScheduledTicks } from '../../lib/marketSync';
 
@@ -53,8 +53,24 @@ export default function StocksPage() {
     setTimeout(() => setMsg(null), 3500);
   };
 
+  const kpu = Number(klass.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
   const isUS = (s) => s?.market === 'US';
-  const priceLabel = (s) => (isUS(s) ? `$${fmt(s.price)}` : `${fmt(s.price)} ${klass.currency}`);
+  /** 종목 가격을 그 종목의 통화로 표시 */
+  const priceLabel = (s) => {
+    const c = stockCur(s);
+    if (c === 'USD') return `$${fmt(s.price)}`;
+    if (c === 'KRW') return `${fmt(s.price)}원`;
+    return `${fmt(s.price)} ${klass.currency}`;
+  };
+  const curMark = (s) => ({ USD: '$', KRW: '', UNIT: '' }[stockCur(s)]);
+  const curSuffix = (s) => ({ USD: '', KRW: '원', UNIT: ` ${klass.currency}` }[stockCur(s)]);
+  /** 학급화폐로 환산한 값 (총액 비교용) */
+  const inUnits = (amount, s) => {
+    const c = stockCur(s);
+    if (c === 'USD') return (amount * fx) / kpu;
+    if (c === 'KRW') return amount / kpu;
+    return amount;
+  };
 
   const trade = async (side) => {
     const n = Math.floor(Number(qty));
@@ -69,38 +85,38 @@ export default function StocksPage() {
         const st = (mkt?.stocks || []).find((x) => x.symbol === sel.id);
         if (!st) throw new Error('지금은 거래할 수 없는 종목이에요.');
         const price = st.price;
-        const usd = st.market === 'US';           // 미국 주식은 달러로 거래해요
-        const wallet = usd ? (s.usd || 0) : (s.cash || 0);
+        const cur = stockCur(st);                 // KRW(한국) / USD(미국) / UNIT(우리 반)
+        const field = WALLET_FIELD[cur];
+        const wallet = s[field] || 0;
         const h = s.holdings?.[sel.id] || { qty: 0, avg: 0 };
+        const need = {
+          KRW: '원이 부족해요! 은행 환전소에서 원(₩)으로 바꿔 오세요 💱',
+          USD: '달러가 부족해요! 은행 환전소에서 달러($)로 바꿔 오세요 💱',
+          UNIT: `${klass.currency}가 부족해요!`,
+        }[cur];
 
         if (side === 'buy') {
           const cost = price * n;
-          if (wallet < cost) {
-            throw new Error(usd
-              ? '달러가 부족해요! 은행 환전소에서 달러로 바꿔 오세요 💱'
-              : '현금이 부족해요!');
-          }
+          if (wallet < cost) throw new Error(need);
           const nq = h.qty + n;
           tx.update(studentRef, {
-            [usd ? 'usd' : 'cash']: wallet - cost,
+            [field]: Math.round((wallet - cost) * 100) / 100,
             [`holdings.${sel.id}`]: {
               qty: nq,
-              avg: Math.round((h.avg * h.qty + cost) / nq),
-              cur: usd ? 'USD' : 'KRW',
+              avg: Math.round(((h.avg * h.qty + cost) / nq) * 100) / 100,
+              cur,
             },
           });
-          logged = { price, total: cost, cur: usd ? 'USD' : 'KRW', profit: null };
+          logged = { price, total: cost, cur, profit: null };
         } else {
           if (h.qty < n) throw new Error('보유 수량이 부족해요!');
           const nq = h.qty - n;
           const gain = price * n;
           tx.update(studentRef, {
-            [usd ? 'usd' : 'cash']: wallet + gain,
-            [`holdings.${sel.id}`]: nq === 0
-              ? { qty: 0, avg: 0, cur: usd ? 'USD' : 'KRW' }
-              : { qty: nq, avg: h.avg, cur: usd ? 'USD' : 'KRW' },
+            [field]: Math.round((wallet + gain) * 100) / 100,
+            [`holdings.${sel.id}`]: nq === 0 ? { qty: 0, avg: 0, cur } : { qty: nq, avg: h.avg, cur },
           });
-          logged = { price, total: gain, cur: usd ? 'USD' : 'KRW', profit: (price - h.avg) * n };
+          logged = { price, total: gain, cur, profit: Math.round((price - h.avg) * n * 100) / 100 };
         }
       });
 
@@ -132,8 +148,8 @@ export default function StocksPage() {
     .filter(([, h]) => h.qty > 0)
     .map(([sym, h]) => ({ sym, ...h, stock: stocks.find((s) => s.id === sym) }))
     .filter((h) => h.stock);
-  const krValue = holdings.filter((h) => !isUS(h.stock)).reduce((a, h) => a + h.stock.price * h.qty, 0);
-  const usValue = holdings.filter((h) => isUS(h.stock)).reduce((a, h) => a + h.stock.price * h.qty, 0);
+  // 전체 평가액을 학급화폐로 환산해서 한 줄로 보여줘요
+  const totalValue = holdings.reduce((a, h) => a + inUnits(h.stock.price * h.qty, h.stock), 0);
 
   const list = stocks.filter((s) => filter === 'ALL' || s.market === filter);
 
@@ -166,7 +182,7 @@ export default function StocksPage() {
         ))}
       </div>
 
-      {tab === 'rank' && <RankBoard klass={klass} student={student} stocks={stocks} fx={fx} />}
+      {tab === 'rank' && <RankBoard klass={klass} student={student} stocks={stocks} fx={fx} kpu={kpu} />}
       {tab === 'log' && <TradeLog klass={klass} student={student} />}
 
       {tab === 'market' && (
@@ -175,7 +191,8 @@ export default function StocksPage() {
           <div className="bg-white rounded-3xl shadow p-4 flex flex-wrap gap-4 items-center">
             <span className="text-sm text-gray-400">내 지갑</span>
             <span className="text-amber-600">💵 {fmt(student.cash)} {klass.currency}</span>
-            <span className="text-emerald-600">💲 {fmt(student.usd || 0)} 달러</span>
+            <span className="text-blue-600">🇰🇷 {fmt(student.krw || 0)}원</span>
+            <span className="text-emerald-600">🇺🇸 ${fmt(student.usd || 0)}</span>
             <Link to="/student/bank" className="ml-auto text-sm text-blue-500 underline">💱 환전소 가기 →</Link>
           </div>
 
@@ -185,12 +202,11 @@ export default function StocksPage() {
               <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
                 <h3 className="text-lg">💼 내 주식</h3>
                 <div className="text-blue-600 tabular-nums text-sm">
-                  국내 {fmt(krValue)} {klass.currency} · 해외 ${fmt(usValue)}
+                  평가액 {fmt(Math.round(totalValue))} {klass.currency}
                 </div>
               </div>
               {holdings.map((h) => {
-                const profit = (h.stock.price - h.avg) * h.qty;
-                const us = isUS(h.stock);
+                const profit = Math.round((h.stock.price - h.avg) * h.qty * 100) / 100;
                 return (
                   <button
                     key={h.sym}
@@ -199,9 +215,11 @@ export default function StocksPage() {
                   >
                     <span>{MARKET_LABEL[h.stock.market] || '🏫'}</span>
                     <span className="flex-1">{h.stock.name} <span className="text-gray-400 text-sm">{h.qty}주</span></span>
-                    <span className="tabular-nums text-sm">{us ? '$' : ''}{fmt(h.stock.price * h.qty)}</span>
+                    <span className="tabular-nums text-sm">
+                      {curMark(h.stock)}{fmt(Math.round(h.stock.price * h.qty * 100) / 100)}{curSuffix(h.stock)}
+                    </span>
                     <span className={`w-24 text-right text-sm tabular-nums ${profit > 0 ? 'text-red-500' : profit < 0 ? 'text-blue-500' : 'text-gray-400'}`}>
-                      {profit >= 0 ? '+' : ''}{us ? '$' : ''}{fmt(profit)}
+                      {profit >= 0 ? '+' : ''}{curMark(h.stock)}{fmt(profit)}
                     </span>
                   </button>
                 );
@@ -255,11 +273,18 @@ export default function StocksPage() {
             <div className="text-3xl text-blue-600 tabular-nums mb-1">{priceLabel(sel)}</div>
             <div className="text-sm text-gray-400 mb-4">
               보유 {(student.holdings?.[sel.id]?.qty || 0)}주 · 내 지갑{' '}
-              {isUS(sel) ? `$${fmt(student.usd || 0)}` : `${fmt(student.cash)} ${klass.currency}`}
+              {{
+                USD: `$${fmt(student.usd || 0)}`,
+                KRW: `${fmt(student.krw || 0)}원`,
+                UNIT: `${fmt(student.cash)} ${klass.currency}`,
+              }[stockCur(sel)]}
             </div>
-            {isUS(sel) && (
+            {stockCur(sel) !== 'UNIT' && (
               <div className="bg-emerald-50 text-emerald-700 text-xs rounded-xl px-3 py-2 mb-3">
-                🇺🇸 미국 주식은 <b>달러($)</b>로 사고팔아요. 달러가 없으면 은행 환전소에서 바꿔 오세요!
+                {stockCur(sel) === 'USD'
+                  ? <>🇺🇸 미국 주식은 <b>달러($)</b>로 사고팔아요.</>
+                  : <>🇰🇷 한국 주식은 <b>원(₩)</b>으로 사고팔아요.</>}
+                {' '}없으면 은행 <b>환전소</b>에서 바꿔 오세요! 💱
               </div>
             )}
             <div className="flex items-center gap-2 mb-2">
@@ -272,8 +297,9 @@ export default function StocksPage() {
               <button onClick={() => setQty(Number(qty) + 1)} className="w-10 h-10 rounded-xl bg-gray-100 text-xl">+</button>
             </div>
             <div className="text-center text-gray-500 mb-4 tabular-nums">
-              총 {isUS(sel) ? '$' : ''}{fmt(sel.price * Math.max(1, Math.floor(Number(qty) || 1)))}
-              {!isUS(sel) && ` ${klass.currency}`}
+              총 {curMark(sel)}
+              {fmt(Math.round(sel.price * Math.max(1, Math.floor(Number(qty) || 1)) * 100) / 100)}
+              {curSuffix(sel)}
             </div>
             <div className="flex gap-2">
               <button onClick={() => trade('buy')} className="flex-1 rounded-2xl py-3 bg-red-500 hover:bg-red-600 text-white text-lg">매수</button>
@@ -287,7 +313,7 @@ export default function StocksPage() {
 }
 
 /* ---------- 🏆 우리 반 랭킹 (오늘 / 이번 주 / 이번 달) ---------- */
-function RankBoard({ klass, student, stocks, fx }) {
+function RankBoard({ klass, student, stocks, fx, kpu }) {
   const [rows, setRows] = useState(null);
   const [period, setPeriod] = useState('d');
 
@@ -303,7 +329,7 @@ function RankBoard({ klass, student, stocks, fx }) {
   const keys = periodKeys();
   const ranked = rows
     .map((r) => {
-      const now = rankAssets(r, stocks, fx);
+      const now = rankAssets(r, stocks, fx, kpu);
       const base = r.snap?.[period];
       // 기준 기록이 없거나 기간이 바뀌었으면 아직 변화 없음(0)으로 봐요
       const start = base && base.k === keys[period] ? base.v : now;

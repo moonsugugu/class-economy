@@ -142,8 +142,31 @@ export function pendingSchedule(market) {
   return dueScheduleKeys().filter((k) => !done.includes(k));
 }
 
+/* =====================================================================
+   화폐 단위 정리
+   - 학급화폐(UNIT): 미소·미역처럼 선생님이 정한 우리 반 돈
+   - 원(KRW): 한국 주식을 살 때 쓰는 돈
+   - 달러(USD): 미국 주식을 살 때 쓰는 돈
+   krwPerUnit = 학급화폐 1개가 몇 원인지 (기본 1 → 1미역 = 1원)
+   ===================================================================== */
+export const DEFAULT_KRW_PER_UNIT = 1;
+
+/** 종목을 어떤 돈으로 사고파는지 */
+export const stockCur = (s) => (s.market === 'US' ? 'USD' : s.market === 'KR' ? 'KRW' : 'UNIT');
+
+/** 그 돈이 학생 문서의 어떤 지갑인지 */
+export const WALLET_FIELD = { KRW: 'krw', USD: 'usd', UNIT: 'cash' };
+
+/** 어떤 돈이든 학급화폐 값으로 환산 */
+export function toUnits(amount, cur, fx, krwPerUnit) {
+  const k = Number(krwPerUnit) || 1;
+  if (cur === 'KRW') return amount / k;
+  if (cur === 'USD') return (amount * (fx || DEFAULT_FX)) / k;
+  return amount;
+}
+
 /** 환율 (미국 주식은 달러로 사고팔아요) */
-export const DEFAULT_FX = 1300;          // 1달러 = 1300 학급화폐
+export const DEFAULT_FX = 1300;          // 1달러 = 1300원
 export const FX_BAND = 0.02;             // 환율도 살짝씩 움직여요 (±2%)
 export function nextFx(fx) {
   const v = Math.round(fx * (1 + (Math.random() - 0.5) * FX_BAND * 2));

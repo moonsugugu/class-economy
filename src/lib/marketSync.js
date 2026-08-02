@@ -10,10 +10,10 @@ import { periodKeys, rankAssets } from './util';
  * 랭킹 기준값 기록 — 오늘/이번 주/이번 달이 시작될 때의 자산을 저장해요.
  * 기간이 바뀐 첫 접속에만 쓰기가 일어나서 비용이 거의 없습니다.
  */
-export async function ensureBaselines(classId, student, stocks, fx) {
+export async function ensureBaselines(classId, student, stocks, fx, krwPerUnit = 1) {
   const keys = periodKeys();
   const snap = student.snap || {};
-  const now = rankAssets(student, stocks, fx);
+  const now = rankAssets(student, stocks, fx, krwPerUnit);
   const upd = {};
   for (const k of ['d', 'w', 'm']) {
     if (snap[k]?.k !== keys[k]) upd[`snap.${k}`] = { k: keys[k], v: now };

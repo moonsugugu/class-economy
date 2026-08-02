@@ -5,7 +5,7 @@ import {
   addDoc, runTransaction, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { MARKET_PATH, DEFAULT_FX } from '../../lib/stocks';
+import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT } from '../../lib/stocks';
 import {
   fmt, WEEK_MS, DAY_MS, SAVINGS_TERMS, savingsRateFor, savingsPayout,
 } from '../../lib/util';
@@ -14,7 +14,8 @@ export default function BankPage() {
   const { klass, student } = useOutletContext();
   const [fx, setFx] = useState(DEFAULT_FX);
   const [exAmount, setExAmount] = useState('');
-  const [exDir, setExDir] = useState('buy'); // buy=달러 사기, sell=달러 팔기
+  const [exDir, setExDir] = useState('buy'); // buy=사기, sell=팔기
+  const [exCur, setExCur] = useState('KRW'); // KRW=원, USD=달러
   const [amount, setAmount] = useState('');
   const [savAmount, setSavAmount] = useState('');
   const [savDays, setSavDays] = useState(14);
@@ -45,25 +46,35 @@ export default function BankPage() {
     setTimeout(() => setMsg(null), 3500);
   };
 
-  /* ----- 💱 환전소: 학급 화폐 ↔ 달러 ----- */
+  /* ----- 💱 환전소: 학급화폐 ↔ 원(₩) / 달러($) ----- */
+  const kpu = Number(klass.krwPerUnit) || DEFAULT_KRW_PER_UNIT; // 학급화폐 1개 = 몇 원
+  // 학급화폐 1개로 살 수 있는 양
+  const rate = exCur === 'KRW' ? kpu : kpu / fx;   // 원: kpu원, 달러: kpu/fx달러
+  const unitCost = (v) => (exCur === 'KRW' ? v / kpu : (v * fx) / kpu); // v를 사는 데 드는 학급화폐
+
   const exchange = async () => {
-    const v = Math.floor(Number(exAmount));
+    const v = exCur === 'KRW' ? Math.floor(Number(exAmount)) : Math.floor(Number(exAmount));
     if (!v || v < 1) return flash('err', '바꿀 금액을 입력해 주세요.');
+    const field = exCur === 'KRW' ? 'krw' : 'usd';
+    const label = exCur === 'KRW' ? '원' : '달러';
     try {
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
         if (exDir === 'buy') {
-          const cost = v * fx;                    // v달러를 사려면 필요한 학급 화폐
-          if ((s.cash || 0) < cost) throw new Error('현금이 부족해요!');
-          tx.update(studentRef, { cash: s.cash - cost, usd: (s.usd || 0) + v });
+          const cost = Math.ceil(unitCost(v));
+          if ((s.cash || 0) < cost) throw new Error(`${klass.currency}가 부족해요!`);
+          tx.update(studentRef, { cash: s.cash - cost, [field]: (s[field] || 0) + v });
         } else {
-          if ((s.usd || 0) < v) throw new Error('달러가 부족해요!');
-          tx.update(studentRef, { usd: (s.usd || 0) - v, cash: (s.cash || 0) + v * fx });
+          if ((s[field] || 0) < v) throw new Error(`${label}가 부족해요!`);
+          tx.update(studentRef, {
+            [field]: (s[field] || 0) - v,
+            cash: (s.cash || 0) + Math.floor(unitCost(v)),
+          });
         }
       });
       flash('ok', exDir === 'buy'
-        ? `💲 ${fmt(v)}달러로 바꿨어요! 이제 미국 주식을 살 수 있어요.`
-        : `💵 ${fmt(v * fx)} ${klass.currency}로 바꿨어요!`);
+        ? `💱 ${fmt(v)}${label}로 바꿨어요! 이제 ${exCur === 'KRW' ? '한국' : '미국'} 주식을 살 수 있어요.`
+        : `💵 ${fmt(Math.floor(unitCost(v)))} ${klass.currency}로 바꿨어요!`);
       setExAmount('');
     } catch (e) {
       flash('err', e.message);
@@ -207,48 +218,70 @@ export default function BankPage() {
       {/* 💱 환율 거래소 */}
       <div className="bg-white rounded-3xl shadow p-6">
         <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-          <h3 className="text-xl">💱 환율 거래소</h3>
-          <div className="text-lg text-emerald-600 tabular-nums">
-            1 달러 = {fmt(fx)} {klass.currency}
+          <h3 className="text-xl">💱 환전소</h3>
+          <div className="text-sm text-emerald-600 tabular-nums text-right">
+            <div>1 {klass.currency} = {fmt(kpu)} 원</div>
+            <div className="text-gray-400">1 달러 = {fmt(fx)} 원</div>
           </div>
         </div>
         <p className="text-xs text-gray-400 mb-3">
-          미국 주식은 <b>달러</b>로만 살 수 있어요. 환율은 아침·오후에 조금씩 바뀌니 쌀 때 바꾸면 이득! 💡
+          한국 주식은 <b>원(₩)</b>, 미국 주식은 <b>달러($)</b>로 사요. 여기서 미리 바꿔 두세요! 💡
         </p>
-        <div className="flex gap-2 mb-3">
-          {[['buy', '💲 달러 사기'], ['sell', '💵 달러 팔기']].map(([id, label]) => (
+
+        {/* 어떤 돈으로 바꿀지 */}
+        <div className="flex gap-2 mb-2">
+          {[['KRW', '🇰🇷 원'], ['USD', '🇺🇸 달러']].map(([id, label]) => (
             <button
               key={id}
-              onClick={() => { setExDir(id); setExAmount(''); }}
+              onClick={() => { setExCur(id); setExAmount(''); }}
               className={`flex-1 rounded-xl py-2 transition ${
-                exDir === id ? 'bg-emerald-500 text-white shadow' : 'bg-gray-100 text-gray-500'
+                exCur === id ? 'bg-emerald-600 text-white shadow' : 'bg-gray-100 text-gray-500'
               }`}
             >
               {label}
             </button>
           ))}
         </div>
+        <div className="flex gap-2 mb-3">
+          {[['buy', '사기'], ['sell', '팔기']].map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => { setExDir(id); setExAmount(''); }}
+              className={`flex-1 rounded-xl py-1.5 text-sm transition ${
+                exDir === id ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-300' : 'bg-gray-50 text-gray-400'
+              }`}
+            >
+              {exCur === 'KRW' ? '원' : '달러'} {label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex gap-2 items-center flex-wrap">
           <input
             type="number"
             value={exAmount}
             onChange={(e) => setExAmount(e.target.value)}
-            placeholder={exDir === 'buy' ? '살 달러(개수)' : '팔 달러(개수)'}
+            placeholder={`${exDir === 'buy' ? '살' : '팔'} 금액`}
             className="rounded-xl border-2 border-gray-200 px-3 py-2 w-36 focus:border-emerald-400 outline-none"
           />
-          <span className="text-gray-400">달러</span>
+          <span className="text-gray-400">{exCur === 'KRW' ? '원' : '달러'}</span>
           <button onClick={exchange} className="rounded-xl px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white">
             바꾸기
           </button>
-          <span className="ml-auto text-sm text-gray-500">
-            내 달러 <b className="text-emerald-600">${fmt(student.usd || 0)}</b>
-          </span>
         </div>
+
+        <div className="flex gap-4 mt-3 text-sm">
+          <span className="text-gray-500">내 지갑</span>
+          <span className="text-amber-600">💵 {fmt(student.cash)} {klass.currency}</span>
+          <span className="text-blue-600">🇰🇷 {fmt(student.krw || 0)}원</span>
+          <span className="text-emerald-600">🇺🇸 ${fmt(student.usd || 0)}</span>
+        </div>
+
         {Number(exAmount) > 0 && (
           <p className="text-sm text-gray-500 mt-2">
             {exDir === 'buy'
-              ? <>💵 {fmt(Math.floor(Number(exAmount)) * fx)} {klass.currency} → 💲 {fmt(Math.floor(Number(exAmount)))}달러</>
-              : <>💲 {fmt(Math.floor(Number(exAmount)))}달러 → 💵 {fmt(Math.floor(Number(exAmount)) * fx)} {klass.currency}</>}
+              ? <>💵 {fmt(Math.ceil(unitCost(Math.floor(Number(exAmount)))))} {klass.currency} → {exCur === 'KRW' ? '🇰🇷' : '🇺🇸'} {fmt(Math.floor(Number(exAmount)))}{exCur === 'KRW' ? '원' : '달러'}</>
+              : <>{exCur === 'KRW' ? '🇰🇷' : '🇺🇸'} {fmt(Math.floor(Number(exAmount)))}{exCur === 'KRW' ? '원' : '달러'} → 💵 {fmt(Math.floor(unitCost(Math.floor(Number(exAmount)))))} {klass.currency}</>}
           </p>
         )}
       </div>

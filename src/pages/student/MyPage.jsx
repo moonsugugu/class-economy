@@ -3,7 +3,7 @@ import { useOutletContext, Link } from 'react-router-dom';
 import { collection, doc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
-import { MARKET_PATH, DEFAULT_FX } from '../../lib/stocks';
+import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT } from '../../lib/stocks';
 import { ensureBaselines } from '../../lib/marketSync';
 import AvatarView from '../../components/AvatarView';
 
@@ -33,19 +33,27 @@ export default function MyPage() {
 
   // 랭킹용 기준값(오늘·이번주·이번달 시작 자산) 기록 — 기간이 바뀔 때만 저장돼요
   useEffect(() => {
-    if (stocks.length) ensureBaselines(klass.id, student, stocks, fx);
-  }, [stocks.length, fx, student.id]);
+    if (stocks.length) ensureBaselines(klass.id, student, stocks, fx, klass.krwPerUnit);
+  }, [stocks.length, fx, student.id, klass.krwPerUnit]);
 
   const savingsSum = savings.reduce((a, s) => a + s.amount, 0);
-  // 미국 주식은 달러 표시 → 학급 화폐로 환산해서 합쳐요
+  const kpu = Number(klass.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
+  // 한국 주식은 원, 미국 주식은 달러 → 모두 학급 화폐로 환산해서 합쳐요
+  const conv = (amount, market) => {
+    if (market === 'US') return (amount * fx) / kpu;
+    if (market === 'KR') return amount / kpu;
+    return amount;
+  };
   const stockValue = Object.entries(student.holdings || {}).reduce((a, [sym, h]) => {
     const st = stocks.find((s) => s.id === sym);
     if (!st || !h.qty) return a;
-    const v = st.price * h.qty;
-    return a + (st.market === 'US' ? v * fx : v);
+    return a + conv(st.price * h.qty, st.market);
   }, 0);
-  const usdValue = (student.usd || 0) * fx;
-  const total = Math.round((student.cash || 0) + (student.deposit || 0) + savingsSum + stockValue + usdValue);
+  const krwValue = (student.krw || 0) / kpu;
+  const usdValue = ((student.usd || 0) * fx) / kpu;
+  const total = Math.round(
+    (student.cash || 0) + (student.deposit || 0) + savingsSum + stockValue + krwValue + usdValue
+  );
 
   const Item = ({ icon, label, value, to, grad, sub }) => (
     <Link
@@ -87,8 +95,12 @@ export default function MyPage() {
         <Item icon="🐷" label="적금 (모으는 중)" value={savingsSum} to="/student/bank" grad="from-pink-50 to-rose-100" sub={`만기까지 기다리면 ${klass.savingsRate}% 이자`} />
         <Item icon="📈" label="주식 평가액" value={stockValue} to="/student/stocks" grad="from-sky-50 to-blue-100" sub="시세에 따라 오르락내리락!" />
         <Item
-          icon="💲" label={`달러 (${fmt(student.usd || 0)}$)`} value={usdValue} to="/student/bank"
-          grad="from-lime-50 to-emerald-100" sub={`환율 1$ = ${fmt(fx)} ${klass.currency}`}
+          icon="🇰🇷" label={`원화 (${fmt(student.krw || 0)}원)`} value={krwValue} to="/student/bank"
+          grad="from-sky-50 to-cyan-100" sub={`1 ${klass.currency} = ${fmt(kpu)}원`}
+        />
+        <Item
+          icon="🇺🇸" label={`달러 ($${fmt(student.usd || 0)})`} value={usdValue} to="/student/bank"
+          grad="from-lime-50 to-emerald-100" sub={`1달러 = ${fmt(fx)}원`}
         />
       </div>
 

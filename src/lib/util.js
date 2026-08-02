@@ -25,16 +25,30 @@ export function periodKeys(now = new Date()) {
   };
 }
 
-/** 랭킹·수익률 계산에 쓰는 자산 정의 (현금 + 예금 + 달러 + 주식평가액) */
-export function rankAssets(student, stocks, fx) {
-  const holdings = student.holdings || {};
-  const stockValue = Object.entries(holdings).reduce((a, [sym, h]) => {
+/**
+ * 총자산 (전부 학급화폐로 환산)
+ * = 현금 + 예금 + 원화지갑 + 달러지갑 + 주식 평가액
+ * krwPerUnit: 학급화폐 1개가 몇 원인지 (기본 1)
+ */
+export function rankAssets(student, stocks, fx, krwPerUnit = 1) {
+  const k = Number(krwPerUnit) || 1;
+  const conv = (amount, market) => {
+    if (market === 'US') return (amount * (fx || 1300)) / k; // 달러 → 원 → 학급화폐
+    if (market === 'KR') return amount / k;                  // 원 → 학급화폐
+    return amount;                                           // 우리 반 종목은 학급화폐
+  };
+  const stockValue = Object.entries(student.holdings || {}).reduce((a, [sym, h]) => {
     const st = stocks.find((s) => (s.symbol || s.id) === sym);
     if (!st || !h.qty) return a;
-    const v = st.price * h.qty;
-    return a + (st.market === 'US' ? v * fx : v); // 미국 주식은 달러 → 학급 화폐로 환산
+    return a + conv(st.price * h.qty, st.market);
   }, 0);
-  return Math.round((student.cash || 0) + (student.deposit || 0) + (student.usd || 0) * fx + stockValue);
+  return Math.round(
+    (student.cash || 0)
+    + (student.deposit || 0)
+    + (student.krw || 0) / k
+    + ((student.usd || 0) * (fx || 1300)) / k
+    + stockValue
+  );
 }
 
 /** 적금 가입 기간 선택지 (오래 맡길수록 이율 우대) */
