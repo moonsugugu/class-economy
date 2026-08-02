@@ -11,7 +11,7 @@ import { fmt, makeClassCode } from '../../lib/util';
 import {
   changePct, advance, usedTicks, makeInitialMarket, makeCustomStock,
   MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, todayKey,
-  pendingSchedule, SCHEDULE_LABEL,
+  pendingSchedule, SCHEDULE_LABEL, fetchRealQuotes, applyRealPrices,
 } from '../../lib/stocks';
 import { applyScheduledTicks } from '../../lib/marketSync';
 import { SHOP_PRESETS } from '../../lib/shopPresets';
@@ -116,12 +116,6 @@ export default function TeacherDashboard() {
                 >
                   🔑 {klass.code}
                 </button>
-                <span
-                  title="학생이 입장할 때 입력하는 비밀번호예요 (⚙️설정에서 변경)"
-                  className="bg-white/20 backdrop-blur rounded-2xl px-4 py-2 tracking-widest"
-                >
-                  🔒 {klass.joinPin || '없음'}
-                </span>
                 <button
                   onClick={() => setShowInvite(true)}
                   title="학생 초대 QR 코드 보기"
@@ -188,7 +182,12 @@ export default function TeacherDashboard() {
           {tab === 'fund' && <FundTab klass={klass} />}
           {tab === 'seats' && <SeatsTab klass={klass} />}
           {tab === 'reports' && <ReportsTab klass={klass} />}
-          {tab === 'settings' && <SettingsTab klass={klass} />}
+          {tab === 'settings' && (
+            <div className="space-y-4">
+              <SettingsTab klass={klass} />
+              <PinManager klass={klass} />
+            </div>
+          )}
         </>
       )}
 
@@ -631,6 +630,7 @@ function StocksTab({ klass }) {
   const [cName, setCName] = useState('');
   const [cPrice, setCPrice] = useState('');
   const [msg, setMsg] = useState('');
+  const [pulling, setPulling] = useState(false);
   const timer = useRef(null);
   const migrated = useRef(false);
 
@@ -675,6 +675,32 @@ function StocksTab({ klass }) {
   }, [market, klass.id]);
 
   const initMarket = () => setDoc(mref, makeInitialMarket());
+
+  // 📡 실제 주식 시세를 그대로 반영 (한국=원, 미국=달러). 하루 횟수와 무관해요.
+  const pullReal = async () => {
+    // 예전 축소 가격(삼성전자 70 등)을 쓰던 학급은 금액이 크게 바뀌므로 한 번 확인해요
+    const old = (market.stocks || []).find((s) => s.market === 'KR');
+    if (old && old.price < 5000 && !confirm(
+      '실제 시세를 반영하면 한국 주식이 실제 원(₩) 가격으로 바뀝니다.\n' +
+      `예: ${old.name} ${fmt(old.price)} → 수십만 원대\n\n` +
+      '이미 주식을 산 학생은 평가금액이 크게 오를 수 있어요. 계속할까요?'
+    )) return;
+    setPulling(true);
+    try {
+      const { prices, fx } = await fetchRealQuotes();
+      await updateDoc(mref, {
+        stocks: applyRealPrices(market.stocks || [], prices),
+        ...(fx ? { fx } : {}),
+        realAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      flash(`📡 실제 시세를 반영했어요! ${fx ? `(환율 1$ = ${fmt(fx)}원)` : ''}`);
+    } catch (e) {
+      flash('⚠️ ' + e.message + ' — 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setPulling(false);
+    }
+  };
 
   // 시세 변동 — 트랜잭션으로 하루 횟수를 정확히 차감
   const tick = async () => {
@@ -765,11 +791,18 @@ function StocksTab({ klass }) {
         <div className="flex flex-wrap items-center gap-3">
           <h3 className="text-xl">📈 우리 반 주식 시장</h3>
           <button
+            onClick={pullReal}
+            disabled={pulling}
+            className={btn + ' bg-gradient-to-r from-blue-500 to-indigo-500 hover:opacity-90 text-lg'}
+          >
+            {pulling ? '불러오는 중...' : '📡 실제 시세 반영'}
+          </button>
+          <button
             onClick={tick}
             disabled={left <= 0}
-            className={btn + ' bg-indigo-500 hover:bg-indigo-600 text-lg'}
+            className={btn + ' bg-indigo-400 hover:bg-indigo-500'}
           >
-            🎲 지금 시세 변동
+            🎲 랜덤 변동
           </button>
           <div className="flex items-center gap-2">
             <span className={`px-3 py-1.5 rounded-xl tabular-nums ${
@@ -793,8 +826,13 @@ function StocksTab({ klass }) {
         </label>
         {msg && <div className="mt-3 text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2">{msg}</div>}
         <p className="text-xs text-gray-400 mt-2">
-          ⏰ 버튼을 누르지 않아도 <b>{SCHEDULE_LABEL}</b>에 한 번씩 저절로 변동돼요 (이건 횟수에 포함되지 않아요).<br />
-          하루 변동 횟수는 ⚙️설정에서 바꿀 수 있어요. (횟수를 제한하면 무료 사용량을 아낄 수 있어요)
+          📡 <b>실제 시세 반영</b>은 진짜 주식 가격을 그대로 가져와요 — 한국 주식은 <b>원(₩)</b>, 미국 주식은 <b>달러($)</b> 단위 그대로예요.
+          {market?.realAt && (
+            <b className="text-blue-500"> (마지막 반영: {new Date(market.realAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })})</b>
+          )}
+          <br />
+          ⏰ 버튼을 누르지 않아도 <b>{SCHEDULE_LABEL}</b>에 실제 시세로 저절로 갱신돼요.
+          🎲 랜덤 변동은 하루 횟수 안에서만 쓸 수 있어요 (⚙️설정에서 변경).
         </p>
       </div>
 
@@ -900,7 +938,6 @@ function SettingsTab({ klass }) {
     depositRate: klass.depositRate, savingsRate: klass.savingsRate,
     tickLimit: klass.tickLimit ?? DEFAULT_TICK_LIMIT,
     taxRate: klass.taxRate ?? 10,
-    joinPin: klass.joinPin ?? '',
   });
   const [form, setForm] = useState(init);
   const [saved, setSaved] = useState(false);
@@ -917,7 +954,6 @@ function SettingsTab({ klass }) {
       savingsRate: Number(form.savingsRate) || 0,
       tickLimit: Math.max(1, Math.min(100, Number(form.tickLimit) || DEFAULT_TICK_LIMIT)),
       taxRate: Math.max(0, Math.min(50, Number(form.taxRate) || 0)),
-      joinPin: String(form.joinPin || '').replace(/\D/g, '').slice(0, 4),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -940,10 +976,6 @@ function SettingsTab({ klass }) {
     <form onSubmit={save} className={card + ' max-w-lg space-y-4'}>
       <h3 className="text-xl">⚙️ 학급 설정</h3>
       {field('학급 이름', 'name')}
-      {field(
-        '학생 입장 비밀번호 (숫자 4자리)', 'joinPin', 'text',
-        '학생이 학급 코드와 함께 입력해야 들어올 수 있어요. 비워 두면 비밀번호 없이 입장합니다.'
-      )}
       {field('화폐 단위', 'currency', 'text', '예: 미소, 달란트, 별, 포인트 — 자유롭게 정해요.')}
       {field('월급 금액', 'salary', 'number', '월급 지급 버튼을 누를 때 1인당 지급되는 금액이에요.')}
       {field('예금 이율 (주당 %)', 'depositRate', 'number', '학생이 예금에 넣어둔 돈에 7일마다 붙는 이자예요.')}
@@ -962,5 +994,88 @@ function SettingsTab({ klass }) {
       <button className={btn + ' bg-indigo-500 hover:bg-indigo-600 text-lg w-full'}>저장하기</button>
       {saved && <p className="text-emerald-600 text-center">✅ 저장되었어요!</p>}
     </form>
+  );
+}
+
+/* ---------- 🔒 학생별 비밀번호 관리 ---------- */
+function PinManager({ klass }) {
+  const [students, setStudents] = useState([]);
+  const [edit, setEdit] = useState({});   // studentId → 입력 중인 값
+  const [msg, setMsg] = useState('');
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    const q = query(collection(db, 'classes', klass.id, 'students'), orderBy('name'));
+    return onSnapshot(q, (s) => setStudents(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  }, [klass.id]);
+
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
+
+  const savePin = async (s) => {
+    const v = String(edit[s.id] ?? '').replace(/\D/g, '').slice(0, 4);
+    if (v.length !== 4) return flash('숫자 4자리로 입력해 주세요.');
+    await updateDoc(doc(db, 'classes', klass.id, 'students', s.id), { pin: v });
+    setEdit((e) => ({ ...e, [s.id]: undefined }));
+    flash(`✅ ${s.name} 학생의 비밀번호를 ${v}로 바꿨어요.`);
+  };
+
+  return (
+    <div className={card + ' max-w-lg space-y-3'}>
+      <div className="flex items-center gap-2">
+        <h3 className="text-xl">🔒 학생 비밀번호</h3>
+        <button
+          onClick={() => setShow((v) => !v)}
+          className="ml-auto text-sm rounded-xl px-3 py-1 bg-gray-100 text-gray-600"
+        >
+          {show ? '🙈 가리기' : '👀 보기'}
+        </button>
+      </div>
+      <p className="text-xs text-gray-400">
+        학생이 처음 입장할 때 스스로 정한 4자리 비밀번호예요. 잊어버린 학생이 있으면 여기서 바꿔 주세요.
+      </p>
+      {msg && <div className="bg-indigo-50 text-indigo-700 rounded-xl px-3 py-2 text-sm">{msg}</div>}
+
+      {!students.length ? (
+        <p className="text-gray-400 text-center py-4">아직 입장한 학생이 없어요.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {students.map((s) => {
+            const editing = edit[s.id] !== undefined;
+            return (
+              <div key={s.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                <span className="text-lg">{s.avatar?.base || '🙂'}</span>
+                <span className="flex-1 text-sm">{s.name}</span>
+                {editing ? (
+                  <>
+                    <input
+                      value={edit[s.id]}
+                      onChange={(e) => setEdit({ ...edit, [s.id]: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                      inputMode="numeric"
+                      maxLength={4}
+                      autoFocus
+                      className="w-20 rounded-lg border-2 border-indigo-300 px-2 py-1 text-center tracking-widest outline-none"
+                    />
+                    <button onClick={() => savePin(s)} className="text-sm rounded-lg px-2.5 py-1 bg-indigo-500 text-white">저장</button>
+                    <button onClick={() => setEdit((e) => ({ ...e, [s.id]: undefined }))} className="text-gray-400 text-sm">취소</button>
+                  </>
+                ) : (
+                  <>
+                    <span className="tabular-nums tracking-widest text-gray-600 w-14 text-center">
+                      {s.pin ? (show ? s.pin : '••••') : <span className="text-gray-300 text-xs">미설정</span>}
+                    </span>
+                    <button
+                      onClick={() => setEdit({ ...edit, [s.id]: s.pin || '' })}
+                      className="text-sm rounded-lg px-2.5 py-1 bg-white border border-gray-200 text-gray-600"
+                    >
+                      바꾸기
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

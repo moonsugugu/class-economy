@@ -1,6 +1,9 @@
 import { doc, updateDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase';
-import { MARKET_PATH, advance, dueScheduleKeys, nextFx, DEFAULT_FX } from './stocks';
+import {
+  MARKET_PATH, advance, dueScheduleKeys, nextFx, DEFAULT_FX,
+  fetchRealQuotes, applyRealPrices,
+} from './stocks';
 import { periodKeys, rankAssets } from './util';
 
 /**
@@ -28,6 +31,15 @@ export async function ensureBaselines(classId, student, stocks, fx) {
  */
 export async function applyScheduledTicks(classId) {
   const ref = doc(db, ...MARKET_PATH(classId));
+
+  // 예약 시각이 지났으면 실제 시세를 먼저 받아 둡니다 (실패하면 시뮬레이션으로)
+  let real = null;
+  try {
+    real = await fetchRealQuotes();
+  } catch {
+    real = null;
+  }
+
   try {
     await runTransaction(db, async (tx) => {
       const snap = await tx.get(ref);
@@ -36,15 +48,24 @@ export async function applyScheduledTicks(classId) {
       const done = m.schedDone || [];
       const todo = dueScheduleKeys().filter((k) => !done.includes(k));
       if (!todo.length) return;
+
       let stocks = m.stocks || [];
       let fx = m.fx || DEFAULT_FX;
-      todo.forEach(() => {
-        stocks = stocks.map((s) => advance(s));
-        fx = nextFx(fx); // 환율도 함께 움직여요
-      });
+
+      if (real?.prices) {
+        stocks = applyRealPrices(stocks, real.prices);
+        if (real.fx) fx = real.fx;
+      } else {
+        todo.forEach(() => {
+          stocks = stocks.map((s) => advance(s));
+          fx = nextFx(fx);
+        });
+      }
+
       tx.update(ref, {
         stocks,
         fx,
+        realAt: real?.prices ? Date.now() : (m.realAt || null),
         schedDone: [...done, ...todo].slice(-8),
         updatedAt: Date.now(),
       });

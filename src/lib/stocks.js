@@ -1,16 +1,18 @@
 // 한국 대표주 10개 + 미국 대표주 10개.
-// 가격은 학급 화폐 규모에 맞춘 시뮬레이션 기준가이며, 실제 시세와 다릅니다.
+// 가격 단위는 실제와 같습니다 — 한국 주식은 원(₩) 그대로, 미국 주식은 달러($) 그대로.
+// (예: 삼성전자 70,800원 → 70,800 학급화폐)
+// base는 실제 시세를 아직 못 불러왔을 때 쓰는 시작값이에요.
 export const STOCK_SEED = [
-  { symbol: 'SAMSUNG', name: '삼성전자', market: 'KR', base: 70 },
-  { symbol: 'SKHYNIX', name: 'SK하이닉스', market: 'KR', base: 180 },
-  { symbol: 'LGES', name: 'LG에너지솔루션', market: 'KR', base: 350 },
-  { symbol: 'HYUNDAI', name: '현대자동차', market: 'KR', base: 210 },
-  { symbol: 'KIA', name: '기아', market: 'KR', base: 100 },
-  { symbol: 'NAVER', name: '네이버', market: 'KR', base: 190 },
-  { symbol: 'KAKAO', name: '카카오', market: 'KR', base: 45 },
-  { symbol: 'SAMBIO', name: '삼성바이오로직스', market: 'KR', base: 800 },
-  { symbol: 'POSCO', name: 'POSCO홀딩스', market: 'KR', base: 280 },
-  { symbol: 'CELLTRION', name: '셀트리온', market: 'KR', base: 170 },
+  { symbol: 'SAMSUNG', name: '삼성전자', market: 'KR', base: 75000 },
+  { symbol: 'SKHYNIX', name: 'SK하이닉스', market: 'KR', base: 200000 },
+  { symbol: 'LGES', name: 'LG에너지솔루션', market: 'KR', base: 400000 },
+  { symbol: 'HYUNDAI', name: '현대자동차', market: 'KR', base: 250000 },
+  { symbol: 'KIA', name: '기아', market: 'KR', base: 110000 },
+  { symbol: 'NAVER', name: '네이버', market: 'KR', base: 200000 },
+  { symbol: 'KAKAO', name: '카카오', market: 'KR', base: 45000 },
+  { symbol: 'SAMBIO', name: '삼성바이오로직스', market: 'KR', base: 950000 },
+  { symbol: 'POSCO', name: 'POSCO홀딩스', market: 'KR', base: 350000 },
+  { symbol: 'CELLTRION', name: '셀트리온', market: 'KR', base: 180000 },
   { symbol: 'AAPL', name: '애플', market: 'US', base: 230 },
   { symbol: 'MSFT', name: '마이크로소프트', market: 'US', base: 420 },
   { symbol: 'NVDA', name: '엔비디아', market: 'US', base: 130 },
@@ -80,7 +82,9 @@ export function makeCustomStock(name, price) {
 
 /** 시세를 한 칸 진행시킨 종목 (수동 지정 가격도 같은 함수로 처리) */
 export function advance(stock, newPrice) {
-  const p = Math.max(1, Math.round(newPrice ?? nextPrice(stock.price)));
+  const raw = newPrice ?? nextPrice(stock.price);
+  // 큰 금액(한국 주식)은 원 단위, 작은 금액(달러)은 센트까지
+  const p = Math.max(0.01, raw >= 1000 ? Math.round(raw) : Math.round(raw * 100) / 100);
   return {
     ...stock,
     prevClose: stock.price,
@@ -96,6 +100,26 @@ export function usedTicks(market) {
 }
 
 export const MARKET_LABEL = { KR: '🇰🇷', US: '🇺🇸', CUSTOM: '🏫' };
+
+/**
+ * 실제 시세 가져오기 — 서버리스 함수(/api/quotes)가 대신 불러와 줍니다.
+ * 반환: { prices: {종목코드: 가격}, fx: 원/달러 환율 }
+ */
+export async function fetchRealQuotes() {
+  const r = await fetch('/api/quotes');
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.ok) throw new Error(j.error ? `실제 시세를 못 불러왔어요 (${j.error})` : '실제 시세를 못 불러왔어요');
+  return j;
+}
+
+/** 실제 시세를 종목 목록에 반영 (우리 반 종목은 그대로 두고 살짝만 움직여요) */
+export function applyRealPrices(stocks, prices) {
+  return (stocks || []).map((s) => {
+    const real = prices[s.symbol];
+    if (typeof real === 'number' && real > 0) return advance(s, real);
+    return s.market === 'CUSTOM' ? advance(s) : s; // 우리 반 종목은 시뮬레이션
+  });
+}
 
 /* =====================================================================
    예약 시세 변동 — 선생님이 버튼을 누르지 않아도

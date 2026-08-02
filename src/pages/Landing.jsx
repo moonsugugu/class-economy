@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { signInWithPopup } from 'firebase/auth';
 import {
-  collection, query, where, getDocs, addDoc, serverTimestamp,
+  collection, query, where, getDocs, addDoc, updateDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { useApp } from '../context/AppContext';
@@ -34,7 +34,9 @@ export default function Landing() {
     setError('');
     const c = code.trim().toUpperCase();
     const n = name.trim();
+    const p = pin.trim();
     if (!c || !n) return setError('학급 코드와 이름을 모두 입력해 주세요.');
+    if (p.length !== 4) return setError('비밀번호는 숫자 4자리로 입력해 주세요. 🔒');
     setBusy(true);
     try {
       const classSnap = await getDocs(query(collection(db, 'classes'), where('code', '==', c)));
@@ -43,17 +45,24 @@ export default function Landing() {
         return;
       }
       const classDoc = classSnap.docs[0];
-      // 선생님이 비밀번호를 정해 둔 학급이면 4자리를 맞춰야 들어갈 수 있어요
-      const needPin = (classDoc.data().joinPin || '').trim();
-      if (needPin && pin.trim() !== needPin) {
-        setError('비밀번호가 틀렸어요. 선생님께 4자리 비밀번호를 물어보세요! 🔒');
-        return;
-      }
       const studentsRef = collection(db, 'classes', classDoc.id, 'students');
       const stSnap = await getDocs(query(studentsRef, where('name', '==', n)));
       let studentId;
-      if (stSnap.empty) {
+
+      if (!stSnap.empty) {
+        // 이미 있는 학생 — 비밀번호가 맞아야 들어갈 수 있어요
+        const docSnap = stSnap.docs[0];
+        const saved = String(docSnap.data().pin || '');
+        if (saved && saved !== p) {
+          setError('비밀번호가 달라요. 처음 정한 4자리를 입력해 주세요! 🔒 (잊었다면 선생님께 말씀드리세요)');
+          return;
+        }
+        // 예전에 만들어진 학생은 이번에 입력한 번호를 비밀번호로 저장해요
+        if (!saved) await updateDoc(docSnap.ref, { pin: p });
+        studentId = docSnap.id;
+      } else {
         const created = await addDoc(studentsRef, {
+          pin: p, // 처음 입장할 때 정한 나만의 비밀번호
           name: n,
           cash: 0,
           usd: 0,
@@ -73,8 +82,6 @@ export default function Landing() {
           createdAt: serverTimestamp(),
         });
         studentId = created.id;
-      } else {
-        studentId = stSnap.docs[0].id;
       }
       saveSession({ classId: classDoc.id, studentId, name: n, className: classDoc.data().name });
       navigate('/student');
@@ -98,7 +105,9 @@ export default function Landing() {
         <div className="bg-white rounded-3xl shadow-xl p-8 border-4 border-yellow-200">
           <h2 className="text-2xl text-amber-600 mb-1">🧑‍🎓 학생 입장</h2>
           <p className="text-gray-400 text-sm mb-5">
-            {invitedCode ? '학급 코드가 채워졌어요! 이름만 쓰면 돼요' : '선생님이 알려준 학급 코드로 들어와요'}
+            {invitedCode ? '학급 코드가 채워졌어요! 이름과 비밀번호만 쓰면 돼요' : '선생님이 알려준 학급 코드로 들어와요'}
+            <br />
+            <span className="text-amber-500">🔒 비밀번호는 처음 입장할 때 내가 정해요. 꼭 기억하세요!</span>
           </p>
           <form onSubmit={studentJoin} className="space-y-3">
             <input
@@ -111,7 +120,7 @@ export default function Landing() {
             <input
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              placeholder="비밀번호 4자리 🔒"
+              placeholder="나만의 비밀번호 4자리 🔒"
               inputMode="numeric"
               maxLength={4}
               className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-lg tracking-[0.4em] text-center focus:border-amber-400 outline-none"
