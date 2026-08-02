@@ -1104,18 +1104,88 @@ function Wallclock({ a = '#f8fafc' }) {
     </group>
   );
 }
-function Flagpole({ a = '#f8fafc' }) {
+/* 🇰🇷 태극기 — 태극 문양과 4괘(건·곤·감·리)를 규격대로 그립니다.
+   w = 깃발 가로 길이. 태극 지름 = w/3, 괘는 네 모서리에 대각선 방향으로 놓여요. */
+function TaegukFace({ w = 0.9 }) {
+  const h = w * (2 / 3);          // 태극기 비율 3:2
+  const R = w / 6;                // 태극 반지름 (지름 = w/3)
+  const z = 0.006;
+  // 괘 한 줄의 크기
+  const barW = w / 4, barH = w / 24, gap = w / 48;
+  const half = (barW - gap) / 2;
+
+  /** 막대 한 줄 — solid=true면 이어진 막대, false면 가운데가 끊긴 막대 */
+  const Line = ({ y, solid }) =>
+    solid ? (
+      <B p={[0, y, 0]} s={[barW, barH, 0.004]} c="#26262b" />
+    ) : (
+      <>
+        <B p={[-(half + gap) / 2 - gap / 2, y, 0]} s={[half, barH, 0.004]} c="#26262b" />
+        <B p={[(half + gap) / 2 + gap / 2, y, 0]} s={[half, barH, 0.004]} c="#26262b" />
+      </>
+    );
+
+  /** 괘 하나 (위→아래 3줄). rot은 중심을 향하도록 45° 기울여요 */
+  const Gua = ({ x, y, rot, lines }) => (
+    <group position={[x, y, z + 0.002]} rotation={[0, 0, rot]}>
+      {lines.map((solid, i) => (
+        <Line key={i} y={(1 - i) * (barH + gap * 1.6)} solid={solid} />
+      ))}
+    </group>
+  );
+
+  const cx1 = w * 0.32, cy1 = h * 0.3; // 괘 위치 (모서리 쪽)
+
+  return (
+    <group>
+      {/* 흰 바탕 */}
+      <B p={[0, 0, 0]} s={[w, h, 0.01]} c="#ffffff" />
+
+      {/* 태극 — 아래는 파랑, 위는 빨강, 경계는 작은 원 두 개로 S자 */}
+      <mesh position={[0, 0, z]}>
+        <circleGeometry args={[R, 40]} />
+        <meshStandardMaterial color="#0047a0" />
+      </mesh>
+      <mesh position={[0, 0, z + 0.0005]}>
+        <circleGeometry args={[R, 40, 0, Math.PI]} />
+        <meshStandardMaterial color="#cd2e3a" />
+      </mesh>
+      <mesh position={[-R / 2, 0, z + 0.001]}>
+        <circleGeometry args={[R / 2, 28]} />
+        <meshStandardMaterial color="#0047a0" />
+      </mesh>
+      <mesh position={[R / 2, 0, z + 0.001]}>
+        <circleGeometry args={[R / 2, 28]} />
+        <meshStandardMaterial color="#cd2e3a" />
+      </mesh>
+
+      {/* 4괘 — 건(좌상) 감(우상) 리(좌하) 곤(우하) */}
+      <Gua x={-cx1} y={cy1} rot={Math.PI / 4} lines={[true, true, true]} />
+      <Gua x={cx1} y={cy1} rot={-Math.PI / 4} lines={[false, true, false]} />
+      <Gua x={-cx1} y={-cy1} rot={-Math.PI / 4} lines={[true, false, true]} />
+      <Gua x={cx1} y={-cy1} rot={Math.PI / 4} lines={[false, false, false]} />
+    </group>
+  );
+}
+
+/** 벽에 거는 태극기 (액자형) */
+function Taegukgi() {
+  return (
+    <group position={[0, 1.85, 0]}>
+      <B p={[0, 0, -0.02]} s={[1.06, 0.75, 0.04]} c="#8a5f36" />
+      <group position={[0, 0, 0.01]}><TaegukFace w={0.96} /></group>
+    </group>
+  );
+}
+
+/** 깃대에 달린 태극기 */
+function Flagpole() {
   return (
     <group>
       <Cy p={[0, 0.05, 0]} rad={0.16} h={0.1} c="#475569" />
       <Cy p={[0, 0.9, 0]} rad={0.025} h={1.8} c="#94a3b8" m={0.5} />
       <Sp p={[0, 1.83, 0]} rad={0.05} c="#fbbf24" m={0.6} />
-      <B p={[0.3, 1.45, 0]} s={[0.55, 0.37, 0.01]} c={a} />
-      <Sp p={[0.3, 1.45, 0.008]} rad={0.09} sc={[1, 1, 0.1]} c="#dc2626" />
-      <Sp p={[0.3, 1.42, 0.012]} rad={0.06} sc={[1, 1, 0.1]} c="#1d4ed8" />
-      {[[-0.14, 0.1], [0.14, -0.1]].map(([dx, dy], i) => (
-        <B key={i} p={[0.3 + dx, 1.45 + dy, 0.012]} s={[0.07, 0.02, 0.01]} c="#26262b" />
-      ))}
+      <group position={[0.42, 1.45, 0]}><TaegukFace w={0.78} /></group>
     </group>
   );
 }
@@ -1481,6 +1551,7 @@ Object.assign(MODELS, {
   chalkboard: Chalkboard, locker: Locker, shoerack: Shoerack, noticeboard: Noticeboard,
   screen: Screen, projector: Projector, wallclock: Wallclock, flagpole: Flagpole,
   waterdisp: Waterdisp, cleanbox: Cleanbox, recyclebin: Recyclebin, milkbox: Milkbox,
+  taegukgi: Taegukgi,
   fluorescent: Fluorescent, moodlamp: Moodlamp, chandelier: Chandelier, neon: Neon,
   starlight: Starlight, xmastree: Xmastree, floorlantern: Floorlantern,
 });

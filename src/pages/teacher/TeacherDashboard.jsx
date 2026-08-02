@@ -70,6 +70,7 @@ export default function TeacherDashboard() {
     const ref = await addDoc(collection(db, 'classes'), {
       name,
       code: makeClassCode(),
+      joinPin: String(Math.floor(1000 + Math.random() * 9000)), // 학생 입장 비밀번호 4자리
       teacherUid: teacher.uid,
       currency: '미소',
       salary: 100,
@@ -115,6 +116,12 @@ export default function TeacherDashboard() {
                 >
                   🔑 {klass.code}
                 </button>
+                <span
+                  title="학생이 입장할 때 입력하는 비밀번호예요 (⚙️설정에서 변경)"
+                  className="bg-white/20 backdrop-blur rounded-2xl px-4 py-2 tracking-widest"
+                >
+                  🔒 {klass.joinPin || '없음'}
+                </span>
                 <button
                   onClick={() => setShowInvite(true)}
                   title="학생 초대 QR 코드 보기"
@@ -893,6 +900,7 @@ function SettingsTab({ klass }) {
     depositRate: klass.depositRate, savingsRate: klass.savingsRate,
     tickLimit: klass.tickLimit ?? DEFAULT_TICK_LIMIT,
     taxRate: klass.taxRate ?? 10,
+    joinPin: klass.joinPin ?? '',
   });
   const [form, setForm] = useState(init);
   const [saved, setSaved] = useState(false);
@@ -909,6 +917,7 @@ function SettingsTab({ klass }) {
       savingsRate: Number(form.savingsRate) || 0,
       tickLimit: Math.max(1, Math.min(100, Number(form.tickLimit) || DEFAULT_TICK_LIMIT)),
       taxRate: Math.max(0, Math.min(50, Number(form.taxRate) || 0)),
+      joinPin: String(form.joinPin || '').replace(/\D/g, '').slice(0, 4),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -931,6 +940,10 @@ function SettingsTab({ klass }) {
     <form onSubmit={save} className={card + ' max-w-lg space-y-4'}>
       <h3 className="text-xl">⚙️ 학급 설정</h3>
       {field('학급 이름', 'name')}
+      {field(
+        '학생 입장 비밀번호 (숫자 4자리)', 'joinPin', 'text',
+        '학생이 학급 코드와 함께 입력해야 들어올 수 있어요. 비워 두면 비밀번호 없이 입장합니다.'
+      )}
       {field('화폐 단위', 'currency', 'text', '예: 미소, 달란트, 별, 포인트 — 자유롭게 정해요.')}
       {field('월급 금액', 'salary', 'number', '월급 지급 버튼을 누를 때 1인당 지급되는 금액이에요.')}
       {field('예금 이율 (주당 %)', 'depositRate', 'number', '학생이 예금에 넣어둔 돈에 7일마다 붙는 이자예요.')}

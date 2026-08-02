@@ -51,6 +51,9 @@ const DEMO_CLASS = {
   '5-6': { id: 'class_water', rot: 0 },
   '4-5': { id: 'class_recycle', rot: 0 },
   '0-7': { id: 'class_flag', rot: 0 },
+  '0-1': { id: 'class_board', rot: 0 },
+  '0-5': { id: 'class_taegukgi', rot: 0 },
+  '0-6': { id: 'class_clock', rot: 0 },
 };
 
 const DEMO_CAFE = {

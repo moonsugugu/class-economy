@@ -14,6 +14,7 @@ export default function Landing() {
   // 선생님이 만든 초대 QR/링크로 들어오면 학급 코드가 미리 채워져요
   const invitedCode = (params.get('code') || '').trim().toUpperCase().slice(0, 6);
   const [code, setCode] = useState(invitedCode);
+  const [pin, setPin] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -42,6 +43,12 @@ export default function Landing() {
         return;
       }
       const classDoc = classSnap.docs[0];
+      // 선생님이 비밀번호를 정해 둔 학급이면 4자리를 맞춰야 들어갈 수 있어요
+      const needPin = (classDoc.data().joinPin || '').trim();
+      if (needPin && pin.trim() !== needPin) {
+        setError('비밀번호가 틀렸어요. 선생님께 4자리 비밀번호를 물어보세요! 🔒');
+        return;
+      }
       const studentsRef = collection(db, 'classes', classDoc.id, 'students');
       const stSnap = await getDocs(query(studentsRef, where('name', '==', n)));
       let studentId;
@@ -100,6 +107,14 @@ export default function Landing() {
               placeholder="학급 코드 (예: AB12CD)"
               maxLength={6}
               className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-lg tracking-widest uppercase focus:border-amber-400 outline-none"
+            />
+            <input
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              placeholder="비밀번호 4자리 🔒"
+              inputMode="numeric"
+              maxLength={4}
+              className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-lg tracking-[0.4em] text-center focus:border-amber-400 outline-none"
             />
             <input
               value={name}

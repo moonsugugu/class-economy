@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 import { fmt } from '../../lib/util';
+import { MARKET_PATH, DEFAULT_FX } from '../../lib/stocks';
 
 const NAV = [
   ['/student', '🏠', '마이', true],
@@ -12,7 +13,7 @@ const NAV = [
   ['/student/stocks', '📈', '주식'],
   ['/student/class', '🏛️', '학급'],
   ['/student/seats', '🪑', '자리'],
-  ['/student/room', '🛋️', '내방'],
+  ['/student/room', '🛋️', '내 공간'],
   ['/student/visit', '🏠', '놀러가기'],
 ];
 
@@ -22,6 +23,8 @@ export default function StudentLayout() {
   const [klass, setKlass] = useState(null);
   const [student, setStudent] = useState(null);
   const [gone, setGone] = useState(false);
+  const [market, setMarket] = useState(null);
+  const [savings, setSavings] = useState([]);
 
   useEffect(() => {
     if (!session) return;
@@ -39,12 +42,47 @@ export default function StudentLayout() {
     return () => { unsub1(); unsub2(); };
   }, [session?.classId, session?.studentId]);
 
+  // 헤더에 총자산을 보여주기 위해 시세와 적금도 함께 봐요
+  useEffect(() => {
+    if (!session) return;
+    return onSnapshot(doc(db, ...MARKET_PATH(session.classId)), (s) =>
+      setMarket(s.exists() ? s.data() : null)
+    );
+  }, [session?.classId]);
+
+  useEffect(() => {
+    if (!session) return;
+    const q = query(
+      collection(db, 'classes', session.classId, 'accounts'),
+      where('studentId', '==', session.studentId),
+      where('status', '==', 'active')
+    );
+    return onSnapshot(q, (s) => setSavings(s.docs.map((d) => d.data())));
+  }, [session?.classId, session?.studentId]);
+
   useEffect(() => {
     if (!session || gone) {
       saveSession(null);
       navigate('/', { replace: true });
     }
   }, [gone]);
+
+  // 총자산 = 현금 + 예금 + 적금 + 달러 + 주식 평가액
+  const fx = market?.fx || DEFAULT_FX;
+  const stockList = market?.stocks || [];
+  const totalAssets = (() => {
+    if (!student) return 0;
+    const stockValue = Object.entries(student.holdings || {}).reduce((a, [sym, h]) => {
+      const st = stockList.find((s) => s.symbol === sym);
+      if (!st || !h.qty) return a;
+      const v = st.price * h.qty;
+      return a + (st.market === 'US' ? v * fx : v);
+    }, 0);
+    const savingsSum = savings.reduce((a, s) => a + (s.amount || 0), 0);
+    return Math.round(
+      (student.cash || 0) + (student.deposit || 0) + savingsSum + (student.usd || 0) * fx + stockValue
+    );
+  })();
 
   if (!session) return null;
   if (!klass || !student) {
@@ -60,8 +98,9 @@ export default function StudentLayout() {
           <div className="text-lg">{student.name}</div>
           <div className="text-xs text-white/70">🏫 {klass.name}</div>
         </div>
-        <div className="ml-auto bg-white/20 backdrop-blur rounded-2xl px-4 py-2 tabular-nums relative">
-          💰 {fmt(student.cash)} <span className="text-xs">{klass.currency}</span>
+        <div className="ml-auto bg-white/20 backdrop-blur rounded-2xl px-4 py-1.5 relative text-right leading-tight">
+          <div className="text-[10px] text-white/70">🏆 총자산</div>
+          <div className="tabular-nums">{fmt(totalAssets)} <span className="text-xs">{klass.currency}</span></div>
         </div>
         <button
           onClick={() => { saveSession(null); navigate('/'); }}
