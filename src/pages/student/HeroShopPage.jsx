@@ -179,7 +179,7 @@ export default function HeroShopPage() {
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-500">{item.level}단계</span>
         </div>
         <div className="text-xs text-indigo-500">
-          {item.slot === 'pet' ? <>보스전 크리티컬 {item.critChance}% · 데미지 2배</> : <>전투력 +{item.power}</>}
+          {item.slot === 'pet' ? <>보스전 크리티컬 {item.critChance}% · 치명타 시 2배</> : <>전투력 +{item.power}</>}
         </div>
         {formatHeroSpecialStats(item).map((stat) => (
           <div key={stat} className="text-[10px] leading-tight text-fuchsia-500 whitespace-normal break-words">✨ {stat}</div>
@@ -265,7 +265,7 @@ export default function HeroShopPage() {
           <span className="text-xs text-gray-400">1단계 5% · 20단계 80% 보스전 크리티컬</span>
         </div>
         <p className="mb-2 rounded-2xl bg-fuchsia-50 px-3 py-2 text-xs text-fuchsia-700">
-          장착한 펫은 보스전에서 일정 확률로 데미지를 2배로 만들어요. 펫은 전투력에는 더하지 않아요.
+          장착한 펫은 보스전에서 일정 확률로 치명타를 발생시켜요. 치명타가 터진 순간에만 기본 2배 피해를 주고, 치명타 피해 +5%가 붙으면 2.05배가 됩니다. 일반 몬스터 공격과 일반 피해에는 2배가 적용되지 않아요. 펫은 전투력에는 더하지 않아요.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {(view === 'shop'

@@ -290,16 +290,30 @@ export function criticalDamageBonus(raw) {
   return heroSpecialValue(raw, 'critDamage');
 }
 
+export const BOSS_CRITICAL_BASE_MULTIPLIER = 2;
+
+// 펫의 보스전 치명타는 일반 공격을 강화하지 않고, 치명타가 실제로 발생했을 때만 기본 2배가 됩니다.
+// 장비·펫에 붙은 치명타 피해 수치는 이 기본 배율에 퍼센트포인트로 더해져요.
+// 예: 치명타 피해 +5% → 2 + 0.05 = 2.05배
+export function bossCriticalMultiplier(raw) {
+  const bonusPercent = Math.max(0, Math.round(criticalDamageBonus(raw)));
+  return (BOSS_CRITICAL_BASE_MULTIPLIER * 100 + bonusPercent) / 100;
+}
+
 export function battleDamage(power, monster, raw, criticalRoll = Math.random()) {
   const base = Math.max(1, Math.floor(Number(power) || 0));
   const criticalChance = monster?.boss ? bossCriticalChance(raw) : 0;
   const critical = criticalChance > 0 && criticalRoll < criticalChance / 100;
-  const criticalDamage = criticalDamageBonus(raw);
+  const criticalDamage = Math.max(0, Math.round(criticalDamageBonus(raw)));
+  const criticalMultiplierPercent = Math.round(bossCriticalMultiplier(raw) * 100);
+  const criticalMultiplier = criticalMultiplierPercent / 100;
   return {
-    damage: critical ? Math.floor(base * (2 + criticalDamage / 100)) : base,
+    // 부동소수점 오차를 피하기 위해 2.05배를 205% 정수로 계산해요.
+    damage: critical ? Math.floor((base * criticalMultiplierPercent) / 100) : base,
     critical,
     criticalChance,
     criticalDamage,
+    criticalMultiplier,
   };
 }
 

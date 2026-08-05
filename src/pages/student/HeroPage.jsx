@@ -6,7 +6,7 @@ import { fmt } from '../../lib/util';
 import {
   HERO_ITEM_MAP, HERO_SLOTS, normalizeHero, heroPower,
   monsterForLevel, battleChance, battleConfig, heroDateKey, battleDamage, bossCriticalChance, heroBattleWinReward,
-  criticalDamageBonus, formatHeroSpecialStats, heroExtraBattleCost, heroDisplayName,
+  criticalDamageBonus, bossCriticalMultiplier, formatHeroSpecialStats, heroExtraBattleCost, heroDisplayName,
 } from '../../lib/hero';
 import HeroPreview from '../../three/Hero3D.jsx';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
@@ -139,6 +139,7 @@ export default function HeroPage() {
             damage: damageResult.damage,
             critical: damageResult.critical,
             criticalDamage: damageResult.criticalDamage,
+            criticalMultiplier: damageResult.criticalMultiplier,
             bossDamage: nextBossDamage,
             bossHp: monster.maxHp,
             bossDefeated,
@@ -155,6 +156,7 @@ export default function HeroPage() {
           won, monster, chance, currentPower, reward,
           damage: damageResult.damage, critical: damageResult.critical,
           criticalDamage: damageResult.criticalDamage,
+          criticalMultiplier: damageResult.criticalMultiplier,
           bossDamage: nextBossDamage, bossHp: monster.maxHp, bossDefeated,
           attempt: attempts + 1, limit: settings.limit, extraCost,
         };
@@ -176,7 +178,7 @@ export default function HeroPage() {
         setMsg({
           type: 'ok',
           text: '💥 ' + battleResult.monster.name + '에게 ' + fmt(battleResult.damage) + ' 데미지' +
-            (battleResult.critical ? ` (크리티컬 ${(2 + (battleResult.criticalDamage || 0) / 100).toFixed(2).replace(/\.00$/, '')}배!)` : '') + '! ' +
+            (battleResult.critical ? ` (크리티컬 ${(battleResult.criticalMultiplier || bossCriticalMultiplier(hero)).toFixed(2).replace(/\.00$/, '')}배!)` : '') + '! ' +
             (battleResult.bossDefeated ? '보스를 쓰러뜨렸어요!' : '아직 보스 HP가 남았어요.') +
             ' 보상 ' + fmt(battleResult.reward) + klass.currency +
             (battleResult.extraCost > 0 ? ' · 추가 도전 비용 ' + fmt(battleResult.extraCost) + klass.currency : '') +
@@ -255,17 +257,17 @@ export default function HeroPage() {
                 </div>
               );
             })}
-            <div className={['flex min-w-0 items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50' : 'border-gray-100 bg-gray-50'].join(' ')}>
-              <span className="w-12 shrink-0 whitespace-nowrap text-[9px] text-gray-400">펫</span>
+            <div className={['grid min-w-0 grid-cols-[2.25rem_2.75rem_minmax(0,1fr)_6.5rem] items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50' : 'border-gray-100 bg-gray-50'].join(' ')}>
+              <span className="whitespace-nowrap text-[9px] text-gray-400">펫</span>
               <HeroItemVisual item={HERO_ITEM_MAP[hero.pet]} size={44} showLevel={false} />
-              <span className="min-w-0 flex-1 overflow-hidden text-gray-600">
-                <span className="block truncate text-[10px] leading-tight">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
+              <span className="min-w-0 overflow-hidden text-gray-600">
+                <span className="block truncate break-keep text-[10px] leading-tight">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
                 {HERO_ITEM_MAP[hero.pet] && <span className="block text-[8px] font-semibold leading-tight text-fuchsia-500">{HERO_ITEM_MAP[hero.pet].level}단계 펫</span>}
               </span>
-              <span className="w-16 shrink-0 break-words text-right text-[7px] leading-tight text-fuchsia-600">
+              <span className="min-w-0 text-right text-[8px] leading-tight text-fuchsia-600 [word-break:keep-all]">
                 {bossCriticalChance(hero) > 0 && <span className="block">치명타 확률 {bossCriticalChance(hero)}%</span>}
-                <small className="block text-[8px] text-gray-400">보스 피해 2배</small>
-                {criticalDamageBonus(hero) > 0 && <small className="block break-words text-[7px] text-fuchsia-400">치명타 피해 +{criticalDamageBonus(hero)}%</small>}
+                <small className="block text-[8px] text-gray-400">치명타 시 보스 피해 ×2</small>
+                {criticalDamageBonus(hero) > 0 && <small className="block text-[8px] text-fuchsia-400">치명타 피해 +{criticalDamageBonus(hero)}%</small>}
               </span>
             </div>
           </div>

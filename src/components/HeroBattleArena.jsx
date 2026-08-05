@@ -1,5 +1,6 @@
 import HeroPreview from '../three/Hero3D.jsx';
 import { fmt } from '../lib/util';
+import { bossCriticalMultiplier } from '../lib/hero.js';
 import MonsterVisual from './MonsterVisual.jsx';
 
 const phaseText = {
@@ -71,7 +72,7 @@ export default function HeroBattleArena({ hero, power = 0, monster, phase = 'idl
                   style={{ width: Math.max(0, Math.min(100, ((monster.maxHp - bossDamage) / monster.maxHp) * 100)) + '%' }}
                 />
               </div>
-              {battleFx?.critical && <div className="mt-1 text-center text-[10px] font-black text-amber-600 animate-pulse">CRITICAL ×{(2 + (battleFx.criticalDamage || 0) / 100).toFixed(2).replace(/\.00$/, '')}</div>}
+              {battleFx?.critical && <div className="mt-1 text-center text-[10px] font-black text-amber-600 animate-pulse">CRITICAL ×{(battleFx.criticalMultiplier || bossCriticalMultiplier(hero)).toFixed(2).replace(/\.00$/, '')}</div>}
             </div>
           )}
         </div>
