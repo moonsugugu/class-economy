@@ -13,37 +13,68 @@ const SYMBOL_MAP = {
   HYUNDAI: '005380.KS', KIA: '000270.KS', NAVER: '035420.KS',
   KAKAO: '035720.KS', SAMBIO: '207940.KS', POSCO: '005490.KS',
   CELLTRION: '068270.KS',
+  LGCHEM: '051910.KS', SAMSUNGSDI: '006400.KS', HYUNDAIMOBIS: '012330.KS',
+  KBFIN: '105560.KS', SHINHAN: '055550.KS', HANWHA: '012450.KS',
+  HDHYNDAI: '329180.KS', DOOSAN: '034020.KS', KTNG: '033780.KS',
+  KAKAOBANK: '323410.KS',
   AAPL: 'AAPL', MSFT: 'MSFT', NVDA: 'NVDA', GOOGL: 'GOOGL',
   AMZN: 'AMZN', TSLA: 'TSLA', META: 'META', NFLX: 'NFLX',
   KO: 'KO', MCD: 'MCD',
+  AVGO: 'AVGO', ORCL: 'ORCL', AMD: 'AMD', JPM: 'JPM', V: 'V',
+  WMT: 'WMT', COST: 'COST', DIS: 'DIS', PEP: 'PEP', INTC: 'INTC',
 };
 
 const FX_SYMBOL = 'USDKRW=X'; // 원/달러 환율
 
 /** 종목 하나의 현재가를 가져와요 (실패하면 null) */
 async function priceOf(yahooSymbol) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
   try {
     const url =
       `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}` +
       '?interval=1d&range=1d';
     const r = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      signal: controller.signal,
     });
     if (!r.ok) return null;
     const j = await r.json();
-    const v = j?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    const result = j?.chart?.result?.[0];
+    const closes = result?.indicators?.quote?.[0]?.close || [];
+    const v = [result?.meta?.regularMarketPrice, ...[...closes].reverse()]
+      .find((x) => typeof x === 'number' && x > 0);
     return typeof v === 'number' && v > 0 ? v : null;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
+async function pricesWithLimit(entries, concurrency = 12) {
+  const results = Array(entries.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < entries.length) {
+      const index = cursor++;
+      results[index] = await priceOf(entries[index][1]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, entries.length) }, worker));
+  return results;
+}
+
 export default async function handler(req, res) {
+  if (req.method && req.method !== 'GET') {
+    res.setHeader('Allow', 'GET');
+    return res.status(405).json({ ok: false, error: 'GET 요청만 허용돼요' });
+  }
   // 같은 값을 5분 동안 재사용해서 호출 수를 아껴요
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=900');
 
   const entries = Object.entries(SYMBOL_MAP);
-  const results = await Promise.all(entries.map(([, yh]) => priceOf(yh)));
+  const results = await pricesWithLimit(entries);
 
   const prices = {};
   entries.forEach(([ours], i) => {

@@ -1,4 +1,4 @@
-// 한국 대표주 10개 + 미국 대표주 10개.
+// 한국 대표주 20개 + 미국 대표주 20개.
 // 가격 단위는 실제와 같습니다 — 한국 주식은 원(₩) 그대로, 미국 주식은 달러($) 그대로.
 // (예: 삼성전자 70,800원 → 70,800 학급화폐)
 // base는 실제 시세를 아직 못 불러왔을 때 쓰는 시작값이에요.
@@ -13,6 +13,16 @@ export const STOCK_SEED = [
   { symbol: 'SAMBIO', name: '삼성바이오로직스', market: 'KR', base: 950000 },
   { symbol: 'POSCO', name: 'POSCO홀딩스', market: 'KR', base: 350000 },
   { symbol: 'CELLTRION', name: '셀트리온', market: 'KR', base: 180000 },
+  { symbol: 'LGCHEM', name: 'LG화학', market: 'KR', base: 300000 },
+  { symbol: 'SAMSUNGSDI', name: '삼성SDI', market: 'KR', base: 250000 },
+  { symbol: 'HYUNDAIMOBIS', name: '현대모비스', market: 'KR', base: 230000 },
+  { symbol: 'KBFIN', name: 'KB금융', market: 'KR', base: 90000 },
+  { symbol: 'SHINHAN', name: '신한지주', market: 'KR', base: 60000 },
+  { symbol: 'HANWHA', name: '한화에어로스페이스', market: 'KR', base: 700000 },
+  { symbol: 'HDHYNDAI', name: 'HD현대중공업', market: 'KR', base: 300000 },
+  { symbol: 'DOOSAN', name: '두산에너빌리티', market: 'KR', base: 30000 },
+  { symbol: 'KTNG', name: 'KT&G', market: 'KR', base: 110000 },
+  { symbol: 'KAKAOBANK', name: '카카오뱅크', market: 'KR', base: 30000 },
   { symbol: 'AAPL', name: '애플', market: 'US', base: 230 },
   { symbol: 'MSFT', name: '마이크로소프트', market: 'US', base: 420 },
   { symbol: 'NVDA', name: '엔비디아', market: 'US', base: 130 },
@@ -23,6 +33,16 @@ export const STOCK_SEED = [
   { symbol: 'NFLX', name: '넷플릭스', market: 'US', base: 650 },
   { symbol: 'KO', name: '코카콜라', market: 'US', base: 62 },
   { symbol: 'MCD', name: '맥도날드', market: 'US', base: 290 },
+  { symbol: 'AVGO', name: '브로드컴', market: 'US', base: 1800 },
+  { symbol: 'ORCL', name: '오라클', market: 'US', base: 180 },
+  { symbol: 'AMD', name: 'AMD', market: 'US', base: 160 },
+  { symbol: 'JPM', name: 'JP모건', market: 'US', base: 250 },
+  { symbol: 'V', name: '비자', market: 'US', base: 350 },
+  { symbol: 'WMT', name: '월마트', market: 'US', base: 100 },
+  { symbol: 'COST', name: '코스트코', market: 'US', base: 900 },
+  { symbol: 'DIS', name: '디즈니', market: 'US', base: 110 },
+  { symbol: 'PEP', name: '펩시코', market: 'US', base: 150 },
+  { symbol: 'INTC', name: '인텔', market: 'US', base: 25 },
 ];
 
 // 랜덤워크: 한 틱에 최대 ±3% 변동
@@ -38,7 +58,7 @@ export function changePct(stock) {
 
 /* =====================================================================
    시장 데이터 구조 (비용 최적화)
-   예전: classes/{id}/stocks/{종목} 문서 20개 → 시세 변동 1회에 읽기 440회
+   예전: classes/{id}/stocks/{종목} 문서 여러 개 → 시세 변동 1회에 읽기 440회 이상
    지금: classes/{id}/market/main 문서 1개  → 시세 변동 1회에 읽기 약 21회
    ===================================================================== */
 export const MARKET_PATH = (classId) => ['classes', classId, 'market', 'main'];
@@ -65,6 +85,18 @@ export function makeInitialMarket() {
     schedDone: dueScheduleKeys(), // 시장을 연 시점의 예약분은 이미 지난 것으로 처리
     updatedAt: Date.now(),
   };
+}
+
+/** 기존 시장 문서를 보존하면서 새 기본 종목만 뒤에 추가합니다. */
+export function mergeSeedStocks(stocks = []) {
+  const existing = new Set(stocks.map((s) => s.symbol));
+  const additions = STOCK_SEED
+    .filter((s) => !existing.has(s.symbol))
+    .map((s) => ({
+      symbol: s.symbol, name: s.name, market: s.market,
+      price: s.base, prevClose: s.base, history: [s.base],
+    }));
+  return [...stocks, ...additions];
 }
 
 /** 선생님이 직접 만드는 우리 반 종목 */

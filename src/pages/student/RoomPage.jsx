@@ -6,7 +6,7 @@ import { fmt } from '../../lib/util';
 import {
   SPECIES_GROUP, CHAR_ITEMS, FRIEND_ITEMS, isCompanion,
   ITEMS, ITEM_MAP, SLOT_LABEL, SETS, setPrice,
-  normalizeRoom, canPlaceAt,
+  normalizeRoom, canPlaceAt, isStackableRoomItem,
 } from '../../lib/items';
 import RoomScene from '../../three/RoomScene.jsx';
 import { ThumbProvider, ItemThumb } from '../../three/Thumbs.jsx';
@@ -80,14 +80,19 @@ function RoomInner({ klass, student }) {
 
   /* ----- 구매 ----- */
   const buyItem = async (item) => {
-    if (inventory.includes(item.id)) return;
+    const stackable = isStackableRoomItem(item.slot);
+    if (inventory.includes(item.id) && !stackable) return;
     if (!confirm(`'${item.name}'을(를) ${fmt(item.price)}${klass.currency}에 살까요?`)) return;
     try {
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
-        if ((s.inventory || []).includes(item.id)) throw new Error('이미 가지고 있어요!');
+        const inv = s.inventory || [];
+        if (inv.includes(item.id) && !stackable) throw new Error('이미 가지고 있어요!');
         if (s.cash < item.price) throw new Error('현금이 부족해요!');
-        const upd = { cash: s.cash - item.price, inventory: arrayUnion(item.id) };
+        const upd = {
+          cash: s.cash - item.price,
+          inventory: stackable ? [...inv, item.id] : arrayUnion(item.id),
+        };
         // 캐릭터를 처음 사면 바로 그 모습으로 바뀌어요
         if (item.slot === 'char' && !s.avatar?.base) upd['avatar.base'] = item.base;
         // 친구·애완동물은 사자마자 함께 다녀요
@@ -127,17 +132,19 @@ function RoomInner({ klass, student }) {
   const onPlace = async (key) => {
     const item = ITEM_MAP[placing];
     if (!item) return;
-    const prevKey = Object.keys(activeMap).find((k) => activeMap[k].id === placing) || null;
+    const placedCount = SPACE_KEYS.reduce((count, sp) =>
+      count + Object.values(maps[sp]).filter((p) => p.id === placing).length, 0);
+    const ownedCount = inventory.filter((id) => id === placing).length;
+    if (placedCount >= ownedCount) {
+      flash('err', '가지고 있는 수량만큼 모두 배치했어요. 기존 배치를 먼저 집어 주세요.');
+      return;
+    }
+    const prevKey = null;
     if (!canPlaceAt(activeMap, key, item, 0, prevKey)) {
       flash('err', '거기엔 놓을 수 없어요! (공간이 부족해요)');
       return;
     }
     const updates = { [`${space}.${key}`]: { id: placing, rot: 0 } };
-    // 다른 공간에 놓여 있던 같은 아이템은 회수해요
-    for (const sp of SPACE_KEYS) {
-      const prev = Object.keys(maps[sp]).find((k) => maps[sp][k].id === placing);
-      if (prev && !(sp === space && prev === key)) updates[`${sp}.${prev}`] = deleteField();
-    }
     await updateDoc(studentRef, updates);
     setPlacing(null);
   };
@@ -185,6 +192,47 @@ function RoomInner({ klass, student }) {
   const applySkin = (item) =>
     updateDoc(studentRef, { [`roomSkin.${item.slot}`]: skin[item.slot] === item.id ? null : item.id });
 
+  const refundItem = async (item) => {
+    if (!confirm(`'${item.name}'을(를) 구매가의 50%인 ${fmt(Math.floor(item.price * 0.5))}${klass.currency}에 환불할까요?`)) return;
+    try {
+      await runTransaction(db, async (tx) => {
+        const s = (await tx.get(studentRef)).data();
+        const inv = [...(s.inventory || [])];
+        const inventoryIndex = inv.indexOf(item.id);
+        if (inventoryIndex < 0) throw new Error('환불할 아이템을 찾지 못했어요.');
+        inv.splice(inventoryIndex, 1);
+        const upd = {
+          cash: (s.cash || 0) + Math.floor(item.price * 0.5),
+          inventory: inv,
+        };
+
+        for (const sp of SPACE_KEYS) {
+          const map = normalizeRoom(s[sp]);
+          const placedKey = Object.keys(map).find((key) => map[key].id === item.id);
+          if (placedKey) {
+            upd[`${sp}.${placedKey}`] = deleteField();
+            break;
+          }
+        }
+        if (isCompanion(item.slot)) {
+          const nextWalking = [...(s.walking || [])];
+          const walkingIndex = nextWalking.indexOf(item.id);
+          if (walkingIndex >= 0) nextWalking.splice(walkingIndex, 1);
+          upd.walking = nextWalking;
+        }
+        if (item.slot === 'char' && s.avatar?.base === item.base) upd['avatar.base'] = deleteField();
+        if (s.avatar?.[item.slot] === item.id) upd[`avatar.${item.slot}`] = deleteField();
+        if (s.roomSkin?.[item.slot] === item.id) upd[`roomSkin.${item.slot}`] = deleteField();
+        tx.update(studentRef, upd);
+      });
+      setSelected(null);
+      setPlacing(null);
+      flash('ok', `♻️ '${item.name}' 환불 완료! 구매가의 50%를 돌려받았어요.`);
+    } catch (e) {
+      flash('err', e.message);
+    }
+  };
+
   /* ----- 인증샷 ----- */
   const screenshot = () => {
     const gl = glRef.current;
@@ -213,7 +261,14 @@ function RoomInner({ klass, student }) {
     flash('ok', '📸 인증샷을 저장했어요!');
   };
 
-  const owned = (slot) => ITEMS.filter((i) => i.slot === slot && inventory.includes(i.id));
+  const owned = (slot) => inventory.flatMap((id, inventoryIndex) => {
+    const item = ITEM_MAP[id];
+    return item?.slot === slot ? [{ ...item, inventoryIndex }] : [];
+  });
+  const inventoryItems = inventory.flatMap((id, inventoryIndex) => {
+    const item = ITEM_MAP[id];
+    return item ? [{ ...item, inventoryIndex }] : [];
+  });
   const selectedItem = selected && activeMap[selected] ? ITEM_MAP[activeMap[selected].id] : null;
   const myChars = CHAR_ITEMS.filter((c) => inventory.includes(c.id));
   const spaceLabel = SPACES.find(([id]) => id === space)[1];
@@ -307,7 +362,7 @@ function RoomInner({ klass, student }) {
                   const on = walking.includes(item.id);
                   return (
                     <button
-                      key={item.id}
+                      key={`${item.id}-${item.inventoryIndex}`}
                       onClick={() => toggleWalking(item)}
                       className={`rounded-2xl border-2 p-2 text-center transition ${
                         on ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 opacity-60 hover:opacity-100'
@@ -338,9 +393,12 @@ function RoomInner({ klass, student }) {
                   {owned(slot).map((item) => {
                     const placedIn = SPACE_KEYS.find((sp) =>
                       Object.values(maps[sp]).some((p) => p.id === item.id));
+                    const placedCount = SPACE_KEYS.reduce((count, sp) =>
+                      count + Object.values(maps[sp]).filter((p) => p.id === item.id).length, 0);
+                    const ownedCount = inventory.filter((id) => id === item.id).length;
                     return (
                       <button
-                        key={item.id}
+                        key={`${item.id}-${item.inventoryIndex}`}
                         onClick={() => startPlacing(item)}
                         className={`rounded-2xl border-2 p-2 text-center transition ${
                           placing === item.id ? 'border-purple-500 bg-purple-50 scale-105'
@@ -351,7 +409,7 @@ function RoomInner({ klass, student }) {
                         <ItemThumb id={item.id} size={48} />
                         <div className="text-[11px] mt-0.5 leading-tight">{item.name}</div>
                         <div className="text-[10px] text-gray-400">
-                          {placedIn ? SPACES.find(([s]) => s === placedIn)[1].slice(0, 3) : '보관 중'}
+                          {placedIn ? `${SPACES.find(([s]) => s === placedIn)[1].slice(0, 3)} · ${placedCount}/${ownedCount}` : `보유 ${ownedCount}개`}
                         </div>
                       </button>
                     );
@@ -369,7 +427,7 @@ function RoomInner({ klass, student }) {
                 <div className="flex flex-wrap gap-2">
                   {owned(slot).map((item) => (
                     <button
-                      key={item.id}
+                      key={`${item.id}-${item.inventoryIndex}`}
                       onClick={() => applySkin(item)}
                       className={`rounded-2xl border-2 px-3 py-2 flex items-center gap-2 transition ${
                         skin[slot] === item.id ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-purple-300'
@@ -386,6 +444,28 @@ function RoomInner({ klass, student }) {
               )}
             </div>
           ))}
+          <div className="border-t border-dashed border-gray-200 pt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <h4 className="text-gray-500">♻️ 아이템 환불</h4>
+              <span className="text-xs text-gray-400">모든 내 공간 아이템은 구매가의 50%로 환불할 수 있어요.</span>
+            </div>
+            {inventoryItems.length ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {inventoryItems.map((item) => (
+                  <div key={`${item.id}-${item.inventoryIndex}`} className="rounded-2xl border border-gray-100 bg-gray-50 p-2 flex items-center gap-2">
+                    <ItemThumb id={item.id} size={38} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] truncate">{item.name}</div>
+                      <div className="text-[10px] text-emerald-600">+{fmt(Math.floor(item.price * 0.5))} {klass.currency}</div>
+                      <button onClick={() => refundItem(item)} className="text-[10px] text-rose-500 underline">환불하기</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-300">아직 환불할 아이템이 없어요.</p>
+            )}
+          </div>
         </div>
       )}
 
@@ -424,7 +504,7 @@ function RoomInner({ klass, student }) {
                 <div className="flex flex-wrap gap-2">
                   {owned(slot).map((item) => (
                     <button
-                      key={item.id}
+                      key={`${item.id}-${item.inventoryIndex}`}
                       onClick={() => equip(item)}
                       title={item.name}
                       className={`rounded-2xl border-2 p-2 transition ${
@@ -533,12 +613,14 @@ function RoomInner({ klass, student }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
               {ITEMS.filter((i) => (CATS.find(([id]) => id === shopCat)[2] || []).includes(i.slot)).map((item) => {
                 const has = inventory.includes(item.id);
+                const stackable = isStackableRoomItem(item.slot);
+                const ownedCount = inventory.filter((id) => id === item.id).length;
                 return (
-                  <div key={item.id} className={`bg-white rounded-2xl shadow p-3 text-center ${has ? 'opacity-60' : ''}`}>
+                  <div key={item.id} className={`bg-white rounded-2xl shadow p-3 text-center ${has && !stackable ? 'opacity-60' : ''}`}>
                     <ItemThumb id={item.id} size={56} />
                     <div className="text-sm leading-tight mt-1">{item.name}</div>
                     <div className="text-[10px] text-gray-400 mb-1.5">{SLOT_LABEL[item.slot]}</div>
-                    {has ? (
+                    {has && !stackable ? (
                       <div className="text-emerald-500 text-sm">보유 중 ✓</div>
                     ) : (
                       <button
@@ -547,7 +629,7 @@ function RoomInner({ klass, student }) {
                           student.cash >= item.price ? 'bg-purple-400 hover:bg-purple-500' : 'bg-gray-300'
                         }`}
                       >
-                        {fmt(item.price)} {klass.currency}
+                        {stackable && has ? `＋ 하나 더 구매 (${ownedCount}개 보유)` : `${fmt(item.price)} ${klass.currency}`}
                       </button>
                     )}
                   </div>

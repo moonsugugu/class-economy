@@ -9,7 +9,7 @@ import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 import { fmt, makeClassCode, rankAssets } from '../../lib/util';
 import {
-  changePct, advance, usedTicks, makeInitialMarket, makeCustomStock,
+  changePct, advance, usedTicks, makeInitialMarket, makeCustomStock, mergeSeedStocks,
   MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, DEFAULT_FX, todayKey,
   pendingSchedule, SCHEDULE_LABEL, fetchRealQuotes, applyRealPrices,
   DEFAULT_KRW_PER_UNIT,
@@ -213,7 +213,7 @@ export default function TeacherDashboard() {
           {tab === 'jobs' && <JobsTab klass={klass} />}
           {tab === 'fund' && <FundTab klass={klass} />}
           {tab === 'seats' && <SeatsTab klass={klass} />}
-          {tab === 'reports' && <ReportsTab klass={klass} />}
+          {tab === 'reports' && <ReportsTab klass={klass} teacherEmail={teacher.email} />}
           {tab === 'settings' && (
             <div className="space-y-4">
               <SettingsTab klass={klass} />
@@ -870,6 +870,16 @@ function StocksTab({ klass }) {
     })();
   }, [market, klass.id]);
 
+  // 기존 20종 시장을 유지하면서 새 한국·미국 기본 종목만 추가해요.
+  useEffect(() => {
+    if (!market?.stocks) return;
+    const stocks = mergeSeedStocks(market.stocks);
+    if (stocks.length === market.stocks.length) return;
+    updateDoc(mref, { stocks, updatedAt: Date.now() })
+      .then(() => flash(`📈 새 한국·미국 종목 ${stocks.length - market.stocks.length}개를 추가했어요!`))
+      .catch((e) => flash('⚠️ 새 종목을 추가하지 못했어요: ' + e.message));
+  }, [market?.stocks?.length, klass.id]);
+
   // 예약 시세 변동(아침 8:30 · 오후 3:00)이 밀려 있으면 적용
   useEffect(() => {
     if (market && pendingSchedule(market).length) applyScheduledTicks(klass.id);
@@ -974,7 +984,7 @@ function StocksTab({ klass }) {
       <div className={card + ' text-center py-10'}>
         <p className="text-gray-500 mb-4">
           아직 주식 시장이 열리지 않았어요.<br />
-          한국 대표주 10개 + 미국 대표주 10개로 시장을 열어 보세요!
+          한국 대표주 20개 + 미국 대표주 20개로 시장을 열어 보세요!
         </p>
         <button onClick={initMarket} className={btn + ' bg-indigo-500 hover:bg-indigo-600 text-lg'}>📈 주식 시장 열기</button>
         {msg && <p className="mt-4 text-indigo-600">{msg}</p>}

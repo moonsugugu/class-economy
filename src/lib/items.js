@@ -388,6 +388,11 @@ export const PET_ITEMS = ITEMS.filter((i) => i.slot === 'pet');
 /** 공간을 돌아다니는 것들(친구·애완동물) */
 export const isCompanion = (slot) => slot === 'friend' || slot === 'pet';
 
+// 가구·장식은 같은 상품을 여러 개 사서 여러 공간에 둘 수 있어요.
+// 캐릭터·동료·꾸미기 스킨은 기존처럼 종류별 1개만 보유합니다.
+export const isStackableRoomItem = (slot) =>
+  ['room', 'garden', 'class', 'cafe', 'light'].includes(slot);
+
 export const SLOT_LABEL = {
   char: '캐릭터', friend: '친구', pet: '애완동물',
   hat: '모자', face: '얼굴', acc: '손 아이템',

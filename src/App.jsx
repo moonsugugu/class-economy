@@ -12,6 +12,8 @@ import ReportPage from './pages/student/ReportPage.jsx';
 import ClassPage from './pages/student/ClassPage.jsx';
 import VisitPage from './pages/student/VisitPage.jsx';
 import RoomPage from './pages/student/RoomPage.jsx';
+import HeroPage from './pages/student/HeroPage.jsx';
+import HeroShopPage from './pages/student/HeroShopPage.jsx';
 import DemoRoom from './pages/DemoRoom.jsx';
 
 function SetupGuide() {
@@ -59,6 +61,8 @@ export default function App() {
         <Route path="visit" element={<VisitPage />} />
         <Route path="report" element={<ReportPage />} />
         <Route path="room" element={<RoomPage />} />
+        <Route path="hero" element={<HeroPage />} />
+        <Route path="hero/shop" element={<HeroShopPage />} />
       </Route>
       <Route path="/demo" element={<DemoRoom />} />
       <Route path="*" element={<Navigate to="/" replace />} />
