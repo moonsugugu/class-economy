@@ -8,36 +8,106 @@ export const HERO_SLOTS = [
   ['accessory', '장신구'],
 ];
 
-export const HERO_ITEMS = [
-  { id: 'hero_male', slot: 'character', name: '남자 용사', emoji: '🧙‍♂️', price: 100, power: 12 },
-  { id: 'hero_female', slot: 'character', name: '여자 용사', emoji: '🧙‍♀️', price: 100, power: 14 },
+export const HERO_RARITIES = {
+  common: { label: '일반', color: 'bg-slate-100 text-slate-600', weight: 8 },
+  rare: { label: '희귀', color: 'bg-sky-100 text-sky-700', weight: 4 },
+  elite: { label: '엘리트', color: 'bg-violet-100 text-violet-700', weight: 2 },
+  legendary: { label: '전설', color: 'bg-amber-100 text-amber-700', weight: 1 },
+};
 
-  { id: 'hero_helmet_cloth', slot: 'helmet', name: '천 모자', emoji: '🧢', price: 50, power: 3 },
-  { id: 'hero_helmet_iron', slot: 'helmet', name: '철제 헬멧', emoji: '⛑️', price: 140, power: 12 },
-  { id: 'hero_helmet_knight', slot: 'helmet', name: '기사 헬멧', emoji: '🪖', price: 320, power: 30 },
-  { id: 'hero_helmet_dragon', slot: 'helmet', name: '용의 투구', emoji: '🐲', price: 800, power: 65 },
+export const HERO_SHOP_REFRESH_LIMIT = 3;
 
-  { id: 'hero_weapon_stick', slot: 'weapon', name: '나무 막대기', emoji: '🪵', price: 60, power: 5 },
-  { id: 'hero_weapon_iron', slot: 'weapon', name: '철검', emoji: '⚔️', price: 180, power: 18 },
-  { id: 'hero_weapon_flame', slot: 'weapon', name: '불꽃 검', emoji: '🔥', price: 450, power: 48 },
-  { id: 'hero_weapon_dragon', slot: 'weapon', name: '용의 검', emoji: '🗡️', price: 1100, power: 105 },
-
-  { id: 'hero_armor_cloth', slot: 'armor', name: '천 갑옷', emoji: '🥋', price: 70, power: 4 },
-  { id: 'hero_armor_chain', slot: 'armor', name: '사슬 갑옷', emoji: '⛓️', price: 220, power: 22 },
-  { id: 'hero_armor_knight', slot: 'armor', name: '기사 갑옷', emoji: '🛡️', price: 560, power: 58 },
-  { id: 'hero_armor_dragon', slot: 'armor', name: '용의 갑옷', emoji: '🐉', price: 1300, power: 145 },
-
-  { id: 'hero_shoes_sandal', slot: 'shoes', name: '가죽 샌들', emoji: '👡', price: 50, power: 3 },
-  { id: 'hero_shoes_boots', slot: 'shoes', name: '전투화', emoji: '🥾', price: 160, power: 15 },
-  { id: 'hero_shoes_wing', slot: 'shoes', name: '날개 신발', emoji: '🪽', price: 420, power: 40 },
-  { id: 'hero_shoes_dragon', slot: 'shoes', name: '용의 발톱', emoji: '🐾', price: 900, power: 85 },
-
-  { id: 'hero_accessory_lucky', slot: 'accessory', name: '행운의 부적', emoji: '🍀', price: 100, power: 6 },
-  { id: 'hero_accessory_ruby', slot: 'accessory', name: '불꽃 루비', emoji: '♦️', price: 350, power: 28 },
-  { id: 'hero_accessory_crown', slot: 'accessory', name: '왕의 보석', emoji: '👑', price: 850, power: 75 },
+const HERO_CHARACTERS = [
+  { id: 'hero_male', slot: 'character', name: '소년 용사', emoji: '🧒', price: 100, power: 12 },
+  { id: 'hero_female', slot: 'character', name: '소녀 용사', emoji: '👧', price: 100, power: 14 },
 ];
 
+const GEAR_NAMES = {
+  helmet: ['천 모자', '가죽 모자', '나무 헬멧', '청동 헬멧', '철제 헬멧', '강철 헬멧', '은빛 투구', '금빛 투구', '마법 투구', '수정 투구', '기사 헬멧', '빛의 헬멧', '왕국 투구', '성기사 투구', '고대 투구', '용의 투구', '화염 투구', '폭풍 투구', '별빛 투구', '천공의 투구'],
+  weapon: ['나무 막대기', '돌칼', '청동검', '철검', '강철검', '은빛 검', '금빛 검', '독검', '번개 창', '얼음 도끼', '불꽃 검', '빛의 검', '왕국 검', '성기사 검', '고대 검', '용의 검', '화염 대검', '폭풍 창', '별빛 활', '천공의 검'],
+  armor: ['천 갑옷', '가죽 조끼', '나무 갑옷', '청동 갑옷', '사슬 갑옷', '강철 갑옷', '은빛 갑옷', '금빛 갑옷', '마법 갑옷', '수정 갑옷', '기사 갑옷', '빛의 갑옷', '왕국 갑옷', '성기사 갑옷', '고대 갑옷', '용의 갑옷', '화염 갑옷', '폭풍 갑옷', '별빛 갑옷', '천공의 갑옷'],
+  shoes: ['가죽 샌들', '천 신발', '나무 신발', '청동 장화', '전투화', '강철 장화', '은빛 장화', '금빛 장화', '바람 장화', '얼음 장화', '날개 신발', '빛의 장화', '왕국 장화', '성기사 장화', '고대 장화', '용의 발톱', '화염 장화', '폭풍 장화', '별빛 장화', '천공의 장화'],
+  accessory: ['행운의 부적', '나무 구슬', '청동 반지', '철 팔찌', '마법 목걸이', '불꽃 루비', '은빛 반지', '금빛 반지', '바람 보석', '얼음 보석', '기사의 문장', '빛의 목걸이', '왕국 인장', '성기사 메달', '고대 유물', '왕의 보석', '화염 보석', '폭풍 보석', '별빛 보석', '천공의 보석'],
+};
+
+const GEAR_EMOJIS = {
+  helmet: ['🧢', '🧢', '⛑️', '⛑️', '🪖', '🪖', '🛡️', '👑', '🔮', '💎', '🪖', '✨', '👑', '🛡️', '🏺', '🐲', '🔥', '🌪️', '🌟', '☄️'],
+  weapon: ['🪵', '🪨', '🗡️', '⚔️', '⚔️', '🗡️', '⚔️', '🦂', '🔱', '🪓', '🔥', '✨', '⚔️', '🗡️', '🏺', '🗡️', '🔥', '🌪️', '🏹', '⚔️'],
+  armor: ['🥋', '🥋', '🪵', '🛡️', '⛓️', '🛡️', '🛡️', '👑', '🔮', '💎', '🛡️', '✨', '👑', '🛡️', '🏺', '🐉', '🔥', '🌪️', '🌟', '☄️'],
+  shoes: ['👡', '👞', '👞', '🥾', '🥾', '🥾', '👢', '👢', '💨', '❄️', '🪽', '✨', '👢', '🥾', '🏺', '🐾', '🔥', '🌪️', '🌟', '☄️'],
+  accessory: ['🍀', '🟤', '🟠', '⚙️', '🔮', '♦️', '⚪', '🟡', '💨', '❄️', '🏅', '✨', '🔱', '🏵️', '🏺', '👑', '🔥', '🌪️', '🌟', '☄️'],
+};
+
+// 기존에 구매한 장비 ID와 능력치는 유지하고, 그 사이에 새 단계를 채워요.
+const LEGACY_GEAR = {
+  helmet: {
+    1: { id: 'hero_helmet_cloth', name: '천 모자', emoji: '🧢', price: 50, power: 3 },
+    6: { id: 'hero_helmet_iron', name: '철제 헬멧', emoji: '⛑️', price: 140, power: 12 },
+    11: { id: 'hero_helmet_knight', name: '기사 헬멧', emoji: '🪖', price: 320, power: 30 },
+    16: { id: 'hero_helmet_dragon', name: '용의 투구', emoji: '🐲', price: 800, power: 65 },
+  },
+  weapon: {
+    1: { id: 'hero_weapon_stick', name: '나무 막대기', emoji: '🪵', price: 60, power: 5 },
+    6: { id: 'hero_weapon_iron', name: '철검', emoji: '⚔️', price: 180, power: 18 },
+    11: { id: 'hero_weapon_flame', name: '불꽃 검', emoji: '🔥', price: 450, power: 48 },
+    16: { id: 'hero_weapon_dragon', name: '용의 검', emoji: '🗡️', price: 1100, power: 105 },
+  },
+  armor: {
+    1: { id: 'hero_armor_cloth', name: '천 갑옷', emoji: '🥋', price: 70, power: 4 },
+    6: { id: 'hero_armor_chain', name: '사슬 갑옷', emoji: '⛓️', price: 220, power: 22 },
+    11: { id: 'hero_armor_knight', name: '기사 갑옷', emoji: '🛡️', price: 560, power: 58 },
+    16: { id: 'hero_armor_dragon', name: '용의 갑옷', emoji: '🐉', price: 1300, power: 145 },
+  },
+  shoes: {
+    1: { id: 'hero_shoes_sandal', name: '가죽 샌들', emoji: '👡', price: 50, power: 3 },
+    6: { id: 'hero_shoes_boots', name: '전투화', emoji: '🥾', price: 160, power: 15 },
+    11: { id: 'hero_shoes_wing', name: '날개 신발', emoji: '🪽', price: 420, power: 40 },
+    16: { id: 'hero_shoes_dragon', name: '용의 발톱', emoji: '🐾', price: 900, power: 85 },
+  },
+  accessory: {
+    1: { id: 'hero_accessory_lucky', name: '행운의 부적', emoji: '🍀', price: 100, power: 6 },
+    6: { id: 'hero_accessory_ruby', name: '불꽃 루비', emoji: '♦️', price: 350, power: 28 },
+    16: { id: 'hero_accessory_crown', name: '왕의 보석', emoji: '👑', price: 850, power: 75 },
+  },
+};
+
+const POWER_BY_SLOT = {
+  helmet: [3, 5, 7, 9, 11, 12, 16, 20, 24, 27, 30, 37, 44, 51, 58, 65, 78, 91, 105, 120],
+  weapon: [5, 8, 11, 14, 17, 18, 26, 34, 41, 45, 48, 61, 74, 86, 96, 105, 125, 145, 168, 195],
+  armor: [4, 7, 10, 13, 17, 22, 30, 38, 45, 52, 58, 70, 84, 98, 112, 145, 170, 195, 220, 250],
+  shoes: [3, 5, 7, 10, 12, 15, 22, 28, 33, 37, 40, 50, 60, 70, 78, 85, 102, 120, 140, 165],
+  accessory: [6, 9, 12, 16, 21, 28, 34, 40, 46, 52, 58, 64, 69, 72, 75, 84, 98, 114, 130, 150],
+};
+
+const rarityOfLevel = (level) => (level <= 5 ? 'common' : level <= 10 ? 'rare' : level <= 15 ? 'elite' : 'legendary');
+
+const gearItems = HERO_SLOTS.flatMap(([slot]) => Array.from({ length: 20 }, (_, index) => {
+  const level = index + 1;
+  const legacy = LEGACY_GEAR[slot][level];
+  const rarity = rarityOfLevel(level);
+  const power = POWER_BY_SLOT[slot][index];
+  return {
+    id: legacy?.id || `hero_${slot}_${level}`,
+    slot,
+    level,
+    rarity,
+    rarityLabel: HERO_RARITIES[rarity].label,
+    name: legacy?.name || `${HERO_RARITIES[rarity].label} ${GEAR_NAMES[slot][index]}`,
+    emoji: legacy?.emoji || GEAR_EMOJIS[slot][index],
+    price: legacy?.price || Math.round(50 + power * 10 + level * 15),
+    power,
+  };
+}));
+
+export const HERO_ITEMS = [...HERO_CHARACTERS, ...gearItems];
 export const HERO_ITEM_MAP = Object.fromEntries(HERO_ITEMS.map((item) => [item.id, item]));
+export const HERO_GEAR_BY_SLOT = Object.fromEntries(HERO_SLOTS.map(([slot]) => [
+  slot, gearItems.filter((item) => item.slot === slot),
+]));
+
+export function heroDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
 export function normalizeHero(raw = {}) {
   const owned = Array.isArray(raw.owned)
@@ -47,11 +117,18 @@ export function normalizeHero(raw = {}) {
   const character = owned.includes(raw.character) && HERO_ITEM_MAP[raw.character]?.slot === 'character'
     ? raw.character
     : null;
+  const shop = raw.shop && typeof raw.shop === 'object' ? { ...raw.shop } : {};
   return {
     character,
     owned,
     equipment,
     clearedLevel: clamp(Number(raw.clearedLevel) || 0, 0, 100),
+    battleDate: raw.battleDate || '',
+    battleCount: Math.max(0, Number(raw.battleCount) || 0),
+    shop: {
+      date: shop.date || '',
+      refreshes: Math.max(0, Number(shop.refreshes) || 0),
+    },
     lastBattle: raw.lastBattle || null,
   };
 }
@@ -64,6 +141,22 @@ export function heroPower(raw) {
     return total + (HERO_ITEM_MAP[id]?.slot === slot ? HERO_ITEM_MAP[id].power : 0);
   }, 0);
   return characterPower + gearPower;
+}
+
+export function battleChance(power, monsterPower) {
+  if (power <= 0) return 0;
+  if (monsterPower <= 0) return 1;
+  // 전투력 80 대 몬스터 20이면 80/(80+20)=80%예요.
+  return clamp(power / (power + monsterPower), 0, 1);
+}
+
+export function battleConfig(klass = {}) {
+  const numberOr = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+  return {
+    limit: clamp(Math.floor(numberOr(klass.heroBattleLimit, 10)), 1, 100),
+    winReward: clamp(Math.floor(numberOr(klass.heroWinReward, 20)), 0, 100000),
+    loseReward: clamp(Math.floor(numberOr(klass.heroLoseReward, 0)), 0, 100000),
+  };
 }
 
 const MONSTER_NAMES = [
@@ -79,20 +172,48 @@ export function monsterForLevel(level) {
   const baseName = MONSTER_NAMES[tier % MONSTER_NAMES.length];
   const boss = safeLevel % 10 === 0;
   const power = Math.floor(30 + safeLevel * 4.5 + Math.pow(safeLevel, 1.2) * 1.5);
-  const reward = Math.floor(15 + safeLevel * 3 + (boss ? safeLevel * 2 : 0));
   return {
     level: safeLevel,
     name: boss ? `${baseName} 대장` : `${baseName} ${numberInTier + 1}호`,
     emoji: boss ? '👑' : MONSTER_EMOJIS[tier % MONSTER_EMOJIS.length],
     power,
-    reward,
     boss,
   };
 }
 
-// 장비를 충분히 갖춰도 운이 필요한 구조로, 100단계 완주가 쉽게 끝나지 않도록 조정했어요.
-export function battleChance(power, monsterPower) {
-  if (power <= 0 || monsterPower <= 0) return 0;
-  return clamp(0.1 + (power / monsterPower) * 0.45, 0.08, 0.88);
+function hashSeed(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
+  return hash >>> 0;
+}
+
+function weightedSample(items, random, count) {
+  const pool = [...items];
+  const picked = [];
+  while (pool.length && picked.length < count) {
+    const total = pool.reduce((sum, item) => sum + HERO_RARITIES[item.rarity].weight, 0);
+    let target = random() * total;
+    let index = 0;
+    for (; index < pool.length - 1; index += 1) {
+      target -= HERO_RARITIES[pool[index].rarity].weight;
+      if (target <= 0) break;
+    }
+    picked.push(pool[index]);
+    pool.splice(index, 1);
+  }
+  return picked;
+}
+
+// 같은 학급의 학생은 같은 날짜·새로고침 번호에서 같은 3개를 보며, 새로고침 횟수는 학생별로 제한해요.
+export function heroShopFor(classId, date = heroDateKey(), refreshes = 0) {
+  let state = hashSeed(`${classId}:${date}:${refreshes}`);
+  const random = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+  return Object.fromEntries(HERO_SLOTS.map(([slot]) => [
+    slot,
+    weightedSample(HERO_GEAR_BY_SLOT[slot], random, 3).map((item) => item.id),
+  ]));
 }
 

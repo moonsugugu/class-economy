@@ -69,7 +69,8 @@ export const todayKey = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-export const DEFAULT_TICK_LIMIT = 10;   // 하루 시세 변동 기본 횟수
+export const DEFAULT_TICK_LIMIT = 25;   // 하루 시세 변동 기본 횟수
+export const AUTO_TICK_MS = 119000;     // 자동 변동: 1분 59초
 export const HISTORY_LEN = 40;          // 미니 차트에 쓰는 최근 시세 개수
 
 /** 처음 시장을 열 때 쓰는 초기 데이터 */

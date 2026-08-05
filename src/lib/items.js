@@ -1,5 +1,5 @@
 /* =====================================================================
-   3D 캐릭터 — 28종. 모두 상점에서 구입해야 쓸 수 있어요(무료 없음).
+   3D 캐릭터 — 모두 상점에서 구입해야 쓸 수 있어요(무료 없음).
    ear: 귀/머리 모양, extra: 특징(갈기·등껍질 등), group: 상점 분류
    ===================================================================== */
 export const SPECIES = {
@@ -16,12 +16,14 @@ export const SPECIES = {
   '🐵': { name: '원숭이', body: '#a97142', belly: '#f0d6b8', ear: 'biground', earIn: '#f0d6b8', price: 80, group: 'land' },
   '🦝': { name: '너구리', body: '#8f9bb3', belly: '#e8ecf5', ear: 'pointy', earIn: '#5c6680', mask: true, price: 90, group: 'land' },
   '🐺': { name: '늑대', body: '#7c8798', belly: '#e2e8f0', ear: 'pointy', earIn: '#4b5563', price: 100, group: 'land' },
-  '🐼': { name: '판다', body: '#ffffff', belly: '#ffffff', ear: 'round', earIn: '#26262b', panda: true, price: 100, group: 'land' },
+  '🐼': { name: '판다', body: '#dbeafe', belly: '#eff6ff', ear: 'round', earIn: '#111827', panda: true, shade: '#93a9c7', price: 100, group: 'land' },
   '🐯': { name: '호랑이', body: '#fb923c', belly: '#fff7ed', ear: 'round', earIn: '#fdba74', stripes: true, price: 100, group: 'land' },
   '🦥': { name: '나무늘보', body: '#b9a184', belly: '#e8dcc8', ear: 'small', earIn: '#8a7660', price: 110, group: 'land' },
   '🦁': { name: '사자', body: '#f0b45e', belly: '#fdf0d5', ear: 'round', earIn: '#c98b3a', extra: 'mane', price: 120, group: 'land' },
   '🦌': { name: '사슴', body: '#c98b5e', belly: '#f5e0cd', ear: 'pointy', earIn: '#a86f45', extra: 'antler', price: 120, group: 'land' },
-  '🦓': { name: '얼룩말', body: '#f8fafc', belly: '#ffffff', ear: 'round', earIn: '#26262b', stripes: true, price: 130, group: 'land' },
+  '🦓': { name: '얼룩말', body: '#f8fafc', belly: '#ffffff', ear: 'zebra', earIn: '#d1d5db', stripes: true, zebra: true, price: 130, group: 'land' },
+  '🦆': { name: '오리', body: '#facc15', belly: '#fff7ed', ear: 'beak', earIn: '#f97316', extra: 'duck', price: 90, group: 'land' },
+  '🧑': { name: '사람', body: '#f1c7a5', belly: '#60a5fa', ear: 'human', earIn: '#d99a76', human: true, extra: 'human', price: 90, group: 'land' },
 
   // ── 바다 친구들 ──
   '🐧': { name: '펭귄', body: '#2f3b52', belly: '#ffffff', ear: 'beak', earIn: '#fbbf24', price: 120, group: 'sea' },
@@ -329,6 +331,8 @@ export const ITEMS = [
   I('pet_butterfly', 'pet', 'petButterfly', '🦋', '나비', 70, { a: '#60a5fa' }),
   I('pet_ladybug', 'pet', 'petLadybug', '🐞', '무당벌레', 55, { a: '#ef4444' }),
   I('pet_fish', 'pet', 'petFish', '🐠', '금붕어', 90, { a: '#fb923c' }),
+  I('pet_panda', 'pet', 'petPanda', '🐼', '판다', 180, { a: '#dbeafe' }),
+  I('pet_pig', 'pet', 'petPig', '🐷', '돼지', 130, { a: '#f9a8d4' }),
   I('pet_dragon', 'pet', 'petDragon', '🐲', '아기 드래곤', 300, { a: '#34d399' }),
   I('pet_ghost', 'pet', 'petGhost', '👻', '꼬마 유령', 200, { a: '#e0e7ff' }),
 

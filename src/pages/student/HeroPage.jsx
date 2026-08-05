@@ -5,8 +5,9 @@ import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import {
   HERO_ITEM_MAP, HERO_SLOTS, normalizeHero, heroPower,
-  monsterForLevel, battleChance,
+  monsterForLevel, battleChance, battleConfig, heroDateKey,
 } from '../../lib/hero';
+import HeroPreview from '../../three/Hero3D.jsx';
 
 export default function HeroPage() {
   const { klass, student } = useOutletContext();
@@ -14,8 +15,12 @@ export default function HeroPage() {
   const [msg, setMsg] = useState(null);
   const hero = normalizeHero(student.rpg);
   const power = heroPower(hero);
+  const today = heroDateKey();
+  const config = battleConfig(klass);
+  const usedToday = hero.battleDate === today ? hero.battleCount : 0;
   const nextMonster = hero.clearedLevel < 100 ? monsterForLevel(hero.clearedLevel + 1) : null;
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
+  const classRef = doc(db, 'classes', klass.id);
 
   const battle = async () => {
     if (busy || !nextMonster) return;
@@ -29,32 +34,40 @@ export default function HeroPage() {
       let battleResult;
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
+        const settings = battleConfig((await tx.get(classRef)).data() || klass);
         const current = normalizeHero(s.rpg);
         const level = current.clearedLevel + 1;
         if (level > 100) throw new Error('이미 100단계까지 모두 정복했어요!');
+        const attempts = current.battleDate === today ? current.battleCount : 0;
+        if (attempts >= settings.limit) throw new Error(`오늘 전투 도전 횟수를 모두 사용했어요. (${settings.limit}회) 내일 다시 도전해 주세요.`);
         const monster = monsterForLevel(level);
         const currentPower = heroPower(current);
         const chance = battleChance(currentPower, monster.power);
         const won = roll < chance;
+        const reward = won ? settings.winReward : settings.loseReward;
         const nextHero = {
           ...current,
           clearedLevel: won ? level : current.clearedLevel,
+          battleDate: today,
+          battleCount: attempts + 1,
           lastBattle: {
             level,
             won,
             power: currentPower,
             monsterPower: monster.power,
+            reward,
+            attempt: attempts + 1,
             at: Date.now(),
           },
         };
         const update = { rpg: nextHero };
-        if (won) update.cash = (s.cash || 0) + monster.reward;
+        if (reward > 0) update.cash = (s.cash || 0) + reward;
         tx.update(studentRef, update);
-        battleResult = { won, monster, chance, currentPower };
+        battleResult = { won, monster, chance, currentPower, reward, attempt: attempts + 1, limit: settings.limit };
       });
       setMsg(battleResult.won
-        ? { type: 'ok', text: `🎉 ${battleResult.monster.name}을(를) 물리쳤어요! ${fmt(battleResult.monster.reward)}${klass.currency}를 보상으로 받았어요.` }
-        : { type: 'err', text: `💥 아쉽게 졌어요. 승리 확률은 약 ${Math.round(battleResult.chance * 100)}%였어요. 장비를 더 맞춰 다시 도전해 보세요.` });
+        ? { type: 'ok', text: `🎉 ${battleResult.monster.name}을(를) 물리쳤어요! ${fmt(battleResult.reward)}${klass.currency}를 받았어요. (${battleResult.attempt}/${battleResult.limit}회)` }
+        : { type: 'err', text: `💥 아쉽게 졌어요. 승리 확률은 ${Math.round(battleResult.chance * 100)}%였어요. ${battleResult.reward > 0 ? `${fmt(battleResult.reward)}${klass.currency}를 받았어요.` : '패배 보상은 0이에요.'} (${battleResult.attempt}/${battleResult.limit}회)` });
     } catch (e) {
       setMsg({ type: 'err', text: e.message });
     } finally {
@@ -81,8 +94,8 @@ export default function HeroPage() {
       )}
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-3xl shadow-lg p-6 text-center">
-          <div className="text-7xl mb-2">{hero.character ? HERO_ITEM_MAP[hero.character]?.emoji : '❔'}</div>
+        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-3xl shadow-lg p-5 text-center">
+          {hero.character ? <HeroPreview hero={hero} size={210} /> : <div className="h-[210px] rounded-2xl bg-white/15 flex items-center justify-center text-7xl">❔</div>}
           <div className="text-xl">{hero.character ? HERO_ITEM_MAP[hero.character]?.name : '아직 용사가 없어요'}</div>
           <div className="text-white/70 text-sm mt-1">현재 전투력</div>
           <div className="text-5xl font-bold tabular-nums">{fmt(power)}</div>
@@ -116,17 +129,18 @@ export default function HeroPage() {
               <div className="text-xs text-gray-400">NEXT · {nextMonster.level}단계 {nextMonster.boss ? '보스' : '몬스터'}</div>
               <h3 className="text-xl text-gray-700">{nextMonster.name}</h3>
               <div className="text-sm text-rose-500">몬스터 전투력 {fmt(nextMonster.power)}</div>
-              <div className="text-xs text-amber-600">승리 보상 {fmt(nextMonster.reward)} {klass.currency}</div>
+              <div className="text-xs text-amber-600">승리 {fmt(config.winReward)} · 패배 {fmt(config.loseReward)} {klass.currency}</div>
             </div>
             <button
               onClick={battle}
-              disabled={busy || !hero.character}
+              disabled={busy || !hero.character || usedToday >= config.limit}
               className="ml-auto rounded-2xl px-5 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-gray-300 text-white shadow font-bold"
             >
-              {busy ? '전투 중...' : '⚔️ 전투 시작'}
+              {busy ? '전투 중...' : usedToday >= config.limit ? '오늘 도전 완료' : '⚔️ 전투 시작'}
             </button>
           </div>
           {!hero.character && <p className="text-sm text-rose-500 mt-4">상점에서 캐릭터를 먼저 구매해야 전투할 수 있어요.</p>}
+          <div className="text-xs text-gray-400 mt-3">오늘 도전 {Math.min(usedToday, config.limit)} / {config.limit}회 · 전투력 비율 승률 {Math.round(battleChance(power, nextMonster.power) * 100)}%</div>
         </div>
       ) : (
         <div className="bg-amber-50 text-amber-700 rounded-3xl shadow p-6 text-center">🏆 100단계 정복 완료! 진정한 경제 용사예요.</div>
@@ -134,10 +148,9 @@ export default function HeroPage() {
 
       {hero.lastBattle && (
         <div className="text-center text-xs text-gray-400">
-          마지막 전투: {hero.lastBattle.level}단계 · {hero.lastBattle.won ? '승리' : '패배'} · {new Date(hero.lastBattle.at).toLocaleString('ko-KR')}
+          마지막 전투: {hero.lastBattle.level}단계 · {hero.lastBattle.won ? '승리' : '패배'} · 보상 {fmt(hero.lastBattle.reward || 0)} {klass.currency} · {new Date(hero.lastBattle.at).toLocaleString('ko-KR')}
         </div>
       )}
     </div>
   );
 }
-

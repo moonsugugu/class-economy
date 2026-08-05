@@ -3,13 +3,21 @@ import { Link, useOutletContext } from 'react-router-dom';
 import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
-import { HERO_ITEMS, HERO_SLOTS, normalizeHero } from '../../lib/hero';
+import {
+  HERO_ITEMS, HERO_SLOTS, HERO_RARITIES, HERO_SHOP_REFRESH_LIMIT,
+  normalizeHero, heroDateKey, heroShopFor,
+} from '../../lib/hero';
+import HeroPreview from '../../three/Hero3D.jsx';
 
 export default function HeroShopPage() {
   const { klass, student } = useOutletContext();
   const [busyId, setBusyId] = useState(null);
   const [msg, setMsg] = useState(null);
+  const [view, setView] = useState('shop');
   const hero = normalizeHero(student.rpg);
+  const today = heroDateKey();
+  const refreshes = hero.shop.date === today ? hero.shop.refreshes : 0;
+  const shopIds = Object.values(heroShopFor(klass.id, today, refreshes)).flat();
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
   const characters = HERO_ITEMS.filter((item) => item.slot === 'character');
 
@@ -20,6 +28,10 @@ export default function HeroShopPage() {
 
   const buy = async (item) => {
     if (hero.owned.includes(item.id)) return;
+    if (item.slot !== 'character' && !shopIds.includes(item.id)) {
+      flash('err', '오늘 상점에 나온 아이템만 구매할 수 있어요. 새로고침으로 상품을 바꿔 보세요.');
+      return;
+    }
     if (item.slot !== 'character' && !hero.character) {
       flash('err', '먼저 남자 또는 여자 용사를 구매해 주세요.');
       return;
@@ -43,6 +55,31 @@ export default function HeroShopPage() {
         tx.update(studentRef, { cash: (s.cash || 0) - item.price, rpg: next });
       });
       flash('ok', `🛒 '${item.name}' 구매 완료!`);
+    } catch (e) {
+      flash('err', e.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const refreshShop = async () => {
+    if (busyId) return;
+    if (refreshes >= HERO_SHOP_REFRESH_LIMIT) {
+      flash('err', '오늘 상점 새로고침을 모두 사용했어요. 내일 다시 이용해 주세요.');
+      return;
+    }
+    setBusyId('refresh');
+    try {
+      await runTransaction(db, async (tx) => {
+        const s = (await tx.get(studentRef)).data();
+        const current = normalizeHero(s.rpg);
+        const used = current.shop.date === today ? current.shop.refreshes : 0;
+        if (used >= HERO_SHOP_REFRESH_LIMIT) throw new Error('오늘 상점 새로고침을 모두 사용했어요.');
+        tx.update(studentRef, {
+          rpg: { ...current, shop: { date: today, refreshes: used + 1 } },
+        });
+      });
+      flash('ok', `🔄 상점이 새로고침됐어요! 오늘 ${refreshes + 1}/${HERO_SHOP_REFRESH_LIMIT}회 사용`);
     } catch (e) {
       flash('err', e.message);
     } finally {
@@ -96,17 +133,21 @@ export default function HeroShopPage() {
     }
   };
 
-  const card = (item) => {
+  const card = (item, available = true) => {
     const owned = hero.owned.includes(item.id);
     const equipped = item.slot === 'character'
       ? hero.character === item.id
       : hero.equipment[item.slot] === item.id;
     const locked = item.slot !== 'character' && !hero.character && !owned;
     return (
-      <div key={item.id} className={`bg-white rounded-3xl shadow p-4 text-center ${owned ? 'ring-2 ring-emerald-100' : ''}`}>
+      <div key={item.id} className={`bg-white rounded-3xl shadow p-4 text-center ${owned ? 'ring-2 ring-emerald-100' : ''} ${!available ? 'opacity-70' : ''}`}>
         <div className="text-5xl mb-2">{item.emoji}</div>
         <div className="text-sm text-gray-700">{item.name}</div>
-        <div className="text-xs text-indigo-500 my-1">전투력 +{item.power}</div>
+        <div className="flex justify-center gap-1 my-1">
+          <span className={`text-[10px] px-1.5 py-0.5 rounded ${HERO_RARITIES[item.rarity]?.color || 'bg-gray-100 text-gray-500'}`}>{item.rarityLabel}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-500">{item.level}단계</span>
+        </div>
+        <div className="text-xs text-indigo-500">전투력 +{item.power}</div>
         <div className="text-xs text-amber-600 mb-2">{fmt(item.price)} {klass.currency}</div>
         {owned ? (
           <div className="space-y-1">
@@ -124,10 +165,10 @@ export default function HeroShopPage() {
         ) : (
           <button
             onClick={() => buy(item)}
-            disabled={busyId === item.id || locked || student.cash < item.price}
+            disabled={busyId === item.id || locked || !available || student.cash < item.price}
             className="w-full rounded-xl py-1.5 text-sm text-white bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300"
           >
-            {locked ? '캐릭터 먼저 구매' : '구매하기'}
+            {locked ? '캐릭터 먼저 구매' : available ? '구매하기' : '오늘 상점에 없음'}
           </button>
         )}
       </div>
@@ -143,19 +184,54 @@ export default function HeroShopPage() {
         </div>
         <Link to="/student/hero" className="ml-auto text-sm text-indigo-500 underline">← 용사 화면</Link>
       </div>
-      <div className="rounded-2xl bg-amber-50 text-amber-700 px-4 py-3 text-sm">내 현금: <b>{fmt(student.cash)} {klass.currency}</b> · 아이템마다 전투력이 올라가요.</div>
+      <div className="flex gap-2">
+        <button onClick={() => setView('shop')} className={`rounded-xl px-3 py-1.5 text-sm ${view === 'shop' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-500'}`}>오늘 상점</button>
+        <button onClick={() => setView('catalog')} className={`rounded-xl px-3 py-1.5 text-sm ${view === 'catalog' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-500'}`}>전체 20단계 도감</button>
+      </div>
+      <div className="rounded-2xl bg-amber-50 text-amber-700 px-4 py-3 text-sm flex items-center gap-2 flex-wrap">
+        <span>내 현금: <b>{fmt(student.cash)} {klass.currency}</b> · 아이템마다 전투력이 올라가요.</span>
+        <button onClick={refreshShop} disabled={!!busyId || refreshes >= HERO_SHOP_REFRESH_LIMIT} className="ml-auto rounded-xl px-3 py-1.5 bg-amber-500 text-white disabled:bg-gray-300">
+          🔄 상점 새로고침 ({refreshes}/{HERO_SHOP_REFRESH_LIMIT})
+        </button>
+      </div>
       {msg && <div className={`rounded-2xl px-4 py-3 ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>{msg.text}</div>}
 
       <section>
         <h3 className="text-lg text-gray-600 mb-2">🧙 캐릭터 선택</h3>
-        <div className="grid grid-cols-2 gap-3">{characters.map(card)}</div>
+        <div className="grid grid-cols-2 gap-3">
+          {characters.map((item) => {
+            const previewHero = { ...hero, character: item.id };
+            return (
+              <div key={item.id} className="bg-white rounded-3xl shadow p-4 text-center">
+                <HeroPreview hero={previewHero} size={150} />
+                <div className="text-sm text-gray-700 mt-2">{item.name}</div>
+                <div className="text-xs text-indigo-500">전투력 +{item.power}</div>
+                <div className="text-xs text-amber-600 mb-2">{fmt(item.price)} {klass.currency}</div>
+                {hero.owned.includes(item.id) ? (
+                  <div className="space-y-1">
+                    <button onClick={() => equip(item)} disabled={busyId === item.id} className="w-full rounded-xl py-1.5 text-sm bg-indigo-100 text-indigo-600">{hero.character === item.id ? '장착 중 ✓' : '장착하기'}</button>
+                    <button onClick={() => refund(item)} disabled={busyId === item.id} className="text-xs text-rose-500 underline">50% 환불</button>
+                  </div>
+                ) : (
+                <button onClick={() => buy(item)} disabled={busyId === item.id || student.cash < item.price} className="w-full rounded-xl py-1.5 text-sm text-white bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300">구매하기</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {HERO_SLOTS.map(([slot, label]) => (
         <section key={slot}>
-          <h3 className="text-lg text-gray-600 mb-2">{label}</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-lg text-gray-600">{label}</h3>
+            <span className="text-xs text-gray-400">20단계 · 오늘 3개 판매</span>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {HERO_ITEMS.filter((item) => item.slot === slot).map(card)}
+            {(view === 'shop'
+              ? HERO_ITEMS.filter((item) => item.slot === slot && shopIds.includes(item.id))
+              : HERO_ITEMS.filter((item) => item.slot === slot)
+            ).map((item) => card(item, view === 'shop' && shopIds.includes(item.id)))}
           </div>
         </section>
       ))}

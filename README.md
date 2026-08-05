@@ -48,22 +48,23 @@ npm run dev
 - **학생**: 체크박스로 선택 → 월급 일괄 지급, 금액 입력 후 지급/차감(상벌점)
 - **상점**: 실물 상품(쿠폰·간식 등) 등록 — 이모지/이미지 URL, 가격, 수량. 인라인 수정/삭제
 - **알림**: 학생 구매 실시간 알림 → "지급 완료" 처리
-- **주식**: "주식 시장 열기"로 40개 종목 생성, 실제 시세 불러오기 및 수동/자동(45초) 시세 변동
+- **주식**: "주식 시장 열기"로 40개 종목 생성, 실제 시세 불러오기 및 수동/자동(1분 59초) 시세 변동. 기본 하루 변동 횟수는 25회
 - **버그 신고·건의함**: 담임 화면에서 개발자 이메일 작성 창을 열고, `xdaethx@naver.com` 계정은 전체 학급 수신함을 별도 확인
-- **설정**: 화폐 단위(미소·달란트 등), 월급 금액, 예금/적금 이율
+- **설정**: 화폐 단위(미소·달란트 등), 월급 금액, 예금/적금 이율, 주식 횟수, 용사 전투 횟수·승패 보상
 
 ### 학생 화면 (하단 탭)
 - **마이**: 현금 + 예금 + 적금 + 주식 평가액 = 총자산 한눈에
 - **상점**: 잔액으로 구매 → 재고 차감 + 교사에게 알림 (PostgreSQL API 트랜잭션으로 품절/잔액 검증)
 - **은행**: 예금(자유 입출금, 7일마다 이자 수령) / 적금(7·14·28일 약정, 높은 이율, 중도해지 시 원금만)
 - **주식**: 실시간 시세·미니 차트·평가손익, 매수/매도 (트랜잭션 처리)
-- **마이룸**: 캐릭터·꾸미기 아이템 구매, 가구 여러 개 구매·배치, 모든 마이룸 아이템 50% 환불 + **Canvas 인증샷 PNG 저장**
-- **용사키우기**: 유료 남/여 캐릭터와 RPG 장비를 구매·장착하고 전투력으로 100단계 몬스터에 도전
+- **마이룸**: 캐릭터 3D 상세 미리보기, 가구 여러 개 구매·배치, 신규 오리·사람 캐릭터와 판다·돼지 애완동물, 모든 마이룸 아이템 50% 환불
+- **용사키우기**: 소년·소녀 캐릭터와 착장 3D 미리보기, 부위별 20단계 장비(일반·희귀·엘리트·전설), 하루 3회 상점 새로고침, 전투력 비율로 100단계 몬스터에 도전
 
 ## 데이터 구조 (PostgreSQL 문서 API의 기존 경로)
 ```
 classes/{classId}
-  ├─ code, name, teacherUid, currency, salary, depositRate, savingsRate
+  ├─ code, name, teacherUid, currency, salary, depositRate, savingsRate, tickLimit
+  ├─ heroBattleLimit, heroWinReward, heroLoseReward — 용사 전투 설정
   ├─ students/{studentId}   — name, cash, deposit, depositLastAt, avatar, inventory, room, holdings, rpg
   ├─ products/{productId}   — name, emoji, imageUrl, price, qty
   ├─ purchases/{purchaseId} — studentName, productName, price, status(pending|done)

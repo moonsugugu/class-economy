@@ -10,7 +10,7 @@ import { useApp } from '../../context/AppContext';
 import { fmt, makeClassCode, rankAssets } from '../../lib/util';
 import {
   changePct, advance, usedTicks, makeInitialMarket, makeCustomStock, mergeSeedStocks,
-  MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, DEFAULT_FX, todayKey,
+  MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, AUTO_TICK_MS, DEFAULT_FX, todayKey,
   pendingSchedule, SCHEDULE_LABEL, fetchRealQuotes, applyRealPrices,
   DEFAULT_KRW_PER_UNIT,
 } from '../../lib/stocks';
@@ -936,11 +936,11 @@ function StocksTab({ klass }) {
     }
   };
 
-  // 자동 변동: 3분 간격, 남은 횟수가 0이면 스스로 꺼짐
+  // 자동 변동: 1분 59초 간격, 남은 횟수가 0이면 스스로 꺼짐
   useEffect(() => {
     if (!auto) return;
     if (left <= 0) { setAuto(false); flash('오늘 횟수를 다 써서 자동 변동을 껐어요.'); return; }
-    timer.current = setInterval(tick, 180000);
+    timer.current = setInterval(tick, AUTO_TICK_MS);
     return () => clearInterval(timer.current);
   }, [auto, left <= 0, klass.id]);
 
@@ -1033,7 +1033,7 @@ function StocksTab({ klass }) {
         </div>
         <label className="flex items-center gap-2 text-gray-600 mt-3">
           <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} disabled={left <= 0} className="w-5 h-5" />
-          자동 변동 (3분마다 · 이 화면이 켜져 있는 동안 · 남은 횟수를 사용해요)
+           자동 변동 (1분 59초마다 · 이 화면이 켜져 있는 동안 · 남은 횟수를 사용해요)
         </label>
         {msg && <div className="mt-3 text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2">{msg}</div>}
         <p className="text-xs text-gray-400 mt-2">
@@ -1148,6 +1148,9 @@ function SettingsTab({ klass }) {
     name: klass.name, currency: klass.currency, salary: klass.salary,
     depositRate: klass.depositRate, savingsRate: klass.savingsRate,
     tickLimit: klass.tickLimit ?? DEFAULT_TICK_LIMIT,
+    heroBattleLimit: klass.heroBattleLimit ?? 10,
+    heroWinReward: klass.heroWinReward ?? 20,
+    heroLoseReward: klass.heroLoseReward ?? 0,
     taxRate: klass.taxRate ?? 10,
     krwPerUnit: klass.krwPerUnit ?? DEFAULT_KRW_PER_UNIT,
   });
@@ -1165,6 +1168,9 @@ function SettingsTab({ klass }) {
       depositRate: Number(form.depositRate) || 0,
       savingsRate: Number(form.savingsRate) || 0,
       tickLimit: Math.max(1, Math.min(100, Number(form.tickLimit) || DEFAULT_TICK_LIMIT)),
+      heroBattleLimit: Math.max(1, Math.min(100, Number(form.heroBattleLimit) || 10)),
+      heroWinReward: Math.max(0, Math.min(100000, Number(form.heroWinReward) || 0)),
+      heroLoseReward: Math.max(0, Math.min(100000, Number(form.heroLoseReward) || 0)),
       taxRate: Math.max(0, Math.min(50, Number(form.taxRate) || 0)),
       krwPerUnit: Math.max(0.01, Number(form.krwPerUnit) || DEFAULT_KRW_PER_UNIT),
     });
@@ -1208,8 +1214,11 @@ function SettingsTab({ klass }) {
       )}
       {field(
         '하루 시세 변동 횟수', 'tickLimit', 'number',
-        '주식 시세를 하루에 몇 번까지 바꿀 수 있는지 정해요. (기본 10회 — 낮출수록 무료 사용량을 아껴요)'
+         '주식 시세를 하루에 몇 번까지 바꿀 수 있는지 정해요. (기본 25회)'
       )}
+      {field('용사 전투 하루 도전 횟수', 'heroBattleLimit', 'number', '학생 한 명이 하루에 용사 전투를 도전할 수 있는 횟수예요. 기본 10회.')}
+      {field('용사 전투 승리 보상', 'heroWinReward', 'number', '용사가 이겼을 때 지급할 학급화폐예요. 기본 20.')}
+      {field('용사 전투 패배 보상', 'heroLoseReward', 'number', '용사가 졌을 때 지급할 학급화폐예요. 기본 0.')}
       <button className={btn + ' bg-indigo-500 hover:bg-indigo-600 text-lg w-full'}>저장하기</button>
       {saved && <p className="text-emerald-600 text-center">✅ 저장되었어요!</p>}
     </form>

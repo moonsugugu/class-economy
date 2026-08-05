@@ -1343,7 +1343,7 @@ function Floorlantern({ a = '#fb923c' }) {
 
 /* =========================================================
    🐾 애완동물 — 작고 귀여운 친구들 (공간을 돌아다녀요)
-   공통 몸체를 만들고 귀·꼬리·특징만 바꿔서 15종을 만듭니다.
+   공통 몸체를 만들고 귀·꼬리·특징만 바꿔서 여러 종을 만듭니다.
    ========================================================= */
 function Critter({ body, belly, nose = '#3f2d20', children, tail }) {
   return (
@@ -1501,11 +1501,29 @@ const PetLadybug = ({ a = '#ef4444' }) => (
 const PetFish = ({ a = '#fb923c' }) => (
   <group position={[0, 0.45, 0]}>
     <Sp p={[0, 0, 0]} rad={0.13} sc={[0.65, 1, 1.4]} c={a} />
-    <Co p={[0, 0, -0.2]} rad={0.1} h={0.14} c="#fdba74" r={[-Math.PI / 2, 0, 0]} />
+    {/* 꼬리의 좁은 꼭짓점이 몸에 붙고 넓은 면이 바깥을 향하도록 뒤집어요. */}
+    <Co p={[0, 0, -0.2]} rad={0.14} h={0.28} c="#fdba74" r={[Math.PI / 2, 0, 0]} />
     <Sp p={[0, 0.11, 0]} rad={0.05} sc={[0.3, 1, 1.3]} c="#fdba74" />
     <Sp p={[-0.06, 0.03, 0.11]} rad={0.022} c="#26262b" />
     <Sp p={[0.06, 0.03, 0.11]} rad={0.022} c="#26262b" />
   </group>
+);
+const PetPanda = ({ a = '#dbeafe' }) => (
+  <Critter body={a} belly="#eff6ff" tail={false}>
+    <Sp p={[-0.1, 0.43, 0.12]} rad={0.055} c="#111827" />
+    <Sp p={[0.1, 0.43, 0.12]} rad={0.055} c="#111827" />
+    <Sp p={[-0.055, 0.35, 0.27]} rad={0.034} c="#ffffff" />
+    <Sp p={[0.055, 0.35, 0.27]} rad={0.034} c="#ffffff" />
+    {[-1, 1].map((s) => <Sp key={s} p={[s * 0.12, 0.43, 0.08]} rad={0.065} c="#111827" />)}
+  </Critter>
+);
+const PetPig = ({ a = '#f9a8d4' }) => (
+  <Critter body={a} belly="#fce7f3" nose="#9d3b63">
+    {[-0.09, 0.09].map((x, i) => (
+      <Co key={x} p={[x, 0.43, 0.12]} rad={0.055} h={0.12} c={a} r={[0, 0, i ? -0.25 : 0.25]} />
+    ))}
+    <Sp p={[0, 0.3, -0.22]} rad={0.05} sc={[1, 1.8, 0.8]} c={a} />
+  </Critter>
 );
 const PetDragon = ({ a = '#34d399' }) => (
   <Critter body={a} belly="#a7f3d0" tail={false}>
@@ -1538,7 +1556,8 @@ export const PET_MODELS = {
   petDog: PetDog, petCat: PetCat, petHamster: PetHamster, petRabbit: PetRabbit,
   petChick: PetChick, petParrot: PetParrot, petTurtle: PetTurtle, petHedgehog: PetHedgehog,
   petSquirrel: PetSquirrel, petPenguin: PetPenguin, petButterfly: PetButterfly,
-  petLadybug: PetLadybug, petFish: PetFish, petDragon: PetDragon, petGhost: PetGhost,
+  petLadybug: PetLadybug, petFish: PetFish, petPanda: PetPanda, petPig: PetPig,
+  petDragon: PetDragon, petGhost: PetGhost,
 };
 
 /** 하늘을 나는 애완동물은 걷지 않고 둥둥 떠다녀요 */

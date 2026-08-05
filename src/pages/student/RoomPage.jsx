@@ -52,6 +52,7 @@ function RoomInner({ klass, student }) {
   const [selected, setSelected] = useState(null);
   const [shopCat, setShopCat] = useState('char');
   const [msg, setMsg] = useState(null);
+  const [previewItem, setPreviewItem] = useState(null);
   const glRef = useRef(null);
 
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
@@ -525,6 +526,24 @@ function RoomInner({ klass, student }) {
         </div>
       )}
 
+      {previewItem && (
+        <div className="fixed inset-0 bg-black/45 flex items-center justify-center p-4 z-50" onClick={() => setPreviewItem(null)}>
+          <div className="bg-white rounded-3xl shadow-xl p-6 w-full max-w-sm text-center space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm text-gray-400">캐릭터 3D 미리보기</div>
+            <ItemThumb id={previewItem.id} size={190} />
+            <h3 className="text-2xl text-purple-600">{previewItem.name}</h3>
+            <p className="text-sm text-gray-500">구매하면 내 캐릭터로 선택해서 사용할 수 있어요.</p>
+            <div className="text-amber-600">{fmt(previewItem.price)} {klass.currency}</div>
+            <div className="flex gap-2">
+              {!inventory.includes(previewItem.id) && (
+                <button onClick={() => { setPreviewItem(null); buyItem(previewItem); }} className="flex-1 rounded-xl py-2 bg-purple-500 text-white">구매하기</button>
+              )}
+              <button onClick={() => setPreviewItem(null)} className="flex-1 rounded-xl py-2 bg-gray-100 text-gray-500">닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 상점 */}
       {tab === 'shop' && (
         <div className="space-y-3">
@@ -585,23 +604,29 @@ function RoomInner({ klass, student }) {
                         <ItemThumb id={c.id} size={64} />
                         <div className="text-sm leading-tight mt-1">{c.name}</div>
                         {has ? (
-                          <button
-                            onClick={() => equipChar(c.base)}
-                            className={`w-full rounded-xl py-1.5 text-sm mt-1 ${
-                              avatar.base === c.base ? 'bg-purple-100 text-purple-600' : 'bg-emerald-100 text-emerald-600'
-                            }`}
-                          >
-                            {avatar.base === c.base ? '사용 중 ✓' : '이걸로 바꾸기'}
-                          </button>
+                          <div className="flex gap-1 mt-1">
+                            <button onClick={() => setPreviewItem(c)} className="flex-1 rounded-xl py-1.5 text-[11px] bg-sky-100 text-sky-600">자세히 보기</button>
+                            <button
+                              onClick={() => equipChar(c.base)}
+                              className={`flex-1 rounded-xl py-1.5 text-[11px] ${
+                                avatar.base === c.base ? 'bg-purple-100 text-purple-600' : 'bg-emerald-100 text-emerald-600'
+                              }`}
+                            >
+                              {avatar.base === c.base ? '사용 중 ✓' : '바꾸기'}
+                            </button>
+                          </div>
                         ) : (
-                          <button
-                            onClick={() => buyItem(c)}
-                            className={`w-full rounded-xl py-1.5 text-sm text-white mt-1 ${
-                              student.cash >= c.price ? 'bg-purple-400 hover:bg-purple-500' : 'bg-gray-300'
-                            }`}
-                          >
-                            🔒 {fmt(c.price)} {klass.currency}
-                          </button>
+                          <div className="flex gap-1 mt-1">
+                            <button onClick={() => setPreviewItem(c)} className="flex-1 rounded-xl py-1.5 text-[11px] bg-sky-100 text-sky-600">자세히 보기</button>
+                            <button
+                              onClick={() => buyItem(c)}
+                              className={`flex-1 rounded-xl py-1.5 text-[11px] text-white ${
+                                student.cash >= c.price ? 'bg-purple-400 hover:bg-purple-500' : 'bg-gray-300'
+                              }`}
+                            >
+                              🔒 {fmt(c.price)}
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
