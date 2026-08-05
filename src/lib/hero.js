@@ -151,6 +151,17 @@ export function heroDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+export const HERO_TITLES = [
+  '용감한', '위대한', '불굴의', '전설의', '빛나는',
+  '강인한', '무적의', '정복자', '신화의', '천공의',
+];
+
+export function heroTitleFor(clearedLevel) {
+  const level = Math.max(0, Math.floor(Number(clearedLevel) || 0));
+  const index = Math.floor(level / 10) - 1;
+  return index >= 0 ? HERO_TITLES[Math.min(index, HERO_TITLES.length - 1)] : '';
+}
+
 export function normalizeHero(raw = {}) {
   const owned = Array.isArray(raw.owned)
     ? [...new Set(raw.owned.filter((id) => HERO_ITEM_MAP[id]))]
@@ -170,6 +181,8 @@ export function normalizeHero(raw = {}) {
   return {
     character,
     pet,
+    name: typeof raw.name === 'string' ? raw.name.trim().slice(0, 20) : '',
+    nameChangeCount: Math.max(0, Number(raw.nameChangeCount) || 0),
     owned,
     equipment,
     bossProgress,
@@ -182,6 +195,11 @@ export function normalizeHero(raw = {}) {
     },
     lastBattle: raw.lastBattle || null,
   };
+}
+
+export function heroDisplayName(raw) {
+  const hero = normalizeHero(raw);
+  return [heroTitleFor(hero.clearedLevel), hero.name || '용사'].filter(Boolean).join(' ');
 }
 
 export function heroPower(raw) {
@@ -218,6 +236,20 @@ export function battleChance(power, monsterPower) {
 }
 
 export const HERO_EXTRA_BATTLE_COST = 15;
+
+export function heroExtraBattleCost(attempts, limit = 10) {
+  const used = Math.max(0, Math.floor(Number(attempts) || 0));
+  const baseLimit = Math.max(1, Math.floor(Number(limit) || 10));
+  return HERO_EXTRA_BATTLE_COST + Math.max(0, used - baseLimit);
+}
+
+export const HERO_DUEL_LIMIT = 10;
+export const HERO_DUEL_EXTRA_COST = 2;
+export const HERO_DUEL_WIN_REWARD = 2;
+
+export function heroDuelExtraCost(attempts) {
+  return Math.max(0, Number(attempts) || 0) >= HERO_DUEL_LIMIT ? HERO_DUEL_EXTRA_COST : 0;
+}
 
 export function battleConfig(klass = {}) {
   const numberOr = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;

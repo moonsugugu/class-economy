@@ -20,6 +20,7 @@ import { grossPay, taxOf } from '../../lib/jobs';
 import { TAX_PARTS, TAX_LEDGER_ID, taxRates } from '../../lib/taxes';
 import { isActiveStudent } from '../../lib/studentState';
 import { ITEM_MAP } from '../../lib/items';
+import { HERO_ITEM_MAP } from '../../lib/hero';
 import { PRICE_MODE_PERCENT, PRICE_MODE_UNIT, pricePolicyLabel } from '../../lib/pricing';
 import SeatsTab from './SeatsTab.jsx';
 import ReportsTab from './ReportsTab.jsx';
@@ -280,6 +281,7 @@ function StudentsTab({ klass }) {
   const marketStocks = market?.stocks || [];
   const fx = Number(market?.fx) || DEFAULT_FX;
   const kpu = Number(klass.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
+  const wholeFmt = (value) => fmt(Math.floor(Number(value) || 0));
 
   const stockValueOf = (student) => Object.entries(student.holdings || {}).reduce((total, [symbol, holding]) => {
     const stock = marketStocks.find((item) => (item.symbol || item.id) === symbol);
@@ -296,6 +298,11 @@ function StudentsTab({ klass }) {
     0
   );
 
+  const heroItemSpendingOf = (student) => (student.rpg?.owned || []).reduce(
+    (total, itemId) => total + (Number(HERO_ITEM_MAP[itemId]?.price) || 0),
+    0
+  );
+
   const assetBreakdownOf = (student) => {
     const savings = savingsByStudent.get(student.id) || 0;
     const stocks = stockValueOf(student);
@@ -306,6 +313,7 @@ function StudentsTab({ klass }) {
       savings,
       stocks,
       spaceSpending: spaceSpendingOf(student),
+      heroItemSpending: heroItemSpendingOf(student),
     };
   };
 
@@ -485,11 +493,11 @@ function StudentsTab({ klass }) {
             행 왼쪽의 ↕ 손잡이를 끌어 놓으면 직접 순서로 저장돼요. 숫자순은 1, 2, 9, 10, 11처럼 정렬됩니다.
           </span>
           <span className="basis-full text-xs text-gray-400">
-            총자산은 현금·예금·적금·주식과 원화/달러 환산액의 합계예요. 공간 지출비는 보유 아이템 가격표 기준이며 세트 할인은 기존 데이터에 없어 반영하지 않습니다.
+            총자산은 현금·예금·적금·주식과 원화/달러 환산액의 합계예요. 공간 지출비와 용사 아이템비는 보유 아이템 가격표 기준이며 세트 할인은 기존 데이터에 없어 반영하지 않습니다.
           </span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-left">
+          <table className="w-full min-w-[1120px] text-left">
             <thead>
               <tr className="text-gray-400 text-sm border-b">
                 <th className="py-2 w-10"></th>
@@ -501,6 +509,7 @@ function StudentsTab({ klass }) {
                 <th className="text-right">적금</th>
                 <th className="text-right">주식 평가액</th>
                 <th className="text-right">공간 지출비</th>
+                <th className="text-right">용사 아이템비</th>
                 <th className="text-right w-20">관리</th>
               </tr>
             </thead>
@@ -523,16 +532,17 @@ function StudentsTab({ klass }) {
                       {s.avatar?.base || '🙂'} {s.name}
                       {s.jobName && (
                         <span className="ml-2 text-xs bg-teal-50 text-teal-700 rounded-lg px-2 py-0.5 align-middle">
-                          {s.jobEmoji} {s.jobName} +{fmt(s.jobSalary || 0)}
+                          {s.jobEmoji} {s.jobName} +{wholeFmt(s.jobSalary || 0)}
                         </span>
                       )}
                     </td>
-                    <td className="text-right font-semibold whitespace-nowrap">{fmt(asset.total)} {klass.currency}</td>
-                    <td className="text-right whitespace-nowrap">{fmt(asset.cash)} {klass.currency}</td>
-                    <td className="text-right text-gray-500 whitespace-nowrap">{fmt(asset.deposit)} {klass.currency}</td>
-                    <td className="text-right text-pink-600 whitespace-nowrap">{fmt(asset.savings)} {klass.currency}</td>
-                    <td className="text-right text-sky-600 whitespace-nowrap">{fmt(asset.stocks)} {klass.currency}</td>
-                    <td className="text-right text-purple-600 whitespace-nowrap">{fmt(asset.spaceSpending)} {klass.currency}</td>
+                    <td className="text-right font-semibold whitespace-nowrap">{wholeFmt(asset.total)} {klass.currency}</td>
+                    <td className="text-right whitespace-nowrap">{wholeFmt(asset.cash)} {klass.currency}</td>
+                    <td className="text-right text-gray-500 whitespace-nowrap">{wholeFmt(asset.deposit)} {klass.currency}</td>
+                    <td className="text-right text-pink-600 whitespace-nowrap">{wholeFmt(asset.savings)} {klass.currency}</td>
+                    <td className="text-right text-sky-600 whitespace-nowrap">{wholeFmt(asset.stocks)} {klass.currency}</td>
+                    <td className="text-right text-purple-600 whitespace-nowrap">{wholeFmt(asset.spaceSpending)} {klass.currency}</td>
+                    <td className="text-right text-violet-600 whitespace-nowrap">{wholeFmt(asset.heroItemSpending)} {klass.currency}</td>
                     <td className="text-right">
                       <button
                         onClick={() => removeStudent(s)}
@@ -545,7 +555,7 @@ function StudentsTab({ klass }) {
                 );
               })}
               {!activeStudents.length && (
-                <tr><td colSpan={10} className="py-8 text-center text-gray-400">
+                <tr><td colSpan={11} className="py-8 text-center text-gray-400">
                   아직 학생이 없어요. 학생들에게 학급 코드 <b>{klass.code}</b>를 알려 주세요!
                 </td></tr>
               )}

@@ -6,6 +6,7 @@ import { fmt } from '../../lib/util';
 import {
   HERO_ITEM_MAP, HERO_SLOTS, normalizeHero, heroPower,
   monsterForLevel, battleChance, battleConfig, heroDateKey, battleDamage, bossCriticalChance,
+  heroExtraBattleCost, heroDisplayName,
 } from '../../lib/hero';
 import HeroPreview from '../../three/Hero3D.jsx';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
@@ -24,10 +25,49 @@ export default function HeroPage() {
   const config = battleConfig(klass);
   const usedToday = hero.battleDate === today ? hero.battleCount : 0;
   const extraAttempts = Math.max(0, usedToday - config.limit);
+  const extraCostPreview = heroExtraBattleCost(usedToday, config.limit);
   const nextMonster = hero.clearedLevel < 100 ? monsterForLevel(hero.clearedLevel + 1) : null;
   const bossProgress = nextMonster?.boss ? Math.min(nextMonster.maxHp, hero.bossProgress[nextMonster.level] || 0) : 0;
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
   const classRef = doc(db, 'classes', klass.id);
+
+  const renameHero = async () => {
+    if (busy || !hero.character) return;
+    const proposed = window.prompt('용사의 새 이름을 입력해 주세요. (최대 20자)', hero.name || '용사');
+    if (proposed === null) return;
+    const name = proposed.trim();
+    if (!name) {
+      setMsg({ type: 'err', text: '이름을 한 글자 이상 입력해 주세요.' });
+      return;
+    }
+    if (name.length > 20) {
+      setMsg({ type: 'err', text: '용사 이름은 20자까지 입력할 수 있어요.' });
+      return;
+    }
+    const previewCost = hero.nameChangeCount > 0 ? 1000 : 0;
+    if (previewCost > 0 && !window.confirm(`이름을 바꾸려면 ${fmt(previewCost)}${klass.currency}가 필요해요. 바꿀까요?`)) return;
+    setBusy(true);
+    try {
+      await runTransaction(db, async (tx) => {
+        const s = (await tx.get(studentRef)).data();
+        const current = normalizeHero(s.rpg);
+        const cost = current.nameChangeCount > 0 ? 1000 : 0;
+        if (cost > previewCost) throw new Error('이름 변경 상태가 바뀌었어요. 다시 시도해 주세요.');
+        const cash = Number(s.cash) || 0;
+        if (cash < cost) throw new Error(`이름 변경에는 ${fmt(cost)}${klass.currency}가 필요해요.`);
+        const update = {
+          rpg: { ...current, name, nameChangeCount: current.nameChangeCount + 1 },
+        };
+        if (cost > 0) update.cash = Math.round((cash - cost) * 100) / 100;
+        tx.update(studentRef, update);
+      });
+      setMsg({ type: 'ok', text: previewCost > 0 ? `✏️ 용사 이름을 바꿨어요. ${fmt(previewCost)}${klass.currency}를 사용했어요.` : '✏️ 첫 용사 이름 변경은 무료예요!' });
+    } catch (e) {
+      setMsg({ type: 'err', text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const battle = async () => {
     if (busy || !nextMonster) return;
@@ -38,7 +78,7 @@ export default function HeroPage() {
     const needsExtraAttempt = usedToday >= config.limit;
     if (needsExtraAttempt && !window.confirm(
       `오늘 기본 도전 ${config.limit}회를 모두 사용했어요.\n` +
-      `추가 도전 1회에 ${config.extraBattleCost}${klass.currency}를 지불하고 도전할까요?`
+      `이번 추가 도전에는 ${extraCostPreview}${klass.currency}를 지불하고 도전할까요?`
     )) return;
     setBusy(true);
     setBattlePhase('charge');
@@ -58,7 +98,7 @@ export default function HeroPage() {
         if (extraAttempt && !needsExtraAttempt) {
           throw new Error('기본 도전 횟수가 방금 소진됐어요. 추가 도전 버튼을 다시 눌러 주세요.');
         }
-        const extraCost = extraAttempt ? settings.extraBattleCost : 0;
+        const extraCost = extraAttempt ? heroExtraBattleCost(attempts, settings.limit) : 0;
         const currentCash = Number(s.cash) || 0;
         if (extraCost > 0 && currentCash < extraCost) {
           throw new Error(`추가 도전에는 ${extraCost}${klass.currency}가 필요해요.`);
@@ -160,7 +200,19 @@ export default function HeroPage() {
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-3xl shadow-lg p-5 text-center">
           {hero.character ? <HeroPreview hero={hero} size={210} /> : <div className="h-[210px] rounded-2xl bg-white/15 flex items-center justify-center text-7xl">❔</div>}
-          <div className="text-xl">{hero.character ? HERO_ITEM_MAP[hero.character]?.name : '아직 용사가 없어요'}</div>
+          {hero.character ? (
+            <>
+              <button
+                onClick={renameHero}
+                disabled={busy}
+                className="text-xl font-semibold hover:text-amber-200 disabled:opacity-60"
+                title="클릭해서 용사 이름 바꾸기"
+              >
+                {heroDisplayName(hero)} ✏️
+              </button>
+              <div className="text-xs text-white/60">{HERO_ITEM_MAP[hero.character]?.name} · 이름 변경 1회 무료, 이후 {fmt(1000)}{klass.currency}</div>
+            </>
+          ) : <div className="text-xl">아직 용사가 없어요</div>}
           <div className="text-white/70 text-sm mt-1">현재 전투력</div>
           <div className="text-5xl font-bold tabular-nums">{fmt(power)}</div>
           <div className="mt-3 text-sm bg-white/15 rounded-xl px-3 py-2">정복 단계 {hero.clearedLevel} / 100</div>
@@ -233,7 +285,7 @@ export default function HeroPage() {
               disabled={busy || !hero.character}
               className="ml-auto rounded-2xl px-5 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-gray-300 text-white shadow font-bold"
             >
-              {busy ? '전투 중...' : usedToday >= config.limit ? `⚔️ 추가 도전 (${config.extraBattleCost}${klass.currency})` : '⚔️ 전투 시작'}
+              {busy ? '전투 중...' : usedToday >= config.limit ? `⚔️ 추가 도전 (${extraCostPreview}${klass.currency})` : '⚔️ 전투 시작'}
             </button>
           </div>
           {!hero.character && <p className="text-sm text-rose-500 mt-4">상점에서 캐릭터를 먼저 구매해야 전투할 수 있어요.</p>}
@@ -241,7 +293,7 @@ export default function HeroPage() {
             오늘 기본 도전 {Math.min(usedToday, config.limit)} / {config.limit}회
             {extraAttempts > 0 && <> · 추가 도전 {extraAttempts}회</>}
             {' · '}전투력 비율 승률 {Math.round(battleChance(power, nextMonster.power) * 100)}%
-            {usedToday >= config.limit && <> · 추가 1회 {config.extraBattleCost}{klass.currency}</>}
+            {usedToday >= config.limit && <> · 다음 추가 도전 {extraCostPreview}{klass.currency}</>}
           </div>
         </div>
       ) : (

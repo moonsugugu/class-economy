@@ -16,6 +16,7 @@ const NAV = [
   ['/student/room', '🛋️', '내 공간'],
   ['/student/visit', '🏠', '놀러가기'],
   ['/student/hero', '⚔️', '용사키우기'],
+  ['/student/hero/duel', '🥊', '친구 대결'],
 ];
 
 export default function StudentLayout() {

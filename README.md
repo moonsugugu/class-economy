@@ -58,7 +58,8 @@ npm run dev
 - **은행**: 예금(자유 입출금, 7일마다 이자 수령) / 적금(7·14·28일 약정, 높은 이율, 중도해지 시 원금만)
 - **주식**: 실제 시세·미니 차트·평가손익, 매수/매도 (매수 세금 없음, 매도 이익의 5% 세금)
 - **마이룸**: 캐릭터 3D 상세 미리보기, 가구 여러 개 구매·배치, 신규 오리·사람 캐릭터와 판다·돼지 애완동물, 모든 마이룸 아이템 50% 환불
-- **용사키우기**: 소년·소녀 캐릭터와 착장 3D 미리보기, 엘리트·전설 장비 발광 효과, 부위별 20단계 장비와 펫, 100종 몬스터·10단계마다 HP 보스, 전투력 비율 전투. 기본 도전 횟수 소진 후 1회 15학급화폐로 추가 도전
+- **용사키우기**: 소년·소녀 캐릭터와 착장 3D 미리보기, 엘리트·전설 장비 발광 효과, 부위별 20단계 장비와 펫, 100종 몬스터·10단계마다 HP 보스, 전투력 비율 전투. 용사 이름·보스 칭호, 기본 도전 횟수 소진 후 비용이 1씩 오르는 추가 도전 지원
+- **친구 대결**: 전투력 순위의 위 2명·아래 2명 중 선택해 전투력 비율로 대결. 하루 기본 10회, 승리 2학급화폐, 패배 0, 추가 대결 2학급화폐
 - **프로필 상점**: 마이 화면의 내 프로필을 누르면 캐릭터·모자·표정·장식을 구매·장착·50% 환불
 
 ## 데이터 구조 (PostgreSQL 문서 API의 기존 경로)
@@ -70,7 +71,7 @@ classes/{classId}
   ├─ taxRate, taxSalaryRate, taxShopRate, taxSeatRate, taxItemRate — 거래별 세율 설정
   ├─ taxStockBuyRate, taxStockSellRate — 호환용 필드(현재 매수 0%, 매도 이익 5% 고정)
   ├─ taxLedger/pending — 아직 공동기금에 반영하지 않은 세금 누적 원장
-  ├─ students/{studentId}   — name, cash, deposit, depositLastAt, avatar, profileOwned, inventory, room, holdings, rpg
+  ├─ students/{studentId}   — name, cash, deposit, depositLastAt, avatar, profileOwned, inventory, room, holdings, rpg, heroDuel
   ├─ products/{productId}   — name, emoji, imageUrl, price, qty, subtotal, tax
   ├─ purchases/{purchaseId} — studentName, productName, price, status(pending|done)
   ├─ accounts/{accountId}   — 적금: studentId, amount, rate, days, startAt, status
