@@ -51,6 +51,22 @@ export function rankAssets(student, stocks, fx, krwPerUnit = 1) {
   );
 }
 
+/**
+ * 학생의 순자산. 기존 자산 계산에 적금과 아직 갚지 않은 대출을 더해
+ * 파산 여부를 판단할 때 사용합니다. 대출은 원금과 만기 이자를 함께 부채로 봅니다.
+ */
+export function netAssets(student = {}, stocks = [], fx, krwPerUnit = 1, savings = [], loans = []) {
+  const savingsValue = savings.reduce((total, account) => total + (Number(account.amount) || 0), 0);
+  const loanLiability = loans
+    .filter((loan) => ['active', 'overdue'].includes(loan.status))
+    .reduce((total, loan) => {
+      const principal = Math.max(0, Number(loan.principal) || 0);
+      const rate = Math.max(0, Number(loan.rate) || 0);
+      return total + principal + Math.floor(principal * rate / 100);
+    }, 0);
+  return Math.round(rankAssets(student, stocks, fx, krwPerUnit) + savingsValue - loanLiability);
+}
+
 /** 적금 가입 기간 선택지 (오래 맡길수록 이율 우대) */
 export const SAVINGS_TERMS = [7, 14, 21];
 

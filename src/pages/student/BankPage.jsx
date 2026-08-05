@@ -7,8 +7,15 @@ import {
 import { db } from '../../firebase';
 import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT } from '../../lib/stocks';
 import {
-  fmt, WEEK_MS, DAY_MS, SAVINGS_TERMS, savingsRateFor, savingsPayout,
+  fmt, WEEK_MS, DAY_MS, SAVINGS_TERMS, savingsRateFor, savingsPayout, netAssets,
 } from '../../lib/util';
+import {
+  depositRateFor, withdrawalFeeFor, savingsSignupBonusFor,
+} from '../../lib/economyEvents.js';
+import {
+  BANKRUPTCY_GRANT, DEFAULT_LOAN_LIMIT, loanDueAmount, loanIsDue,
+  loanLimitFor, loanRateFor, LOAN_TERM_MS,
+} from '../../lib/loans.js';
 
 export default function BankPage() {
   const { klass, student } = useOutletContext();
@@ -20,9 +27,18 @@ export default function BankPage() {
   const [savAmount, setSavAmount] = useState('');
   const [savDays, setSavDays] = useState(14);
   const [accounts, setAccounts] = useState([]);
+  const [loans, setLoans] = useState([]);
+  const [market, setMarket] = useState(null);
+  const [loanAmount, setLoanAmount] = useState('');
   const [msg, setMsg] = useState(null);
+  const [clock, setClock] = useState(Date.now());
 
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const q = query(
@@ -34,10 +50,23 @@ export default function BankPage() {
     );
   }, [klass.id, student.id]);
 
+  useEffect(() => {
+    const q = query(
+      collection(db, 'classes', klass.id, 'loans'),
+      where('studentId', '==', student.id)
+    );
+    return onSnapshot(q, (snap) =>
+      setLoans(snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.borrowedAt || 0) - (a.borrowedAt || 0)))
+    );
+  }, [klass.id, student.id]);
+
   // 환율은 시장 문서에서 실시간으로 받아와요
   useEffect(() => {
     return onSnapshot(doc(db, ...MARKET_PATH(klass.id)), (snap) => {
-      if (snap.exists()) setFx(snap.data().fx || DEFAULT_FX);
+      if (snap.exists()) {
+        setMarket(snap.data());
+        setFx(snap.data().fx || DEFAULT_FX);
+      }
     });
   }, [klass.id]);
 
@@ -50,6 +79,21 @@ export default function BankPage() {
   const kpu = Number(klass.krwPerUnit) || DEFAULT_KRW_PER_UNIT; // 학급화폐 1개 = 몇 원
   const classUsdRate = kpu / (Number(fx) || DEFAULT_FX);
   const fmtRate = (value) => Number(value || 0).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+  const depositRate = depositRateFor(klass);
+  const withdrawalFee = withdrawalFeeFor(klass);
+  const savingsSignupBonus = savingsSignupBonusFor(klass);
+  const currentLoans = loans.filter((loan) => ['active', 'overdue'].includes(loan.status));
+  const loanLimit = loanLimitFor(klass) || DEFAULT_LOAN_LIMIT;
+  const loanedPrincipal = currentLoans.reduce((total, loan) => total + (Number(loan.principal) || 0), 0);
+  const availableLoan = Math.max(0, loanLimit - loanedPrincipal);
+  const studentNetAssets = netAssets(
+    student,
+    market?.stocks || [],
+    fx,
+    kpu,
+    accounts.filter((account) => account.status === 'active'),
+    loans
+  );
   // 학급화폐 1개로 살 수 있는 양
   const rate = exCur === 'KRW' ? kpu : kpu / fx;   // 원: kpu원, 달러: kpu/fx달러
   const unitCost = (v) => (exCur === 'KRW' ? v / kpu : (v * fx) / kpu); // v를 사는 데 드는 학급화폐
@@ -100,7 +144,8 @@ export default function BankPage() {
           });
         } else {
           if (s.deposit < amt) throw new Error('예금이 부족해요.');
-          tx.update(studentRef, { cash: s.cash + amt, deposit: s.deposit - amt });
+          if (withdrawalFee > amt) throw new Error(`출금 수수료 ${fmt(withdrawalFee)}보다 적은 금액은 출금할 수 없어요.`);
+          tx.update(studentRef, { cash: s.cash + amt - withdrawalFee, deposit: s.deposit - amt });
         }
       });
       setAmount('');
@@ -113,14 +158,14 @@ export default function BankPage() {
   const weeks = student.deposit > 0
     ? Math.floor((Date.now() - (student.depositLastAt || Date.now())) / WEEK_MS)
     : 0;
-  const pendingInterest = Math.floor(student.deposit * (klass.depositRate / 100) * weeks);
+  const pendingInterest = Math.floor(student.deposit * (depositRate / 100) * weeks);
 
   const claimInterest = async () => {
     try {
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
         const w = Math.floor((Date.now() - (s.depositLastAt || Date.now())) / WEEK_MS);
-        const interest = Math.floor(s.deposit * (klass.depositRate / 100) * w);
+        const interest = Math.floor(s.deposit * (depositRate / 100) * w);
         if (w < 1 || interest < 1) throw new Error('아직 이자가 쌓이지 않았어요. 7일마다 이자가 생겨요!');
         tx.update(studentRef, {
           deposit: s.deposit + interest,
@@ -141,7 +186,7 @@ export default function BankPage() {
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
         if (s.cash < amt) throw new Error('현금이 부족해요.');
-        tx.update(studentRef, { cash: s.cash - amt });
+        tx.update(studentRef, { cash: s.cash - amt + savingsSignupBonus });
       });
       await addDoc(collection(db, 'classes', klass.id, 'accounts'), {
         studentId: student.id,
@@ -180,11 +225,161 @@ export default function BankPage() {
     }
   };
 
+  const applyLoan = async () => {
+    const amt = Math.floor(Math.abs(Number(loanAmount)));
+    if (!amt) return flash('err', '대출 금액을 입력해 주세요.');
+    if (amt > availableLoan) return flash('err', `현재 대출 가능 금액은 ${fmt(availableLoan)}${klass.currency}예요.`);
+    const now = Date.now();
+    const loanRef = doc(collection(db, 'classes', klass.id, 'loans'));
+    try {
+      await runTransaction(db, async (tx) => {
+        const s = (await tx.get(studentRef)).data() || {};
+        const classData = (await tx.get(doc(db, 'classes', klass.id))).data() || klass;
+        const limit = loanLimitFor(classData);
+        if (amt > Math.max(0, limit - loanedPrincipal)) throw new Error('대출 한도를 초과했어요.');
+        tx.set(loanRef, {
+          studentId: student.id,
+          studentName: s.name || student.name,
+          principal: amt,
+          rate: loanRateFor(classData),
+          borrowedAt: now,
+          dueAt: now + LOAN_TERM_MS,
+          status: 'active',
+          createdAt: serverTimestamp(),
+        });
+        tx.update(studentRef, { cash: (Number(s.cash) || 0) + amt });
+      });
+      setLoanAmount('');
+      flash('ok', `대출 ${fmt(amt)}${klass.currency}이 실행됐어요. 7일 뒤 ${fmt(amt + Math.floor(amt * loanRateFor(klass) / 100))}${klass.currency}을 갚아야 해요.`);
+    } catch (e) {
+      flash('err', e.message);
+    }
+  };
+
+  const repayLoan = async (loan) => {
+    if (!loanIsDue(loan)) return flash('err', '대출은 빌린 뒤 7일이 지나야 상환할 수 있어요.');
+    const due = loanDueAmount(loan);
+    if (!window.confirm(`${fmt(due)}${klass.currency}을 상환할까요?`)) return;
+    try {
+      await runTransaction(db, async (tx) => {
+        const loanRef = doc(db, 'classes', klass.id, 'loans', loan.id);
+        const latestLoan = (await tx.get(loanRef)).data() || {};
+        const s = (await tx.get(studentRef)).data() || {};
+        if (!['active', 'overdue'].includes(latestLoan.status)) throw new Error('이미 처리된 대출이에요.');
+        const latestDue = loanDueAmount(latestLoan);
+        if ((Number(s.cash) || 0) < latestDue) throw new Error('현금이 부족해요.');
+        tx.update(loanRef, { status: 'paid', paidAt: Date.now(), interest: latestDue - (Number(latestLoan.principal) || 0) });
+        tx.update(studentRef, { cash: (Number(s.cash) || 0) - latestDue });
+      });
+      flash('ok', `대출 ${fmt(due)}${klass.currency}을 상환했어요.`);
+    } catch (e) {
+      flash('err', e.message);
+    }
+  };
+
+  const requestBankruptcy = async () => {
+    if (studentNetAssets >= 0) return flash('err', '순자산이 0보다 작을 때만 파산 신청할 수 있어요.');
+    const status = student.bankruptcy?.status;
+    if (['requested', 'mission', 'submitted'].includes(status)) return flash('err', '이미 진행 중인 파산 신청이 있어요.');
+    try {
+      await runTransaction(db, async (tx) => {
+        const s = (await tx.get(studentRef)).data() || {};
+        tx.update(studentRef, {
+          bankruptcy: {
+            status: 'requested',
+            requestedAt: Date.now(),
+            assetAtRequest: studentNetAssets,
+          },
+        });
+      });
+      flash('ok', '담임 선생님께 파산 신청을 보냈어요.');
+    } catch (e) {
+      flash('err', e.message);
+    }
+  };
+
+  const submitVolunteer = async () => {
+    if (student.bankruptcy?.status !== 'mission') return;
+    try {
+      await runTransaction(db, async (tx) => {
+        const s = (await tx.get(studentRef)).data() || {};
+        if (s.bankruptcy?.status !== 'mission') throw new Error('선생님이 먼저 봉사 미션을 승인해야 해요.');
+        tx.update(studentRef, {
+          bankruptcy: { ...s.bankruptcy, status: 'submitted', submittedAt: Date.now() },
+        });
+      });
+      flash('ok', '봉사활동 완료를 제출했어요. 선생님 확인을 기다려 주세요.');
+    } catch (e) {
+      flash('err', e.message);
+    }
+  };
+
   const active = accounts.filter((a) => a.status === 'active');
 
   return (
     <div className="space-y-4">
       <h2 className="text-2xl text-emerald-600">🏦 우리 반 은행</h2>
+      <div className="bg-white rounded-3xl shadow p-6 space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="text-xl text-indigo-700">💳 대출</h3>
+          <span className="text-sm text-gray-500">주 이자 {fmt(loanRateFor(klass))}% · 한도 {fmt(loanLimit)} {klass.currency}</span>
+        </div>
+        <p className="text-xs text-gray-400">대출일로부터 7일이 지나면 원금에 이자가 붙은 금액을 한 번에 상환해야 해요. 현재 가능 금액: <b className="text-indigo-600">{fmt(availableLoan)} {klass.currency}</b></p>
+        <div className="flex gap-2 flex-wrap">
+          <input
+            type="number"
+            min="1"
+            value={loanAmount}
+            onChange={(e) => setLoanAmount(e.target.value)}
+            placeholder="빌릴 금액"
+            className="rounded-xl border-2 border-gray-200 px-3 py-2 w-32 focus:border-indigo-400 outline-none"
+          />
+          <button onClick={applyLoan} className="rounded-xl px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white">대출받기</button>
+        </div>
+        {currentLoans.length > 0 && (
+          <div className="space-y-2 pt-1">
+            {currentLoans.map((loan) => {
+              const due = loanDueAmount(loan);
+              const dueNow = loanIsDue(loan, clock);
+              return (
+                <div key={loan.id} className={`rounded-2xl border-2 p-3 ${dueNow ? 'border-rose-200 bg-rose-50' : 'border-indigo-100 bg-indigo-50/50'}`}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex-1 text-sm">
+                      <b>{fmt(loan.principal)} {klass.currency}</b> 대출 · 상환액 <b>{fmt(due)} {klass.currency}</b>
+                      <div className="text-xs text-gray-500 mt-1">{dueNow ? '상환 가능' : `${new Date(loan.dueAt).toLocaleDateString('ko-KR')}부터 상환 가능`}</div>
+                    </div>
+                    <button onClick={() => repayLoan(loan)} disabled={!dueNow} className="rounded-xl px-3 py-2 text-sm bg-rose-500 text-white disabled:bg-gray-300">상환하기</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {(studentNetAssets < 0 || student.bankruptcy?.status) && (
+        <div className="rounded-3xl border-2 border-rose-200 bg-gradient-to-br from-rose-50 to-orange-50 shadow p-6 space-y-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="text-xl text-rose-700">🧯 파산 신청·회생</h3>
+            <span className="text-sm text-rose-600">현재 순자산 {fmt(studentNetAssets)} {klass.currency}</span>
+          </div>
+          {!student.bankruptcy?.status && <p className="text-sm text-rose-600">순자산이 마이너스예요. 담임 선생님께 파산 신청을 보내고 봉사활동으로 회생할 수 있어요.</p>}
+          {student.bankruptcy?.status === 'requested' && <p className="text-sm text-amber-700">신청을 보냈어요. 담임 선생님이 봉사활동 미션을 승인할 때까지 기다려 주세요.</p>}
+          {student.bankruptcy?.status === 'mission' && (
+            <div className="rounded-2xl bg-white/80 p-4 space-y-2">
+              <b className="text-rose-700">봉사 미션: 교실 정리와 교구 정돈</b>
+              <p className="text-sm text-gray-600">선생님께 봉사활동을 확인받은 뒤 완료 제출을 눌러 주세요.</p>
+              <button onClick={submitVolunteer} className="rounded-xl px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white">봉사 완료 제출</button>
+            </div>
+          )}
+          {student.bankruptcy?.status === 'submitted' && <p className="text-sm text-amber-700">완료 제출을 보냈어요. 선생님 승인 후 기본금 {fmt(BANKRUPTCY_GRANT)}를 받아 회생합니다.</p>}
+          {student.bankruptcy?.status === 'rehabilitated' && <p className="text-sm text-emerald-700">회생이 완료됐어요. 기본금 {fmt(BANKRUPTCY_GRANT)}를 받았습니다.</p>}
+          {studentNetAssets < 0 && !['requested', 'mission', 'submitted'].includes(student.bankruptcy?.status) && (
+            <button onClick={requestBankruptcy} className="rounded-xl px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white">담임 선생님께 파산 신청</button>
+          )}
+        </div>
+      )}
+
       {msg && (
         <div className={`rounded-2xl px-4 py-3 ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
           {msg.text}
@@ -194,7 +389,7 @@ export default function BankPage() {
       {/* 예금 */}
       <div className="bg-white rounded-3xl shadow p-6">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-xl">💵 예금 통장 <span className="text-sm text-gray-400">(주 {klass.depositRate}% 이자)</span></h3>
+          <h3 className="text-xl">💵 예금 통장 <span className="text-sm text-gray-400">(주 {depositRate}% 이자)</span></h3>
           <div className="text-2xl text-emerald-600 tabular-nums">{fmt(student.deposit)} {klass.currency}</div>
         </div>
         <p className="text-xs text-gray-400 mb-3">언제든 넣고 뺄 수 있어요. 7일마다 이자가 쌓여요.</p>

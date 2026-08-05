@@ -1,5 +1,7 @@
 // 학급별 물가 조정값을 모든 구매 화면에서 동일하게 적용해요.
 // 기존 학급에는 값이 없으므로 기본값 0으로 원래 가격을 그대로 유지합니다.
+import { eventPriceMultiplier } from './economyEvents.js';
+
 export const PRICE_MODE_UNIT = 'unit';
 export const PRICE_MODE_PERCENT = 'percent';
 
@@ -14,7 +16,8 @@ export function pricePolicy(klass = {}) {
 }
 
 export function itemPrice(basePrice, klass = {}) {
-  const base = Math.max(0, Number(basePrice) || 0);
+  const eventAdjustedBase = (Number(basePrice) || 0) * eventPriceMultiplier(klass);
+  const base = Math.max(0, eventAdjustedBase);
   const policy = pricePolicy(klass);
   if (policy.mode === PRICE_MODE_PERCENT) {
     return Math.max(0, Math.round(base * (1 + policy.value / 100)));

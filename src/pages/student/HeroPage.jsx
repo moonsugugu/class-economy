@@ -5,7 +5,7 @@ import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import {
   HERO_ITEM_MAP, HERO_SLOTS, normalizeHero, heroPower,
-  monsterForLevel, battleChance, battleConfig, heroDateKey, battleDamage, bossCriticalChance,
+  monsterForLevel, battleChance, battleConfig, heroDateKey, battleDamage, bossCriticalChance, heroBattleWinReward,
   criticalDamageBonus, formatHeroSpecialStats, heroExtraBattleCost, heroDisplayName,
 } from '../../lib/hero';
 import HeroPreview from '../../three/Hero3D.jsx';
@@ -29,6 +29,8 @@ export default function HeroPage() {
   const extraAttempts = Math.max(0, usedToday - config.limit);
   const extraCostPreview = heroExtraBattleCost(usedToday, config.limit);
   const nextMonster = hero.clearedLevel < 100 ? monsterForLevel(hero.clearedLevel + 1) : null;
+  const nextWinReward = nextMonster ? heroBattleWinReward(nextMonster.level, nextMonster.boss, config.winReward) : 0;
+  const finalBossReward = heroBattleWinReward(100, true, config.winReward);
   const bossProgress = nextMonster?.boss ? Math.min(nextMonster.maxHp, hero.bossProgress[nextMonster.level] || 0) : 0;
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
   const classRef = doc(db, 'classes', klass.id);
@@ -112,7 +114,9 @@ export default function HeroPage() {
         const damageResult = won
           ? battleDamage(currentPower, monster, current)
           : { damage: 0, critical: false, criticalChance: bossCriticalChance(current), criticalDamage: criticalDamageBonus(current) };
-        const reward = won ? settings.winReward : settings.loseReward;
+        const reward = won
+          ? heroBattleWinReward(monster.level, monster.boss, settings.winReward)
+          : settings.loseReward;
         const previousBossDamage = current.bossProgress[monster.level] || 0;
         const nextBossDamage = monster.boss
           ? Math.min(monster.maxHp, previousBossDamage + damageResult.damage)
@@ -206,9 +210,11 @@ export default function HeroPage() {
         </div>
       )}
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="hero-profile-panel text-white rounded-3xl shadow-lg p-5 text-center">
-          {hero.character ? <HeroPreview hero={hero} size={210} /> : <div className="h-[210px] rounded-2xl bg-white/15 flex items-center justify-center text-7xl">❔</div>}
+          <div className="flex w-full justify-center">
+            {hero.character ? <HeroPreview hero={hero} size={210} /> : <div className="h-[210px] w-[210px] rounded-2xl bg-white/15 flex items-center justify-center text-7xl">❔</div>}
+          </div>
           {hero.character ? (
             <>
               <button
@@ -225,6 +231,7 @@ export default function HeroPage() {
           <div className="text-white/70 text-sm mt-1">현재 전투력</div>
           <div className="text-5xl font-bold tabular-nums">{fmt(power)}</div>
           <div className="mt-3 text-sm bg-white/15 rounded-xl px-3 py-2">정복 단계 {hero.clearedLevel} / 100</div>
+          <div className="mt-1 text-xs text-amber-100/90">최종 보스 처치 시 보상 {fmt(finalBossReward)}{klass.currency}</div>
         </div>
 
         <div className="bg-white rounded-3xl shadow p-5">
@@ -236,29 +243,29 @@ export default function HeroPage() {
                 .replace('보스전 크리티컬 확률', '치명타 확률')
                 .replace('크리티컬 데미지', '치명타 피해'));
               return (
-                <div key={slot} className={`flex items-center gap-2 rounded-2xl border px-2 py-1.5 ${item ? 'border-indigo-100 bg-indigo-50/40' : 'border-gray-100 bg-gray-50'}`}>
-                  <span className="w-8 shrink-0 text-[10px] text-gray-400">{label}</span>
+                <div key={slot} className={`flex min-w-0 items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5 ${item ? 'border-indigo-100 bg-indigo-50/40' : 'border-gray-100 bg-gray-50'}`}>
+                  <span className="w-12 shrink-0 whitespace-nowrap text-[9px] text-gray-400">{label}</span>
                   <HeroItemVisual item={item} size={44} showLevel={false} />
                   <span className="min-w-0 flex-1 overflow-hidden text-gray-600">
-                    <span className="block truncate text-[11px] leading-tight">{item?.name || '미장착'}</span>
-                    {item && <span className="block text-[9px] font-semibold leading-tight text-indigo-500">{item.level}단계 장비</span>}
-                    {specialStats.map((stat) => <span key={stat} title={stat} className="block whitespace-nowrap text-[8px] leading-[1.05] tracking-[-0.03em] text-fuchsia-500">✨ {stat}</span>)}
+                    <span className="block truncate text-[10px] leading-tight">{item?.name || '미장착'}</span>
+                    {item && <span className="block text-[8px] font-semibold leading-tight text-indigo-500">{item.level}단계 장비</span>}
+                    {specialStats.map((stat) => <span key={stat} title={stat} className="block break-words text-[8px] leading-tight tracking-[-0.04em] text-fuchsia-500">✨ {stat}</span>)}
                   </span>
-                  <span className="w-10 shrink-0 text-right text-[10px] text-indigo-500">{item ? `+${item.power}` : ''}<small className="block text-[8px] text-gray-400">전투력</small></span>
+                  <span className="w-11 shrink-0 text-right text-[9px] text-indigo-500">{item ? `+${item.power}` : ''}<small className="block text-[7px] leading-tight text-gray-400">전투력</small></span>
                 </div>
               );
             })}
-            <div className={['flex items-center gap-2 rounded-2xl border px-2 py-1.5', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50' : 'border-gray-100 bg-gray-50'].join(' ')}>
-              <span className="w-8 shrink-0 text-[10px] text-gray-400">펫</span>
+            <div className={['flex min-w-0 items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50' : 'border-gray-100 bg-gray-50'].join(' ')}>
+              <span className="w-12 shrink-0 whitespace-nowrap text-[9px] text-gray-400">펫</span>
               <HeroItemVisual item={HERO_ITEM_MAP[hero.pet]} size={44} showLevel={false} />
               <span className="min-w-0 flex-1 overflow-hidden text-gray-600">
-                <span className="block truncate text-[11px] leading-tight">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
-                {HERO_ITEM_MAP[hero.pet] && <span className="block text-[9px] font-semibold leading-tight text-fuchsia-500">{HERO_ITEM_MAP[hero.pet].level}단계 펫</span>}
+                <span className="block truncate text-[10px] leading-tight">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
+                {HERO_ITEM_MAP[hero.pet] && <span className="block text-[8px] font-semibold leading-tight text-fuchsia-500">{HERO_ITEM_MAP[hero.pet].level}단계 펫</span>}
               </span>
-              <span className="w-16 shrink-0 text-right text-[8px] leading-tight text-fuchsia-600">
-                {bossCriticalChance(hero) > 0 && <span className="block whitespace-nowrap">치명타 확률 {bossCriticalChance(hero)}%</span>}
+              <span className="w-16 shrink-0 break-words text-right text-[7px] leading-tight text-fuchsia-600">
+                {bossCriticalChance(hero) > 0 && <span className="block">치명타 확률 {bossCriticalChance(hero)}%</span>}
                 <small className="block text-[8px] text-gray-400">보스 피해 2배</small>
-                {criticalDamageBonus(hero) > 0 && <small className="block whitespace-nowrap text-[8px] text-fuchsia-400">치명타 피해 +{criticalDamageBonus(hero)}%</small>}
+                {criticalDamageBonus(hero) > 0 && <small className="block break-words text-[7px] text-fuchsia-400">치명타 피해 +{criticalDamageBonus(hero)}%</small>}
               </span>
             </div>
           </div>
@@ -292,7 +299,7 @@ export default function HeroPage() {
                   {bossCriticalChance(hero) > 0 && <> · 펫 크리티컬 {bossCriticalChance(hero)}%</>}
                 </div>
               )}
-              <div className="text-xs text-amber-600">승리 {fmt(config.winReward)} · 패배 {fmt(config.loseReward)} {klass.currency}</div>
+              <div className="text-xs text-amber-600">승리 {fmt(nextWinReward)} · 패배 {fmt(config.loseReward)} {klass.currency}</div>
             </div>
             <button
               onClick={battle}

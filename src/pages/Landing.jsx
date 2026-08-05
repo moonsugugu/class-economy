@@ -99,8 +99,45 @@ export default function Landing() {
     <div className="min-h-screen flex flex-col items-center justify-center p-6">
       <div className="text-center mb-10">
         <div className="text-7xl mb-3">🏦</div>
-        <h1 className="text-5xl text-indigo-700 mb-2">우리 반 경제나라</h1>
+        <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1">
+          <h1 className="text-4xl sm:text-5xl text-indigo-700">우리 반 경제나라</h1>
+          <span className="text-sm text-gray-400">made by</span>
+          <a
+            href="https://moonsunezipbrand.vercel.app"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border-2 border-purple-200 bg-white px-3 py-1 text-sm text-purple-600 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-400 hover:bg-purple-50"
+          >
+            문수네집
+          </a>
+        </div>
         <p className="text-gray-500 text-lg">벌고, 모으고, 투자하고, 꾸미는 학급 경제 놀이터</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <a
+            href="https://moonsunezipbrand.vercel.app"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border-2 border-purple-200 bg-white/90 px-4 py-2 text-sm text-purple-600 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-400 hover:bg-purple-50"
+          >
+            🏠 문수네집
+          </a>
+          <a
+            href="https://www.instagram.com/moonsune.zip/"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border-2 border-pink-200 bg-white/90 px-4 py-2 text-sm text-pink-600 shadow-sm transition hover:-translate-y-0.5 hover:border-pink-400 hover:bg-pink-50"
+          >
+            📷 Instagram
+          </a>
+          <a
+            href="https://moonsunezip.com"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border-2 border-sky-200 bg-white/90 px-4 py-2 text-sm text-sky-600 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50"
+          >
+            🌐 moonsune.zip
+          </a>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 w-full max-w-4xl">

@@ -2,6 +2,8 @@
 // 가격 단위는 실제와 같습니다 — 한국 주식은 원(₩) 그대로, 미국 주식은 달러($) 그대로.
 // (예: 삼성전자 70,800원 → 70,800 학급화폐)
 // base는 실제 시세를 아직 못 불러왔을 때 쓰는 시작값이에요.
+import { QUOTE_FX_SYMBOL, QUOTE_SYMBOL_MAP } from './quoteSymbols.js';
+
 export const STOCK_SEED = [
   { symbol: 'SAMSUNG', name: '삼성전자', market: 'KR', base: 75000 },
   { symbol: 'SKHYNIX', name: 'SK하이닉스', market: 'KR', base: 200000 },
@@ -140,12 +142,90 @@ export function usedTicks(market) {
 
 export const MARKET_LABEL = { KR: '🇰🇷', US: '🇺🇸', CUSTOM: '🏫' };
 
+const READER_BASE_URL = 'https://r.jina.ai/https://query1.finance.yahoo.com/v7/finance/spark';
+const READER_BATCH_SIZE = 20;
+const READER_TIMEOUT_MS = 25_000;
+
+function splitQuoteSymbols(symbols) {
+  const batches = [];
+  for (let index = 0; index < symbols.length; index += READER_BATCH_SIZE) {
+    batches.push(symbols.slice(index, index + READER_BATCH_SIZE));
+  }
+  return batches;
+}
+
+function readerJson(text) {
+  const marker = 'Markdown Content:';
+  const marked = text.indexOf(marker);
+  const body = (marked >= 0 ? text.slice(marked + marker.length) : text).trim();
+  const start = body.indexOf('{');
+  const end = body.lastIndexOf('}');
+  if (start < 0 || end <= start) throw new Error('실제 시세 응답에서 JSON을 찾지 못했어요.');
+  return JSON.parse(body.slice(start, end + 1));
+}
+
+function sparkPrice(item) {
+  const result = item?.response?.[0];
+  const closes = result?.indicators?.quote?.[0]?.close || [];
+  const value = [result?.meta?.regularMarketPrice, ...[...closes].reverse()]
+    .find((price) => typeof price === 'number' && price > 0);
+  if (!(value > 0)) return null;
+  return value >= 1000 ? Math.round(value) : Math.round(value * 100) / 100;
+}
+
+async function fetchReaderBatch(symbols) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), READER_TIMEOUT_MS);
+  const minuteKey = Math.floor(Date.now() / 60_000);
+  const endpoint = `${READER_BASE_URL}?symbols=${encodeURIComponent(symbols.join(','))}`
+    + `&range=1d&interval=1d&_=${minuteKey}`;
+  try {
+    const response = await fetch(endpoint, {
+      headers: { Accept: 'text/plain' },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`실제 시세 중계 서버 응답 ${response.status}`);
+    const json = readerJson(await response.text());
+    if (json?.spark?.error) throw new Error(json.spark.error.description || 'Yahoo Finance 시세 오류');
+    return Array.isArray(json?.spark?.result) ? json.spark.result : [];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function fetchReaderQuotes() {
+  const entries = Object.entries(QUOTE_SYMBOL_MAP);
+  const yahooSymbols = [...entries.map(([, symbol]) => symbol), QUOTE_FX_SYMBOL];
+  const batches = splitQuoteSymbols(yahooSymbols);
+  const results = (await Promise.all(batches.map(fetchReaderBatch))).flat();
+  const bySymbol = new Map(results.map((item) => [item.symbol, sparkPrice(item)]));
+  const prices = {};
+  entries.forEach(([ours, yahoo]) => {
+    const price = bySymbol.get(yahoo);
+    if (price > 0) prices[ours] = price;
+  });
+  const fxValue = bySymbol.get(QUOTE_FX_SYMBOL);
+  const fx = fxValue > 0 ? Math.round(fxValue) : null;
+  const count = Object.keys(prices).length;
+  if (!count) throw new Error('Yahoo Finance에서 실제 주식 가격을 받지 못했어요.');
+  return {
+    ok: true,
+    prices,
+    fx,
+    at: Date.now(),
+    count,
+    partial: count < entries.length,
+    source: 'yahoo-reader',
+  };
+}
+
 /**
  * 실제 시세 가져오기 — 서버리스 함수(/api/quotes)가 대신 불러와 줍니다.
  * 반환: { prices: {종목코드: 가격}, fx: 원/달러 환율 }
  */
 export async function fetchRealQuotes() {
-  const configured = import.meta.env.VITE_QUOTES_API_URL;
+  const configured = import.meta.env?.VITE_QUOTES_API_URL;
   const endpoints = [...new Set([configured, '/api/quotes', '/api/quotes/'].filter(Boolean))];
   let lastDetail = '시세 응답이 비어 있어요.';
 
@@ -166,6 +246,14 @@ export async function fetchRealQuotes() {
     } catch (error) {
       lastDetail = error?.message || lastDetail;
     }
+  }
+
+  try {
+    return await fetchReaderQuotes();
+  } catch (error) {
+    lastDetail = error?.name === 'AbortError'
+      ? '실제 시세 서버 응답 시간이 너무 오래 걸렸어요.'
+      : error?.message || lastDetail;
   }
 
   throw new Error(`실제 시세를 불러오지 못했어요. (${lastDetail})`);

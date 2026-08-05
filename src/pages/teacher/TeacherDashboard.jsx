@@ -7,7 +7,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
-import { fmt, makeClassCode, rankAssets } from '../../lib/util';
+import { fmt, makeClassCode, netAssets } from '../../lib/util';
 import {
   changePct, advance, usedTicks, makeInitialMarket, makeCustomStock, mergeSeedStocks,
   MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, MAX_TICK_LIMIT, normalizedTickLimit, AUTO_TICK_MS, DEFAULT_FX, todayKey,
@@ -22,11 +22,15 @@ import { isActiveStudent } from '../../lib/studentState';
 import { ITEM_MAP } from '../../lib/items';
 import { HERO_ITEM_MAP } from '../../lib/hero';
 import { PRICE_MODE_PERCENT, PRICE_MODE_UNIT, pricePolicyLabel } from '../../lib/pricing';
+import { loanDueAmount } from '../../lib/loans.js';
 import SeatsTab from './SeatsTab.jsx';
 import ReportsTab from './ReportsTab.jsx';
 import JobsTab from './JobsTab.jsx';
 import FundTab from './FundTab.jsx';
 import InviteQR from '../../components/InviteQR.jsx';
+import EconomyEventsPanel from './EconomyEventsPanel.jsx';
+import RecoveryTab from './RecoveryTab.jsx';
+import FeatureGuideModal from '../../components/FeatureGuideModal.jsx';
 
 const card = 'bg-white rounded-3xl shadow p-6';
 const input = 'rounded-xl border-2 border-gray-200 px-3 py-2 focus:border-indigo-400 outline-none';
@@ -111,6 +115,8 @@ export default function TeacherDashboard() {
       salary: 100,
       depositRate: 2,
       savingsRate: 5,
+      loanRate: 10,
+      loanLimit: 1000,
       createdAt: serverTimestamp(),
     });
     setNewClassName('');
@@ -126,6 +132,7 @@ export default function TeacherDashboard() {
     ['fund', '🏛️', '공동기금', 'from-emerald-400 to-green-500'],
     ['seats', '🪑', '자리', 'from-teal-400 to-cyan-500'],
     ['reports', '🐞', '건의함', 'from-fuchsia-400 to-rose-500'],
+    ['recovery', '🧯', '파산·회생', 'from-rose-400 to-orange-500'],
     ['settings', '⚙️', '설정', 'from-slate-400 to-gray-500'],
   ];
 
@@ -217,9 +224,13 @@ export default function TeacherDashboard() {
           {tab === 'fund' && <FundTab klass={klass} />}
           {tab === 'seats' && <SeatsTab klass={klass} />}
           {tab === 'reports' && <ReportsTab klass={klass} teacherEmail={teacher.email} />}
+          {tab === 'recovery' && <RecoveryTab klass={klass} />}
           {tab === 'settings' && (
             <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
-              <SettingsTab klass={klass} />
+              <div className="space-y-4">
+                <SettingsTab klass={klass} />
+                <EconomyEventsPanel klass={klass} />
+              </div>
               <PinManager klass={klass} />
             </div>
           )}
@@ -229,6 +240,7 @@ export default function TeacherDashboard() {
       {showInvite && klass && (
         <InviteQR klass={klass} onClose={() => setShowInvite(false)} />
       )}
+      <FeatureGuideModal role="teacher" />
     </div>
   );
 }
@@ -241,6 +253,7 @@ function Center({ children }) {
 function StudentsTab({ klass }) {
   const [students, setStudents] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [loans, setLoans] = useState([]);
   const [market, setMarket] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [amount, setAmount] = useState('');
@@ -263,6 +276,12 @@ function StudentsTab({ klass }) {
   }, [klass.id]);
 
   useEffect(() => {
+    return onSnapshot(collection(db, 'classes', klass.id, 'loans'), (snap) =>
+      setLoans(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+  }, [klass.id]);
+
+  useEffect(() => {
     return onSnapshot(doc(db, ...MARKET_PATH(klass.id)), (snap) => {
       setMarket(snap.exists() ? snap.data() : null);
     });
@@ -278,6 +297,14 @@ function StudentsTab({ klass }) {
     });
     return totals;
   }, [accounts]);
+  const loansByStudent = useMemo(() => {
+    const totals = new Map();
+    loans.forEach((loan) => {
+      if (!['active', 'overdue'].includes(loan.status)) return;
+      totals.set(loan.studentId, (totals.get(loan.studentId) || 0) + loanDueAmount(loan));
+    });
+    return totals;
+  }, [loans]);
   const marketStocks = market?.stocks || [];
   const fx = Number(market?.fx) || DEFAULT_FX;
   const kpu = Number(klass.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
@@ -306,14 +333,17 @@ function StudentsTab({ klass }) {
   const assetBreakdownOf = (student) => {
     const savings = savingsByStudent.get(student.id) || 0;
     const stocks = stockValueOf(student);
+    const studentAccounts = accounts.filter((account) => account.studentId === student.id);
+    const studentLoans = loans.filter((loan) => loan.studentId === student.id);
     return {
-      total: Math.round(rankAssets(student, marketStocks, fx, kpu) + savings),
+      total: netAssets(student, marketStocks, fx, kpu, studentAccounts, studentLoans),
       cash: Number(student.cash) || 0,
       deposit: Number(student.deposit) || 0,
       savings,
       stocks,
       spaceSpending: spaceSpendingOf(student),
       heroItemSpending: heroItemSpendingOf(student),
+      loan: loansByStudent.get(student.id) || 0,
     };
   };
 
@@ -493,7 +523,7 @@ function StudentsTab({ klass }) {
             행 왼쪽의 ↕ 손잡이를 끌어 놓으면 직접 순서로 저장돼요. 숫자순은 1, 2, 9, 10, 11처럼 정렬됩니다.
           </span>
           <span className="basis-full text-xs text-gray-400">
-            총자산은 현금·예금·적금·주식과 원화/달러 환산액의 합계예요. 공간 지출비와 용사 아이템비는 보유 아이템 가격표 기준이며 세트 할인은 기존 데이터에 없어 반영하지 않습니다.
+            총자산은 현금·예금·적금·주식과 원화/달러 환산액에서 미상환 대출을 뺀 순자산이에요. 공간 지출비와 용사 아이템비는 보유 아이템 가격표 기준입니다.
           </span>
         </div>
         <div className="overflow-x-auto">
@@ -508,6 +538,7 @@ function StudentsTab({ klass }) {
                 <th className="text-right">예금</th>
                 <th className="text-right">적금</th>
                 <th className="text-right">주식 평가액</th>
+                <th className="text-right">대출 잔액</th>
                 <th className="text-right">공간 지출비</th>
                 <th className="text-right">용사 아이템비</th>
                 <th className="text-right w-20">관리</th>
@@ -541,6 +572,7 @@ function StudentsTab({ klass }) {
                     <td className="text-right text-gray-500 whitespace-nowrap">{wholeFmt(asset.deposit)} {klass.currency}</td>
                     <td className="text-right text-pink-600 whitespace-nowrap">{wholeFmt(asset.savings)} {klass.currency}</td>
                     <td className="text-right text-sky-600 whitespace-nowrap">{wholeFmt(asset.stocks)} {klass.currency}</td>
+                    <td className="text-right text-rose-600 whitespace-nowrap">{wholeFmt(asset.loan)} {klass.currency}</td>
                     <td className="text-right text-purple-600 whitespace-nowrap">{wholeFmt(asset.spaceSpending)} {klass.currency}</td>
                     <td className="text-right text-violet-600 whitespace-nowrap">{wholeFmt(asset.heroItemSpending)} {klass.currency}</td>
                     <td className="text-right">
@@ -555,7 +587,7 @@ function StudentsTab({ klass }) {
                 );
               })}
               {!activeStudents.length && (
-                <tr><td colSpan={11} className="py-8 text-center text-gray-400">
+                <tr><td colSpan={12} className="py-8 text-center text-gray-400">
                   아직 학생이 없어요. 학생들에게 학급 코드 <b>{klass.code}</b>를 알려 주세요!
                 </td></tr>
               )}
@@ -833,7 +865,7 @@ function AlertsTab({ klass }) {
 /* ---------- 주식 관리 (시뮬레이션 · 시장 전체가 문서 1개) ---------- */
 function StocksTab({ klass }) {
   const [market, setMarket] = useState(undefined); // undefined=불러오는 중, null=시장 없음
-  const [auto, setAuto] = useState(false);
+  const [autoMode, setAutoMode] = useState(null); // null | random | real
   const [filter, setFilter] = useState('ALL');
   const [edit, setEdit] = useState(null);          // 편집 중인 종목
   const [editPrice, setEditPrice] = useState('');
@@ -896,7 +928,7 @@ function StocksTab({ klass }) {
 
   const initMarket = () => setDoc(mref, makeInitialMarket());
 
-  // 📡 실제 주식 시세를 그대로 반영 (한국=원, 미국=달러). 하루 횟수와 무관해요.
+  // 📡 수동으로 실제 주식 시세를 그대로 반영 (자동변동과 달리 하루 횟수는 차감하지 않아요)
   const pullReal = async () => {
     // 예전 축소 가격(삼성전자 70 등)을 쓰던 학급은 금액이 크게 바뀌므로 한 번 확인해요
     const old = (market.stocks || []).find((s) => s.market === 'KR');
@@ -907,14 +939,15 @@ function StocksTab({ klass }) {
     )) return;
     setPulling(true);
     try {
-      const { prices, fx } = await fetchRealQuotes();
+      const { prices, fx, partial } = await fetchRealQuotes();
       await updateDoc(mref, {
         stocks: applyRealPrices(market.stocks || [], prices),
         ...(fx ? { fx } : {}),
         realAt: Date.now(),
         updatedAt: Date.now(),
       });
-      flash(`📡 실제 시세를 반영했어요! ${fx ? `(환율 1$ = ${fmt(fx)}원)` : ''}`);
+      const count = Object.keys(prices || {}).length;
+      flash(`📡 실제 시세 ${count}개 종목을 반영했어요! ${fx ? `(환율 1$ = ${fmt(fx)}원)` : ''}${partial ? ' · 일부 종목은 다음 시도에 갱신돼요.' : ''}`);
     } catch (e) {
       flash('⚠️ ' + e.message + ' — 잠시 후 다시 시도해 주세요.');
     } finally {
@@ -922,7 +955,7 @@ function StocksTab({ klass }) {
     }
   };
 
-  // 시세 변동 — 트랜잭션으로 하루 횟수를 정확히 차감
+  // 랜덤 시세 변동 — 트랜잭션으로 하루 횟수를 정확히 차감
   const tick = async () => {
     try {
       await runTransaction(db, async (tx) => {
@@ -941,17 +974,62 @@ function StocksTab({ klass }) {
       });
     } catch (e) {
       flash('⚠️ ' + e.message);
-      setAuto(false);
+      setAutoMode(null);
     }
+  };
+
+  // 실제 시세 자동 변동 — 실제 시세를 성공적으로 가져온 경우에만 하루 횟수를 차감
+  const tickReal = async () => {
+    if (pulling) return;
+    setPulling(true);
+    try {
+      const { prices, fx, partial } = await fetchRealQuotes();
+      let count = 0;
+      let nextUsed = used + 1;
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(mref);
+        if (!snap.exists()) throw new Error('시장이 아직 열리지 않았어요.');
+        const m = snap.data();
+        const today = todayKey();
+        const u = m.tickDate === today ? (m.tickCount || 0) : 0;
+        if (u >= limit) throw new Error(`오늘 시세 변동을 모두 사용했어요! (${limit}회) 내일 다시 할 수 있어요.`);
+        nextUsed = u + 1;
+        const nextStocks = (m.stocks || []).map((stock) => {
+          const price = prices?.[stock.symbol];
+          return price > 0 ? advance(stock, price) : stock;
+        });
+        count = Object.keys(prices || {}).length;
+        tx.update(mref, {
+          stocks: nextStocks,
+          ...(fx ? { fx } : {}),
+          realAt: Date.now(),
+          tickCount: u + 1,
+          tickDate: today,
+          updatedAt: Date.now(),
+        });
+      });
+      flash(`📡 실제 시세 자동변동 완료 · ${count}개 종목 반영 · 오늘 ${nextUsed}/${limit}회${partial ? ' · 일부 종목은 다음 시도에 갱신돼요.' : ''}`);
+    } catch (e) {
+      flash('⚠️ 실제 시세 자동변동 실패: ' + e.message);
+      setAutoMode(null);
+    } finally {
+      setPulling(false);
+    }
+  };
+
+  const toggleAuto = (mode) => {
+    if (pulling) return flash('⏳ 시세를 불러오는 중에는 자동 모드를 바꿀 수 없어요.');
+    setAutoMode((current) => current === mode ? null : mode);
   };
 
   // 자동 변동: 1분 59초 간격, 남은 횟수가 0이면 스스로 꺼짐
   useEffect(() => {
-    if (!auto) return;
-    if (left <= 0) { setAuto(false); flash('오늘 횟수를 다 써서 자동 변동을 껐어요.'); return; }
-    timer.current = setInterval(tick, AUTO_TICK_MS);
+    if (!autoMode) return;
+    if (left <= 0) { setAutoMode(null); flash('오늘 횟수를 다 써서 자동 변동을 껐어요.'); return; }
+    const run = autoMode === 'real' ? tickReal : tick;
+    timer.current = setInterval(run, AUTO_TICK_MS);
     return () => clearInterval(timer.current);
-  }, [auto, left <= 0, klass.id]);
+  }, [autoMode, left <= 0, klass.id]);
 
   const addCustom = async (e) => {
     e.preventDefault();
@@ -1015,7 +1093,7 @@ function StocksTab({ klass }) {
             disabled={pulling}
             className={btn + ' bg-gradient-to-r from-blue-500 to-indigo-500 hover:opacity-90 text-lg'}
           >
-            {pulling ? '불러오는 중...' : '📡 실제 시세 반영'}
+            {pulling ? '불러오는 중...' : '📡 실제 시세 반영 (수동)'}
           </button>
           <button
             onClick={tick}
@@ -1040,19 +1118,38 @@ function StocksTab({ klass }) {
             style={{ width: `${Math.min(100, (used / limit) * 100)}%` }}
           />
         </div>
-        <label className="flex items-center gap-2 text-gray-600 mt-3">
-          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} disabled={left <= 0} className="w-5 h-5" />
-           자동 변동 (1분 59초마다 · 이 화면이 켜져 있는 동안 · 남은 횟수를 사용해요)
-        </label>
+        <div className="mt-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-bold text-indigo-700">⏱️ 자동변동</span>
+            <button
+              type="button"
+              onClick={() => toggleAuto('real')}
+              disabled={left <= 0}
+              className={`rounded-xl px-3 py-2 text-sm transition disabled:opacity-40 ${autoMode === 'real' ? 'bg-blue-600 text-white shadow' : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'}`}
+            >
+              {autoMode === 'real' ? '⏹ 실제 시세 자동변동 중' : '📡 실제 시세 자동변동'}
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleAuto('random')}
+              disabled={left <= 0}
+              className={`rounded-xl px-3 py-2 text-sm transition disabled:opacity-40 ${autoMode === 'random' ? 'bg-violet-600 text-white shadow' : 'bg-white text-violet-600 border border-violet-200 hover:bg-violet-50'}`}
+            >
+              {autoMode === 'random' ? '⏹ 랜덤 자동변동 중' : '🎲 랜덤 자동변동'}
+            </button>
+            <span className="text-xs text-indigo-500">1분 59초마다 실행 · 이 화면이 켜져 있는 동안 · 두 모드 모두 1회 차감</span>
+          </div>
+        </div>
         {msg && <div className="mt-3 text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2">{msg}</div>}
         <p className="text-xs text-gray-400 mt-2">
           📡 <b>실제 시세 반영</b>은 진짜 주식 가격을 그대로 가져와요 — 한국 주식은 <b>원(₩)</b>, 미국 주식은 <b>달러($)</b> 단위 그대로예요.
+          수동 반영은 횟수를 차감하지 않고, 아래 자동변동 버튼만 횟수를 차감해요.
           {market?.realAt && (
             <b className="text-blue-500"> (마지막 반영: {new Date(market.realAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })})</b>
           )}
           <br />
           ⏰ 버튼을 누르지 않아도 <b>{SCHEDULE_LABEL}</b>에 실제 시세로 저절로 갱신돼요.
-          🎲 랜덤 변동은 하루 횟수 안에서만 쓸 수 있어요 (⚙️설정에서 변경).
+          🎲 랜덤 변동은 하루 횟수 안에서만 쓸 수 있어요 (⚙️설정에서 변경). 자동변동은 실제 시세·랜덤 모드 모두 실행할 때마다 1회씩 차감돼요.
         </p>
       </div>
 
@@ -1156,9 +1253,10 @@ function SettingsTab({ klass }) {
   const init = () => ({
     name: klass.name, currency: klass.currency, salary: klass.salary,
     depositRate: klass.depositRate, savingsRate: klass.savingsRate,
+    loanRate: klass.loanRate ?? 10, loanLimit: klass.loanLimit ?? 1000,
     tickLimit: normalizedTickLimit(klass.tickLimit ?? DEFAULT_TICK_LIMIT),
     heroBattleLimit: klass.heroBattleLimit ?? 10,
-    heroWinReward: klass.heroWinReward ?? 20,
+    heroWinReward: klass.heroWinReward ?? 10,
     heroLoseReward: klass.heroLoseReward ?? 0,
     priceInflationMode: klass.priceInflationMode ?? PRICE_MODE_UNIT,
     priceInflationValue: klass.priceInflationValue ?? 0,
@@ -1186,6 +1284,8 @@ function SettingsTab({ klass }) {
       salary: Number(form.salary) || 0,
       depositRate: Number(form.depositRate) || 0,
       savingsRate: Number(form.savingsRate) || 0,
+      loanRate: Math.max(0, Math.min(1000, Number(form.loanRate) || 0)),
+      loanLimit: Math.max(0, Math.floor(Number(form.loanLimit) || 0)),
       tickLimit: Math.max(1, Math.min(MAX_TICK_LIMIT, Number(form.tickLimit) || DEFAULT_TICK_LIMIT)),
       heroBattleLimit: Math.max(1, Math.min(100, Number(form.heroBattleLimit) || 10)),
       heroWinReward: Math.max(0, Math.min(100000, Number(form.heroWinReward) || 0)),
@@ -1230,6 +1330,8 @@ function SettingsTab({ klass }) {
         '적금 기본 이율 (7일 기준, 주당 %)', 'savingsRate', 'number',
         `오래 맡길수록 1%p씩 우대해요 → 7일 ${form.savingsRate}% · 14일 ${Number(form.savingsRate) + 1}% · 21일 ${Number(form.savingsRate) + 2}%`
       )}
+      {field('대출 이율 (7일 기준, %)', 'loanRate', 'number', '대출일로부터 7일 뒤 원금에 붙는 이자율이에요.')}
+      {field('학생 1명 대출 한도', 'loanLimit', 'number', '상환하지 않은 대출 원금의 합이 이 한도를 넘지 않도록 해요.')}
       <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-3">
         <div>
           <h4 className="font-bold text-emerald-700">🏛️ 거래별 공동기금 세율</h4>
@@ -1260,7 +1362,7 @@ function SettingsTab({ klass }) {
          '주식 시세를 하루에 몇 번까지 바꿀 수 있는지 정해요. (기본 25회)'
       )}
       {field('용사 전투 하루 도전 횟수', 'heroBattleLimit', 'number', '학생 한 명이 하루에 용사 전투를 도전할 수 있는 횟수예요. 기본 10회.')}
-      {field('용사 전투 승리 보상', 'heroWinReward', 'number', '용사가 이겼을 때 지급할 학급화폐예요. 기본 20.')}
+      {field('용사 전투 1구간 승리 보상', 'heroWinReward', 'number', '1~10단계의 일반 몬스터 승리 보상이에요. 다음 구간마다 보상이 올라가고, 보스는 해당 구간 보상의 10배를 지급해요. 기본 10.')}
       {field('용사 전투 패배 보상', 'heroLoseReward', 'number', '용사가 졌을 때 지급할 학급화폐예요. 기본 0.')}
       <div>
         <label className="text-sm text-gray-500 block mb-1">상점·내 공간 물가 상승 방식</label>

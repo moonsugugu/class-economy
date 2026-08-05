@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { collection, doc, query, where, onSnapshot, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { fmt } from '../../lib/util';
+import { fmt, netAssets } from '../../lib/util';
 import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT } from '../../lib/stocks';
 import { ensureBaselines } from '../../lib/marketSync';
 import AvatarView from '../../components/AvatarView';
@@ -11,7 +11,7 @@ import { itemPrice } from '../../lib/pricing';
 import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
 
 export default function MyPage() {
-  const { klass, student } = useOutletContext();
+  const { klass, student, loans: contextLoans = [] } = useOutletContext();
   const [savings, setSavings] = useState([]);
   const [stocks, setStocks] = useState([]);
   const [fx, setFx] = useState(DEFAULT_FX);
@@ -122,7 +122,7 @@ export default function MyPage() {
     if (stocks.length) ensureBaselines(klass.id, student, stocks, fx, klass.krwPerUnit);
   }, [stocks.length, fx, student.id, klass.krwPerUnit]);
 
-  const savingsSum = savings.reduce((a, s) => a + s.amount, 0);
+  const savingsSum = savings.reduce((a, s) => a + (Number(s.amount) || 0), 0);
   const kpu = Number(klass.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
   // 한국 주식은 원, 미국 주식은 달러 → 모두 학급 화폐로 환산해서 합쳐요
   const conv = (amount, market) => {
@@ -137,9 +137,7 @@ export default function MyPage() {
   }, 0);
   const krwValue = (student.krw || 0) / kpu;
   const usdValue = ((student.usd || 0) * fx) / kpu;
-  const total = Math.round(
-    (student.cash || 0) + (student.deposit || 0) + savingsSum + stockValue + krwValue + usdValue
-  );
+  const total = netAssets(student, stocks, fx, kpu, savings, contextLoans);
 
   const Item = ({ icon, label, value, to, grad, sub }) => (
     <Link

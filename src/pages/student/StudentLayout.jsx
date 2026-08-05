@@ -3,8 +3,10 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { collection, doc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
-import { fmt } from '../../lib/util';
+import { fmt, netAssets } from '../../lib/util';
 import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT } from '../../lib/stocks';
+import { activeEconomyEvent } from '../../lib/economyEvents.js';
+import FeatureGuideModal from '../../components/FeatureGuideModal.jsx';
 
 const NAV = [
   ['/student', '🏠', '마이', true],
@@ -27,6 +29,7 @@ export default function StudentLayout() {
   const [gone, setGone] = useState(false);
   const [market, setMarket] = useState(null);
   const [savings, setSavings] = useState([]);
+  const [loans, setLoans] = useState([]);
 
   useEffect(() => {
     if (!session) return;
@@ -63,6 +66,15 @@ export default function StudentLayout() {
   }, [session?.classId, session?.studentId]);
 
   useEffect(() => {
+    if (!session) return;
+    const q = query(
+      collection(db, 'classes', session.classId, 'loans'),
+      where('studentId', '==', session.studentId)
+    );
+    return onSnapshot(q, (s) => setLoans(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  }, [session?.classId, session?.studentId]);
+
+  useEffect(() => {
     if (!session || gone) {
       saveSession(null);
       navigate('/', { replace: true });
@@ -73,24 +85,8 @@ export default function StudentLayout() {
   const fx = market?.fx || DEFAULT_FX;
   const stockList = market?.stocks || [];
   const kpu = Number(klass?.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
-  const totalAssets = (() => {
-    if (!student) return 0;
-    const conv = (amount, market) => {
-      if (market === 'US') return (amount * fx) / kpu;
-      if (market === 'KR') return amount / kpu;
-      return amount;
-    };
-    const stockValue = Object.entries(student.holdings || {}).reduce((a, [sym, h]) => {
-      const st = stockList.find((s) => s.symbol === sym);
-      if (!st || !h.qty) return a;
-      return a + conv(st.price * h.qty, st.market);
-    }, 0);
-    const savingsSum = savings.reduce((a, s) => a + (s.amount || 0), 0);
-    return Math.round(
-      (student.cash || 0) + (student.deposit || 0) + savingsSum
-      + (student.krw || 0) / kpu + ((student.usd || 0) * fx) / kpu + stockValue
-    );
-  })();
+  const totalAssets = student ? netAssets(student, stockList, fx, kpu, savings, loans) : 0;
+  const currentEvent = activeEconomyEvent(klass || {});
 
   if (!session) return null;
   if (!klass || !student) {
@@ -118,8 +114,20 @@ export default function StudentLayout() {
         </button>
       </header>
 
+      {currentEvent && (
+        <div className="mx-3 mb-4 rounded-2xl border border-amber-200 bg-amber-50 text-amber-900 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 text-xs font-bold whitespace-nowrap overflow-hidden">
+            <span className="shrink-0 rounded-full bg-amber-400 px-2 py-1 text-white">📢 이벤트 발생</span>
+            <div className="event-ticker-track">
+              <span>{currentEvent.title} · {currentEvent.description}</span>
+              {Number(klass.economyEvent?.multiplier) > 1 && <span className="ml-4">효과 {klass.economyEvent.multiplier}배</span>}
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="px-4">
-        <Outlet context={{ klass, student, session }} />
+        <Outlet context={{ klass, student, session, loans, savings, market }} />
       </main>
 
       <nav className="fixed bottom-3 inset-x-0 px-3 z-40">
@@ -141,6 +149,7 @@ export default function StudentLayout() {
           ))}
         </div>
       </nav>
+      <FeatureGuideModal role="student" />
     </div>
   );
 }

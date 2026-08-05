@@ -10,6 +10,20 @@ input, select, textarea, button {
   font-family: inherit;
 }
 
+@keyframes eventTicker {
+  from { transform: translateX(100%); }
+  to { transform: translateX(-100%); }
+}
+
+.event-ticker-track {
+  min-width: max-content;
+  animation: eventTicker 20s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-ticker-track { animation: none; }
+}
+
 /* 용사 전투 연출 */
 @keyframes battleMonsterFloat {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
