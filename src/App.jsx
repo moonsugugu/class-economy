@@ -15,6 +15,7 @@ import RoomPage from './pages/student/RoomPage.jsx';
 import HeroPage from './pages/student/HeroPage.jsx';
 import HeroShopPage from './pages/student/HeroShopPage.jsx';
 import HeroDuelPage from './pages/student/HeroDuelPage.jsx';
+import MissionsPage from './pages/student/MissionsPage.jsx';
 import DemoRoom from './pages/DemoRoom.jsx';
 
 function SetupGuide() {
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="shop" element={<ShopPage />} />
         <Route path="bank" element={<BankPage />} />
         <Route path="stocks" element={<StocksPage />} />
+        <Route path="missions" element={<MissionsPage />} />
         <Route path="seats" element={<SeatsPage />} />
         <Route path="class" element={<ClassPage />} />
         <Route path="visit" element={<VisitPage />} />

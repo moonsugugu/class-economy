@@ -30,6 +30,7 @@ import FundTab from './FundTab.jsx';
 import InviteQR from '../../components/InviteQR.jsx';
 import EconomyEventsPanel from './EconomyEventsPanel.jsx';
 import RecoveryTab from './RecoveryTab.jsx';
+import MissionsTab from './MissionsTab.jsx';
 import FeatureGuideModal from '../../components/FeatureGuideModal.jsx';
 
 const card = 'bg-white rounded-3xl shadow p-6';
@@ -128,6 +129,7 @@ export default function TeacherDashboard() {
     ['shop', '🏪', '상점', 'from-amber-400 to-orange-500'],
     ['alerts', '🔔', pendingCount ? `알림 ${pendingCount}` : '알림', 'from-rose-400 to-pink-500'],
     ['stocks', '📈', '주식', 'from-blue-400 to-indigo-500'],
+    ['missions', '🎯', '오늘의 미션', 'from-indigo-400 to-cyan-500'],
     ['jobs', '🧑‍🍳', '직업', 'from-teal-400 to-emerald-500'],
     ['fund', '🏛️', '공동기금', 'from-emerald-400 to-green-500'],
     ['seats', '🪑', '자리', 'from-teal-400 to-cyan-500'],
@@ -220,6 +222,7 @@ export default function TeacherDashboard() {
           {tab === 'shop' && <ShopTab klass={klass} />}
           {tab === 'alerts' && <AlertsTab klass={klass} />}
           {tab === 'stocks' && <StocksTab klass={klass} />}
+          {tab === 'missions' && <MissionsTab klass={klass} />}
           {tab === 'jobs' && <JobsTab klass={klass} />}
           {tab === 'fund' && <FundTab klass={klass} />}
           {tab === 'seats' && <SeatsTab klass={klass} />}
@@ -1081,6 +1084,22 @@ function StocksTab({ klass }) {
 
   const list = (market.stocks || []).filter((s) => filter === 'ALL' || s.market === filter);
   const customCount = (market.stocks || []).filter((s) => s.market === 'CUSTOM').length;
+  const stockPriceLabels = (stock) => {
+    const price = Math.max(0, Number(stock.price) || 0);
+    const fx = Number(market.fx) || DEFAULT_FX;
+    const kpu = Number(klass.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
+    const actual = stock.market === 'US'
+      ? `$${Math.floor(price).toLocaleString('en-US')}`
+      : stock.market === 'KR'
+        ? `${fmt(Math.floor(price))}원`
+        : `${fmt(Math.floor(price))}${klass.currency}`;
+    const classValue = stock.market === 'US'
+      ? Math.floor((price * fx) / kpu)
+      : stock.market === 'KR'
+        ? Math.floor(price / kpu)
+        : Math.floor(price);
+    return { actual, classValue };
+  };
 
   return (
     <div className="space-y-4">
@@ -1187,6 +1206,7 @@ function StocksTab({ klass }) {
         <div className="grid md:grid-cols-2 gap-x-8">
           {list.map((s) => {
             const pct = changePct(s);
+            const prices = stockPriceLabels(s);
             return (
               <button
                 key={s.symbol}
@@ -1194,8 +1214,11 @@ function StocksTab({ klass }) {
                 className="flex items-center gap-2 border-b border-gray-100 py-2 text-left hover:bg-indigo-50/50 rounded-lg px-1"
               >
                 <span>{MARKET_LABEL[s.market] || '🏫'}</span>
-                <span className="flex-1">{s.name}</span>
-                <span className="tabular-nums">{fmt(s.price)} {klass.currency}</span>
+                <span className="flex-1 min-w-0 truncate">{s.name}</span>
+                <span className="text-right leading-tight tabular-nums whitespace-nowrap">
+                  <span className="block">{prices.actual}</span>
+                  <span className="block text-[11px] text-indigo-500">({fmt(prices.classValue)} {klass.currency})</span>
+                </span>
                 <span className={`w-20 text-right tabular-nums ${pct > 0 ? 'text-red-500' : pct < 0 ? 'text-blue-500' : 'text-gray-400'}`}>
                   {pct > 0 ? '▲' : pct < 0 ? '▼' : '−'} {Math.abs(pct).toFixed(1)}%
                 </span>
@@ -1214,7 +1237,7 @@ function StocksTab({ klass }) {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50" onClick={() => setEdit(null)}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-3" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-xl">{MARKET_LABEL[edit.market] || '🏫'} {edit.name}</h3>
-            <p className="text-sm text-gray-400">현재 가격 {fmt(edit.price)} {klass.currency}</p>
+            <p className="text-sm text-gray-400">현재 가격 {stockPriceLabels(edit).actual} ({fmt(stockPriceLabels(edit).classValue)} {klass.currency})</p>
             <div>
               <label className="text-xs text-gray-400 block">새 가격</label>
               <input

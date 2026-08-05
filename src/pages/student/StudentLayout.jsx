@@ -5,7 +5,7 @@ import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 import { fmt, netAssets } from '../../lib/util';
 import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT } from '../../lib/stocks';
-import { activeEconomyEvent } from '../../lib/economyEvents.js';
+import { activeEconomyEvents, eventEffectSummary } from '../../lib/economyEvents.js';
 import FeatureGuideModal from '../../components/FeatureGuideModal.jsx';
 
 const NAV = [
@@ -13,6 +13,7 @@ const NAV = [
   ['/student/shop', '🏪', '상점'],
   ['/student/bank', '🏦', '은행'],
   ['/student/stocks', '📈', '주식'],
+  ['/student/missions', '🎯', '오늘 미션'],
   ['/student/class', '🏛️', '학급'],
   ['/student/seats', '🪑', '자리'],
   ['/student/room', '🛋️', '내 공간'],
@@ -86,7 +87,7 @@ export default function StudentLayout() {
   const stockList = market?.stocks || [];
   const kpu = Number(klass?.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
   const totalAssets = student ? netAssets(student, stockList, fx, kpu, savings, loans) : 0;
-  const currentEvent = activeEconomyEvent(klass || {});
+  const currentEvents = activeEconomyEvents(klass || {});
 
   if (!session) return null;
   if (!klass || !student) {
@@ -104,7 +105,7 @@ export default function StudentLayout() {
         </div>
         <div className="ml-auto bg-white/20 backdrop-blur rounded-2xl px-4 py-1.5 relative text-right leading-tight">
           <div className="text-[10px] text-white/70">🏆 총자산</div>
-          <div className="tabular-nums">{fmt(totalAssets)} <span className="text-xs">{klass.currency}</span></div>
+          <div className="tabular-nums">{fmt(Math.floor(Number(totalAssets) || 0))} <span className="text-xs">{klass.currency}</span></div>
         </div>
         <button
           onClick={() => { saveSession(null); navigate('/'); }}
@@ -114,13 +115,17 @@ export default function StudentLayout() {
         </button>
       </header>
 
-      {currentEvent && (
+      {currentEvents.length > 0 && (
         <div className="mx-3 mb-4 rounded-2xl border border-amber-200 bg-amber-50 text-amber-900 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2 text-xs font-bold whitespace-nowrap overflow-hidden">
             <span className="shrink-0 rounded-full bg-amber-400 px-2 py-1 text-white">📢 이벤트 발생</span>
             <div className="event-ticker-track">
-              <span>{currentEvent.title} · {currentEvent.description}</span>
-              {Number(klass.economyEvent?.multiplier) > 1 && <span className="ml-4">효과 {klass.economyEvent.multiplier}배</span>}
+              {currentEvents.map((event) => (
+                <span key={`${event.id}-${event.at || ''}`} className="mr-8">
+                  <b>{event.title}</b> · {event.description} · <strong className="text-amber-700">효과: {eventEffectSummary(event)}</strong>
+                  {Number(event.multiplier) > 1 && <em className="ml-2 not-italic">({event.multiplier}배 적용)</em>}
+                </span>
+              ))}
             </div>
           </div>
         </div>

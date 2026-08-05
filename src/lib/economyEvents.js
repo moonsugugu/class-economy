@@ -48,35 +48,63 @@ export function eventById(id) {
   return ECONOMY_EVENTS.find((item) => item.id === id) || null;
 }
 
-export function activeEconomyEvent(klass = {}) {
-  const current = klass.economyEvent;
+function resolveEvent(current) {
   if (!current) return null;
   const definition = eventById(current.id);
   return definition ? { ...definition, ...current, effects: { ...definition.effects, ...(current.effects || {}) } } : current;
 }
 
-export function eventMultiplier(klass = {}) {
-  const value = Number(klass.economyEvent?.multiplier);
+export function activeEconomyEvents(klass = {}) {
+  const stored = Array.isArray(klass.economyEvents) && klass.economyEvents.length
+    ? klass.economyEvents
+    : (klass.economyEvent ? [klass.economyEvent] : []);
+  return stored.map(resolveEvent).filter(Boolean);
+}
+
+export function activeEconomyEvent(klass = {}) {
+  return activeEconomyEvents(klass)[0] || null;
+}
+
+function eventMultiplierOf(event = {}) {
+  const value = Number(event.multiplier);
   return Number.isFinite(value) && value > 0 ? value : 1;
 }
 
+export function eventMultiplier(klass = {}) {
+  return eventMultiplierOf(activeEconomyEvent(klass));
+}
+
 export function eventEffect(klass = {}, key, fallback = 0) {
-  const value = Number(activeEconomyEvent(klass)?.effects?.[key]);
-  return Number.isFinite(value) ? value * eventMultiplier(klass) : fallback;
+  const events = activeEconomyEvents(klass);
+  const values = events
+    .map((event) => {
+      const value = Number(event.effects?.[key]);
+      return Number.isFinite(value) ? value * eventMultiplierOf(event) : null;
+    })
+    .filter((value) => value !== null);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) : fallback;
 }
 
 export function eventPriceMultiplier(klass = {}) {
-  const value = Number(activeEconomyEvent(klass)?.effects?.priceMultiplier);
-  if (!Number.isFinite(value) || value <= 0) return 1;
-  const multiplier = eventMultiplier(klass);
-  return Math.max(0, 1 + (value - 1) * multiplier);
+  return activeEconomyEvents(klass).reduce((total, event) => {
+    const value = Number(event.effects?.priceMultiplier);
+    if (!Number.isFinite(value) || value <= 0) return total;
+    const adjusted = 1 + (value - 1) * eventMultiplierOf(event);
+    return total * Math.max(0, adjusted);
+  }, 1);
 }
 
 export function depositRateFor(klass = {}) {
   const base = Math.max(0, Number(klass.depositRate) || 0);
-  const maintenance = activeEconomyEvent(klass)?.effects?.depositRateMultiplier;
   const rate = base + eventEffect(klass, 'depositRateDelta', 0);
-  return Math.max(0, rate * (Number.isFinite(Number(maintenance)) ? Number(maintenance) : 1) * (Number(activeEconomyEvent(klass)?.effects?.depositInterestMultiplier) || 1));
+  const { maintenance, interest } = activeEconomyEvents(klass).reduce((result, event) => {
+    const maintenanceValue = Number(event.effects?.depositRateMultiplier);
+    const interestValue = Number(event.effects?.depositInterestMultiplier);
+    if (Number.isFinite(maintenanceValue)) result.maintenance *= maintenanceValue;
+    if (Number.isFinite(interestValue) && interestValue > 0) result.interest *= interestValue;
+    return result;
+  }, { maintenance: 1, interest: 1 });
+  return Math.max(0, rate * maintenance * interest);
 }
 
 export function withdrawalFeeFor(klass = {}) {
@@ -92,7 +120,36 @@ export function loanRateAdjustmentFor(klass = {}) {
 }
 
 export function loanLimitMultiplierFor(klass = {}) {
-  const value = Number(activeEconomyEvent(klass)?.effects?.loanLimitMultiplier);
-  if (!Number.isFinite(value) || value <= 0) return 1;
-  return Math.max(0.1, value);
+  return Math.max(0.1, activeEconomyEvents(klass).reduce((total, event) => {
+    const value = Number(event.effects?.loanLimitMultiplier);
+    return Number.isFinite(value) && value > 0 ? total * value : total;
+  }, 1));
+}
+
+function signedNumber(value) {
+  const rounded = Math.round(Number(value) || 0);
+  return `${rounded > 0 ? '+' : ''}${rounded}`;
+}
+
+function percentDelta(value) {
+  const delta = (Number(value) - 1) * 100;
+  return `${delta > 0 ? '+' : ''}${Math.round(delta)}%`;
+}
+
+export function eventEffectSummary(event = {}) {
+  const effects = event.effects || {};
+  const items = [];
+  if (Number(effects.cashDelta)) items.push(`학생 현금 ${signedNumber(effects.cashDelta)}`);
+  if (Number(effects.depositHolderDelta)) items.push(`예금 보유자 ${signedNumber(effects.depositHolderDelta)}`);
+  if (Number(effects.priceMultiplier)) items.push(`물품 가격 ${percentDelta(effects.priceMultiplier)}`);
+  if (Number(effects.stockChangePct)) items.push(`전체 주식 ${signedNumber(effects.stockChangePct)}%`);
+  if (Number(effects.targetStockChangePct)) items.push(`관련 주식 ${signedNumber(effects.targetStockChangePct)}%`);
+  if (Number(effects.depositRateDelta)) items.push(`예금 이율 ${signedNumber(effects.depositRateDelta)}%p`);
+  if (Number(effects.depositInterestMultiplier)) items.push(`예금 이자 ×${effects.depositInterestMultiplier}`);
+  if (Number(effects.savingsSignupBonus)) items.push(`적금 신규 가입 +${Math.round(effects.savingsSignupBonus)}`);
+  if (Number(effects.withdrawalFee)) items.push(`예금 출금 수수료 ${Math.round(effects.withdrawalFee)}`);
+  if (Number(effects.loanRateDelta)) items.push(`대출 이율 ${signedNumber(effects.loanRateDelta)}%p`);
+  if (Number(effects.loanLimitMultiplier)) items.push(`대출 한도 ×${effects.loanLimitMultiplier}`);
+  if (Number(effects.nextMultiplier)) items.push(`다음 이벤트 ×${effects.nextMultiplier}`);
+  return items.join(' · ') || '효과 적용';
 }

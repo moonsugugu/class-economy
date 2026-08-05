@@ -9,6 +9,9 @@ import AvatarView from '../../components/AvatarView';
 import { PROFILE_ITEMS, PROFILE_SLOTS, normalizeProfileOwned } from '../../lib/profile';
 import { itemPrice } from '../../lib/pricing';
 import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
+import { ITEM_MAP } from '../../lib/items';
+import { HERO_ITEM_MAP } from '../../lib/hero';
+import { loanDueAmount } from '../../lib/loans.js';
 
 export default function MyPage() {
   const { klass, student, loans: contextLoans = [] } = useOutletContext();
@@ -138,20 +141,17 @@ export default function MyPage() {
   const krwValue = (student.krw || 0) / kpu;
   const usdValue = ((student.usd || 0) * fx) / kpu;
   const total = netAssets(student, stocks, fx, kpu, savings, contextLoans);
-
-  const Item = ({ icon, label, value, to, grad, sub }) => (
-    <Link
-      to={to}
-      className={`rounded-3xl shadow-md p-5 flex items-center gap-4 hover:scale-[1.03] hover:shadow-lg transition bg-gradient-to-br ${grad}`}
-    >
-      <span className="text-4xl drop-shadow-sm">{icon}</span>
-      <div className="flex-1">
-        <div className="text-sm text-gray-500">{label}</div>
-        <div className="text-2xl tabular-nums text-gray-800">{fmt(value)} <span className="text-sm text-gray-500">{klass.currency}</span></div>
-        {sub && <div className="text-[11px] text-gray-400">{sub}</div>}
-      </div>
-      <span className="text-gray-400/60 text-xl">›</span>
-    </Link>
+  const whole = (value) => fmt(Math.floor(Number(value) || 0));
+  const loanBalance = contextLoans
+    .filter((loan) => ['active', 'overdue'].includes(loan.status))
+    .reduce((sum, loan) => sum + loanDueAmount(loan), 0);
+  const spaceSpending = (student.inventory || []).reduce(
+    (sum, itemId) => sum + (Number(ITEM_MAP[itemId]?.price) || 0),
+    0
+  );
+  const heroItemSpending = (student.rpg?.owned || []).reduce(
+    (sum, itemId) => sum + (Number(HERO_ITEM_MAP[itemId]?.price) || 0),
+    0
   );
 
   const share = total > 0 ? Math.round(((student.cash || 0) / total) * 100) : 0;
@@ -176,7 +176,7 @@ export default function MyPage() {
         </button>
         <div className="relative">
           <div className="text-sm text-white/70">{student.name}의 총자산 🏆</div>
-          <div className="text-4xl tabular-nums drop-shadow">{fmt(total)} <span className="text-lg">{klass.currency}</span></div>
+          <div className="text-4xl tabular-nums drop-shadow">{whole(total)} <span className="text-lg">{klass.currency}</span></div>
           <div className="text-[11px] text-white/60 mt-1">현금 비중 {share}% · 예금·적금·주식까지 모두 더한 금액이에요</div>
         </div>
       </div>
@@ -237,33 +237,39 @@ export default function MyPage() {
         </section>
       )}
 
-      <div className="grid sm:grid-cols-2 gap-3">
-        <Item icon="💵" label="현금" value={student.cash} to="/student/shop" grad="from-amber-50 to-orange-100" sub="상점에서 바로 쓸 수 있어요" />
-        <Item icon="🏦" label="예금" value={student.deposit} to="/student/bank" grad="from-emerald-50 to-teal-100" sub={`7일마다 ${klass.depositRate}% 이자`} />
-        <Item icon="🐷" label="적금 (모으는 중)" value={savingsSum} to="/student/bank" grad="from-pink-50 to-rose-100" sub={`만기까지 기다리면 ${klass.savingsRate}% 이자`} />
-        <Item icon="📈" label="주식 평가액" value={stockValue} to="/student/stocks" grad="from-sky-50 to-blue-100" sub="시세에 따라 오르락내리락!" />
-        <Item
-          icon="🇰🇷" label={`원화 (${fmt(student.krw || 0)}원)`} value={krwValue} to="/student/bank"
-          grad="from-sky-50 to-cyan-100" sub={`1 ${klass.currency} = ${fmt(kpu)}원`}
-        />
-        <Item
-          icon="🇺🇸" label={`달러 ($${fmt(student.usd || 0)})`} value={usdValue} to="/student/bank"
-          grad="from-lime-50 to-emerald-100" sub={`1달러 = ${fmt(fx)}원`}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Link to="/student/room" className="rounded-3xl bg-gradient-to-br from-purple-100 to-fuchsia-100 shadow-md p-4 text-center hover:scale-[1.03] transition">
-          <div className="text-3xl mb-1">🛋️🌳</div>
-          <div className="text-purple-700">마이룸 & 정원 꾸미기</div>
-          <div className="text-[11px] text-purple-400">3D 방과 정원을 꾸며 보세요!</div>
-        </Link>
-        <Link to="/student/visit" className="rounded-3xl bg-gradient-to-br from-pink-100 to-rose-100 shadow-md p-4 text-center hover:scale-[1.03] transition">
-          <div className="text-3xl mb-1">🏠✍️</div>
-          <div className="text-pink-700">친구 방 놀러가기</div>
-          <div className="text-[11px] text-pink-500">구경하고 방명록 남기기!</div>
-        </Link>
-      </div>
+      <section className="rounded-3xl bg-white shadow-md border border-indigo-50 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xl">📋</span>
+          <h3 className="font-bold text-indigo-700">자산 내역</h3>
+          <span className="ml-auto text-[11px] text-gray-400">모든 금액은 소수점 없이 표시</span>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-x-8">
+          {[
+            ['💵', '현금', student.cash, '/student/shop'],
+            ['🏦', '예금', student.deposit, '/student/bank'],
+            ['🐷', '적금', savingsSum, '/student/bank'],
+            ['📈', '주식 평가액', stockValue, '/student/stocks'],
+            ['🇰🇷', `원화 (${whole(student.krw || 0)}원)`, krwValue, '/student/bank'],
+            ['🇺🇸', `달러 ($${whole(student.usd || 0)})`, usdValue, '/student/bank'],
+            ['💳', '대출 잔액', loanBalance, '/student/bank', 'text-rose-600'],
+            ['🛋️', '공간 지출비', spaceSpending, '/student/room', 'text-purple-600'],
+            ['⚔️', '용사 아이템비', heroItemSpending, '/student/hero', 'text-violet-600'],
+          ].map(([icon, label, value, to, tone]) => (
+            <Link key={label} to={to} className="flex items-center gap-2 border-b border-gray-100 py-3 hover:bg-indigo-50/60 rounded-xl px-2 transition">
+              <span className="text-xl">{icon}</span>
+              <span className="flex-1 text-sm text-gray-600">{label}</span>
+              <span className={`tabular-nums font-semibold ${tone || 'text-gray-800'}`}>{whole(value)} {klass.currency}</span>
+              <span className="text-gray-300">›</span>
+            </Link>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-400">
+          <span>예금 이율 {klass.depositRate}%</span>
+          <span>적금 이율 {klass.savingsRate}%</span>
+          <span>1 {klass.currency} = {whole(kpu)}원</span>
+          <span>1달러 = {whole(fx)}원</span>
+        </div>
+      </section>
 
       {student.jobName && (
         <div className="rounded-3xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-md p-4 flex items-center gap-3">
