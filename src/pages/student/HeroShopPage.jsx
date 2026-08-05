@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
-import { doc, runTransaction } from 'firebase/firestore';
+import { doc, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import {
@@ -8,6 +8,9 @@ import {
   normalizeHero, heroDateKey, heroShopFor,
 } from '../../lib/hero';
 import HeroPreview from '../../three/Hero3D.jsx';
+import { HeroItemVisual, HeroRarityBadge } from '../../components/HeroItemVisual.jsx';
+import { itemPrice, pricePolicyLabel } from '../../lib/pricing';
+import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
 
 export default function HeroShopPage() {
   const { klass, student } = useOutletContext();
@@ -20,6 +23,7 @@ export default function HeroShopPage() {
   const shopIds = Object.values(heroShopFor(klass.id, today, refreshes)).flat();
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
   const characters = HERO_ITEMS.filter((item) => item.slot === 'character');
+  const costOf = (item) => itemPrice(item.price, klass);
 
   const flash = (type, text) => {
     setMsg({ type, text });
@@ -36,15 +40,22 @@ export default function HeroShopPage() {
       flash('err', '먼저 남자 또는 여자 용사를 구매해 주세요.');
       return;
     }
-    if (!confirm(`'${item.name}'을(를) ${fmt(item.price)}${klass.currency}에 구매할까요?`)) return;
+    const price = costOf(item);
+    const previewTax = taxForPart(price, klass, 'item').tax;
+    const previewTotal = price + previewTax;
+    if (!confirm(`'${item.name}'을(를) 구매할까요?\n상품가 ${fmt(price)} + 세금 ${fmt(previewTax)} = 총 ${fmt(previewTotal)}${klass.currency}`)) return;
     setBusyId(item.id);
     try {
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
+        const settings = { ...klass, ...((await tx.get(doc(db, 'classes', klass.id))).data() || {}) };
+        const currentPrice = itemPrice(item.price, settings);
+        const tax = taxForPart(currentPrice, settings, 'item').tax;
+        const total = currentPrice + tax;
         const current = normalizeHero(s.rpg);
         if (current.owned.includes(item.id)) throw new Error('이미 가지고 있는 아이템이에요.');
         if (item.slot !== 'character' && !current.character) throw new Error('먼저 캐릭터를 구매해 주세요.');
-        if ((s.cash || 0) < item.price) throw new Error('현금이 부족해요.');
+        if ((s.cash || 0) < total) throw new Error('현금이 부족해요.');
         const next = {
           ...current,
           owned: [...current.owned, item.id],
@@ -52,7 +63,14 @@ export default function HeroShopPage() {
           equipment: { ...current.equipment },
         };
         if (item.slot !== 'character' && !next.equipment[item.slot]) next.equipment[item.slot] = item.id;
-        tx.update(studentRef, { cash: (s.cash || 0) - item.price, rpg: next });
+        tx.update(studentRef, { cash: (s.cash || 0) - total, rpg: next });
+        if (tax > 0) {
+          tx.set(doc(db, 'classes', klass.id, 'taxLedger', TAX_LEDGER_ID), {
+            pending: increment(tax),
+            item: increment(tax),
+            updatedAt: Date.now(),
+          }, { merge: true });
+        }
       });
       flash('ok', `🛒 '${item.name}' 구매 완료!`);
     } catch (e) {
@@ -108,7 +126,7 @@ export default function HeroShopPage() {
   };
 
   const refund = async (item) => {
-    const refundPrice = Math.floor(item.price * 0.5);
+    const refundPrice = Math.floor(costOf(item) * 0.5);
     if (!confirm(`'${item.name}'을(를) ${refundPrice}${klass.currency}에 환불할까요?`)) return;
     setBusyId(item.id);
     try {
@@ -135,20 +153,29 @@ export default function HeroShopPage() {
 
   const card = (item, available = true) => {
     const owned = hero.owned.includes(item.id);
+    const price = costOf(item);
+    const tax = taxForPart(price, klass, 'item').tax;
+    const total = price + tax;
     const equipped = item.slot === 'character'
       ? hero.character === item.id
       : hero.equipment[item.slot] === item.id;
     const locked = item.slot !== 'character' && !hero.character && !owned;
+    const rarity = item.rarity ? HERO_RARITIES[item.rarity] : null;
     return (
-      <div key={item.id} className={`bg-white rounded-3xl shadow p-4 text-center ${owned ? 'ring-2 ring-emerald-100' : ''} ${!available ? 'opacity-70' : ''}`}>
-        <div className="text-5xl mb-2">{item.emoji}</div>
+      <div
+        key={item.id}
+        className={`relative overflow-hidden rounded-3xl border-2 bg-gradient-to-br p-4 text-center shadow-lg transition hover:-translate-y-0.5 ${rarity?.surface || 'from-indigo-50 via-white to-pink-100'} ${rarity?.border || 'border-indigo-200'} ${owned ? 'ring-2 ring-emerald-300 ring-offset-2' : ''} ${!available ? 'opacity-70' : ''}`}
+      >
+        {rarity && <div className="absolute right-3 top-3 h-2 w-2 rounded-full" style={{ background: rarity.accent, boxShadow: `0 0 12px ${rarity.accent}` }} />}
+        <HeroItemVisual item={item} size={96} className="mx-auto mb-2" />
         <div className="text-sm text-gray-700">{item.name}</div>
         <div className="flex justify-center gap-1 my-1">
-          <span className={`text-[10px] px-1.5 py-0.5 rounded ${HERO_RARITIES[item.rarity]?.color || 'bg-gray-100 text-gray-500'}`}>{item.rarityLabel}</span>
+          <HeroRarityBadge item={item} />
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-500">{item.level}단계</span>
         </div>
         <div className="text-xs text-indigo-500">전투력 +{item.power}</div>
-        <div className="text-xs text-amber-600 mb-2">{fmt(item.price)} {klass.currency}</div>
+        <div className="text-xs text-amber-600 mb-2">{fmt(total)} {klass.currency}</div>
+        {tax > 0 && <div className="text-[10px] text-gray-400 mb-1">상품 {fmt(price)} + 세금 {fmt(tax)}</div>}
         {owned ? (
           <div className="space-y-1">
             <button
@@ -159,13 +186,13 @@ export default function HeroShopPage() {
               {equipped ? '장착 중 ✓' : '장착하기'}
             </button>
             <button onClick={() => refund(item)} disabled={busyId === item.id} className="text-xs text-rose-500 underline">
-              50% 환불 ({fmt(Math.floor(item.price * 0.5))})
+              50% 환불 ({fmt(Math.floor(price * 0.5))})
             </button>
           </div>
         ) : (
           <button
             onClick={() => buy(item)}
-            disabled={busyId === item.id || locked || !available || student.cash < item.price}
+            disabled={busyId === item.id || locked || !available || student.cash < total}
             className="w-full rounded-xl py-1.5 text-sm text-white bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300"
           >
             {locked ? '캐릭터 먼저 구매' : available ? '구매하기' : '오늘 상점에 없음'}
@@ -189,7 +216,7 @@ export default function HeroShopPage() {
         <button onClick={() => setView('catalog')} className={`rounded-xl px-3 py-1.5 text-sm ${view === 'catalog' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-500'}`}>전체 20단계 도감</button>
       </div>
       <div className="rounded-2xl bg-amber-50 text-amber-700 px-4 py-3 text-sm flex items-center gap-2 flex-wrap">
-        <span>내 현금: <b>{fmt(student.cash)} {klass.currency}</b> · 아이템마다 전투력이 올라가요.</span>
+        <span>내 현금: <b>{fmt(student.cash)} {klass.currency}</b> · {pricePolicyLabel(klass, klass.currency)} · 아이템마다 전투력이 올라가요.</span>
         <button onClick={refreshShop} disabled={!!busyId || refreshes >= HERO_SHOP_REFRESH_LIMIT} className="ml-auto rounded-xl px-3 py-1.5 bg-amber-500 text-white disabled:bg-gray-300">
           🔄 상점 새로고침 ({refreshes}/{HERO_SHOP_REFRESH_LIMIT})
         </button>
@@ -202,18 +229,19 @@ export default function HeroShopPage() {
           {characters.map((item) => {
             const previewHero = { ...hero, character: item.id };
             return (
-              <div key={item.id} className="bg-white rounded-3xl shadow p-4 text-center">
+              <div key={item.id} className="relative overflow-hidden rounded-3xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-pink-100 p-4 text-center shadow-lg">
                 <HeroPreview hero={previewHero} size={150} />
+                <HeroItemVisual item={item} size={58} className="mx-auto -mt-7 border-white" />
                 <div className="text-sm text-gray-700 mt-2">{item.name}</div>
                 <div className="text-xs text-indigo-500">전투력 +{item.power}</div>
-                <div className="text-xs text-amber-600 mb-2">{fmt(item.price)} {klass.currency}</div>
+                <div className="text-xs text-amber-600 mb-2">총 {fmt(costOf(item) + taxForPart(costOf(item), klass, 'item').tax)} {klass.currency}</div>
                 {hero.owned.includes(item.id) ? (
                   <div className="space-y-1">
                     <button onClick={() => equip(item)} disabled={busyId === item.id} className="w-full rounded-xl py-1.5 text-sm bg-indigo-100 text-indigo-600">{hero.character === item.id ? '장착 중 ✓' : '장착하기'}</button>
                     <button onClick={() => refund(item)} disabled={busyId === item.id} className="text-xs text-rose-500 underline">50% 환불</button>
                   </div>
                 ) : (
-                <button onClick={() => buy(item)} disabled={busyId === item.id || student.cash < item.price} className="w-full rounded-xl py-1.5 text-sm text-white bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300">구매하기</button>
+                <button onClick={() => buy(item)} disabled={busyId === item.id || student.cash < costOf(item) + taxForPart(costOf(item), klass, 'item').tax} className="w-full rounded-xl py-1.5 text-sm text-white bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300">구매하기</button>
                 )}
               </div>
             );

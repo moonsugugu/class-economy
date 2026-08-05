@@ -17,8 +17,10 @@ import {
 import { applyScheduledTicks } from '../../lib/marketSync';
 import { SHOP_PRESETS } from '../../lib/shopPresets';
 import { grossPay, taxOf } from '../../lib/jobs';
+import { TAX_PARTS, TAX_LEDGER_ID, taxRates } from '../../lib/taxes';
 import { isActiveStudent } from '../../lib/studentState';
 import { ITEM_MAP } from '../../lib/items';
+import { PRICE_MODE_PERCENT, PRICE_MODE_UNIT, pricePolicyLabel } from '../../lib/pricing';
 import SeatsTab from './SeatsTab.jsx';
 import ReportsTab from './ReportsTab.jsx';
 import JobsTab from './JobsTab.jsx';
@@ -321,7 +323,7 @@ function StudentsTab({ klass }) {
   // 월급 = 기본 월급 + 직업 수당, 세금은 자동으로 학급 공동기금에 적립돼요
   const paySalary = async () => {
     if (!targets.length) return flash('먼저 학생을 선택해 주세요.');
-    const rate = Number(klass.taxRate ?? 10);
+    const rate = taxRates(klass).salary;
     const batch = writeBatch(db);
     let totalTax = 0, totalNet = 0;
     targets.forEach((s) => {
@@ -331,19 +333,16 @@ function StudentsTab({ klass }) {
       batch.update(doc(db, 'classes', klass.id, 'students', s.id), { cash: increment(net) });
     });
     if (totalTax > 0) {
-      batch.update(doc(db, 'classes', klass.id), { fund: increment(totalTax) });
-      batch.set(doc(collection(db, 'classes', klass.id, 'fundLog')), {
-        type: 'tax',
-        amount: totalTax,
-        memo: `월급 세금 (${targets.length}명 · ${rate}%)`,
-        at: Date.now(),
-        createdAt: serverTimestamp(),
-      });
+      batch.set(doc(db, 'classes', klass.id, 'taxLedger', TAX_LEDGER_ID), {
+        pending: increment(totalTax),
+        salary: increment(totalTax),
+        updatedAt: Date.now(),
+      }, { merge: true });
     }
     await batch.commit();
     flash(
       totalTax > 0
-        ? `💰 ${targets.length}명 월급 지급! 실수령 ${fmt(totalNet)} · 세금 ${fmt(totalTax)}${klass.currency}가 🏛️공동기금에 쌓였어요.`
+        ? `💰 ${targets.length}명 월급 지급! 실수령 ${fmt(totalNet)} · 세금 ${fmt(totalTax)}${klass.currency}가 누적됐어요. 공동기금 화면에서 정산해 주세요.`
         : `💰 ${targets.length}명에게 월급 ${fmt(totalNet)}${klass.currency}를 지급했어요!`
     );
   };
@@ -417,9 +416,9 @@ function StudentsTab({ klass }) {
           <button onClick={paySalary} className={btn + ' bg-gradient-to-r from-emerald-400 to-teal-500 hover:opacity-90 text-lg'}>
             💰 월급 지급 (기본 {fmt(klass.salary)}{klass.currency} + 직업 수당)
           </button>
-          {(klass.taxRate ?? 10) > 0 && (
+          {taxRates(klass).salary > 0 && (
             <span className="text-xs bg-emerald-50 text-emerald-700 rounded-xl px-3 py-1.5">
-              세금 {klass.taxRate ?? 10}% → 🏛️공동기금
+              월급 세금 {taxRates(klass).salary}% → 🏛️공동기금
             </span>
           )}
           <span className="text-sm text-gray-400">
@@ -1151,7 +1150,10 @@ function SettingsTab({ klass }) {
     heroBattleLimit: klass.heroBattleLimit ?? 10,
     heroWinReward: klass.heroWinReward ?? 20,
     heroLoseReward: klass.heroLoseReward ?? 0,
+    priceInflationMode: klass.priceInflationMode ?? PRICE_MODE_UNIT,
+    priceInflationValue: klass.priceInflationValue ?? 0,
     taxRate: klass.taxRate ?? 10,
+    ...Object.fromEntries(TAX_PARTS.map(({ field }) => [field, klass[field] ?? klass.taxRate ?? 10])),
     krwPerUnit: klass.krwPerUnit ?? DEFAULT_KRW_PER_UNIT,
   });
   const [form, setForm] = useState(init);
@@ -1161,6 +1163,9 @@ function SettingsTab({ klass }) {
 
   const save = async (e) => {
     e.preventDefault();
+    const taxValues = Object.fromEntries(TAX_PARTS.map(({ field }) => [
+      field, Math.max(0, Math.min(100, Number(form[field]) || 0)),
+    ]));
     await updateDoc(doc(db, 'classes', klass.id), {
       name: form.name.trim() || klass.name,
       currency: form.currency.trim() || '포인트',
@@ -1171,7 +1176,10 @@ function SettingsTab({ klass }) {
       heroBattleLimit: Math.max(1, Math.min(100, Number(form.heroBattleLimit) || 10)),
       heroWinReward: Math.max(0, Math.min(100000, Number(form.heroWinReward) || 0)),
       heroLoseReward: Math.max(0, Math.min(100000, Number(form.heroLoseReward) || 0)),
-      taxRate: Math.max(0, Math.min(50, Number(form.taxRate) || 0)),
+      priceInflationMode: form.priceInflationMode === PRICE_MODE_PERCENT ? PRICE_MODE_PERCENT : PRICE_MODE_UNIT,
+      priceInflationValue: Math.max(0, Math.min(form.priceInflationMode === PRICE_MODE_PERCENT ? 1000 : 1000000, Number(form.priceInflationValue) || 0)),
+      taxRate: taxValues.taxSalaryRate,
+      ...taxValues,
       krwPerUnit: Math.max(0.01, Number(form.krwPerUnit) || DEFAULT_KRW_PER_UNIT),
     });
     setSaved(true);
@@ -1208,10 +1216,29 @@ function SettingsTab({ klass }) {
         '적금 기본 이율 (7일 기준, 주당 %)', 'savingsRate', 'number',
         `오래 맡길수록 1%p씩 우대해요 → 7일 ${form.savingsRate}% · 14일 ${Number(form.savingsRate) + 1}% · 21일 ${Number(form.savingsRate) + 2}%`
       )}
-      {field(
-        '세율 (%)', 'taxRate', 'number',
-        `월급을 줄 때 이 비율만큼 세금을 떼서 🏛️학급 공동기금에 모아요. (0이면 세금 없음) 예: 월급 ${fmt(form.salary)} → 세금 ${fmt(Math.floor(Number(form.salary) * (Number(form.taxRate) || 0) / 100))}`
-      )}
+      <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-3">
+        <div>
+          <h4 className="font-bold text-emerald-700">🏛️ 거래별 공동기금 세율</h4>
+          <p className="text-xs text-emerald-600 mt-1">거래 금액 × 세율을 세금으로 떼어 공동기금에 모아요. 소수점 이하는 버립니다. 기존 학급은 기존 세율을 모든 항목의 기본값으로 사용해요.</p>
+        </div>
+        {TAX_PARTS.map(({ field: taxField, label, description }) => (
+          <div key={taxField} className="flex items-center gap-3 rounded-xl bg-white/80 px-3 py-2">
+            <div className="flex-1 min-w-0">
+              <label className="text-sm text-gray-600 block">{label} 세율</label>
+              <span className="text-[11px] text-gray-400">{description}</span>
+            </div>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={form[taxField]}
+              onChange={(e) => setForm({ ...form, [taxField]: e.target.value })}
+              className={input + ' w-24 text-right'}
+            />
+            <span className="text-sm text-gray-500">%</span>
+          </div>
+        ))}
+      </div>
       {field(
         '하루 시세 변동 횟수', 'tickLimit', 'number',
          '주식 시세를 하루에 몇 번까지 바꿀 수 있는지 정해요. (기본 25회)'
@@ -1219,6 +1246,22 @@ function SettingsTab({ klass }) {
       {field('용사 전투 하루 도전 횟수', 'heroBattleLimit', 'number', '학생 한 명이 하루에 용사 전투를 도전할 수 있는 횟수예요. 기본 10회.')}
       {field('용사 전투 승리 보상', 'heroWinReward', 'number', '용사가 이겼을 때 지급할 학급화폐예요. 기본 20.')}
       {field('용사 전투 패배 보상', 'heroLoseReward', 'number', '용사가 졌을 때 지급할 학급화폐예요. 기본 0.')}
+      <div>
+        <label className="text-sm text-gray-500 block mb-1">상점·내 공간 물가 상승 방식</label>
+        <select
+          value={form.priceInflationMode}
+          onChange={(e) => setForm({ ...form, priceInflationMode: e.target.value })}
+          className={input + ' w-full bg-white'}
+        >
+          <option value={PRICE_MODE_UNIT}>금액 단위로 올리기</option>
+          <option value={PRICE_MODE_PERCENT}>퍼센트로 올리기</option>
+        </select>
+      </div>
+      {field(
+        form.priceInflationMode === PRICE_MODE_PERCENT ? '물가 상승률 (%)' : `아이템당 추가 금액 (${form.currency || '포인트'})`,
+        'priceInflationValue', 'number',
+        `현재 설정: ${pricePolicyLabel(form, form.currency || '포인트')} · 학급 상점, 용사 상점, 내 공간 아이템에 적용돼요. 기존 구매·보유 데이터는 바뀌지 않아요.`
+      )}
       <button className={btn + ' bg-indigo-500 hover:bg-indigo-600 text-lg w-full'}>저장하기</button>
       {saved && <p className="text-emerald-600 text-center">✅ 저장되었어요!</p>}
     </form>

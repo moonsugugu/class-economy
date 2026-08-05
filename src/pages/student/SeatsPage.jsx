@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
-  collection, doc, query, orderBy, limit, onSnapshot, runTransaction,
+  collection, doc, query, orderBy, limit, onSnapshot, runTransaction, increment,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
+import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
 
 function useNow(active) {
   const [now, setNow] = useState(Date.now());
@@ -73,33 +74,48 @@ export default function SeatsPage() {
     const auctionRef = doc(db, 'classes', klass.id, 'auctions', auction.id);
     const bidRef = doc(db, 'classes', klass.id, 'auctions', auction.id, 'bids', sel);
     const myRef = doc(db, 'classes', klass.id, 'students', student.id);
+    const classRef = doc(db, 'classes', klass.id);
+    const ledgerRef = doc(db, 'classes', klass.id, 'taxLedger', TAX_LEDGER_ID);
+    let chargedTax = 0;
     try {
       await runTransaction(db, async (tx) => {
         const a = (await tx.get(auctionRef)).data();
         if (!a || a.status !== 'active' || Date.now() >= a.endsAt) throw new Error('경매가 이미 끝났어요!');
         const bSnap = await tx.get(bidRef);
         const prev = bSnap.exists() ? bSnap.data() : null;
+        const settings = { ...klass, ...((await tx.get(classRef)).data() || {}) };
+        const nextTax = taxForPart(amt, settings, 'seat').tax;
+        const previousTax = Number.isFinite(Number(prev?.tax)) ? Math.max(0, Math.floor(Number(prev.tax))) : 0;
+        const taxDelta = nextTax - previousTax;
         const minBid = prev ? prev.amount + 1 : (a.startPrice || 1);
         if (amt < minBid) throw new Error(`최소 ${fmt(minBid)}${klass.currency} 이상 입찰해야 해요!`);
         const me = (await tx.get(myRef)).data();
         if (prev && prev.studentId === student.id) {
           // 내 입찰 올리기: 차액만 추가로 지불
-          const extra = amt - prev.amount;
+          const extra = (amt - prev.amount) + taxDelta;
           if (me.cash < extra) throw new Error('현금이 부족해요!');
           tx.update(myRef, { cash: me.cash - extra });
         } else {
-          if (me.cash < amt) throw new Error('현금이 부족해요!');
+          if (me.cash < amt + nextTax) throw new Error('현금이 부족해요!');
           if (prev) {
-            // 이전 최고 입찰자에게 자동 환불
+            // 이전 최고 입찰자에게 입찰금과 당시 세금을 함께 자동 환불
             const prevRef = doc(db, 'classes', klass.id, 'students', prev.studentId);
             const prevSnap = await tx.get(prevRef);
-            if (prevSnap.exists()) tx.update(prevRef, { cash: prevSnap.data().cash + prev.amount });
+            if (prevSnap.exists()) tx.update(prevRef, { cash: prevSnap.data().cash + prev.amount + previousTax });
           }
-          tx.update(myRef, { cash: me.cash - amt });
+          tx.update(myRef, { cash: me.cash - amt - nextTax });
         }
-        tx.set(bidRef, { amount: amt, studentId: student.id, studentName: student.name, at: Date.now() });
+        if (taxDelta !== 0) {
+          tx.set(ledgerRef, {
+            pending: increment(taxDelta),
+            seat: increment(taxDelta),
+            updatedAt: Date.now(),
+          }, { merge: true });
+        }
+        tx.set(bidRef, { amount: amt, tax: nextTax, studentId: student.id, studentName: student.name, at: Date.now() });
+        chargedTax = nextTax;
       });
-      flash('ok', `🔨 ${fmt(amt)}${klass.currency} 입찰 완료! 더 높은 입찰이 나오면 자동으로 돌려받아요.`);
+      flash('ok', `🔨 ${fmt(amt)}${klass.currency} 입찰 완료! 세금 ${fmt(chargedTax)}${klass.currency} 포함 · 더 높은 입찰이 나오면 함께 돌려받아요.`);
       setSel(null); setAmount('');
     } catch (e) {
       flash('err', e.message);
@@ -211,6 +227,9 @@ export default function SeatsPage() {
               onChange={(e) => setAmount(e.target.value)}
               className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-xl text-center outline-none focus:border-rose-400 mb-3"
             />
+            <div className="text-xs text-gray-400 text-center mb-3">
+              입찰금 {fmt(Math.floor(Number(amount) || 0))} + 예상 세금 {fmt(taxForPart(Math.floor(Number(amount) || 0), klass, 'seat').tax)} {klass.currency}
+            </div>
             <button onClick={placeBid} className="w-full rounded-2xl py-3 bg-rose-500 hover:bg-rose-600 text-white text-lg">
               입찰하기
             </button>

@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   collection, doc, query, orderBy, onSnapshot,
-  addDoc, runTransaction, serverTimestamp,
+  addDoc, runTransaction, increment, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
+import { itemPrice, pricePolicyLabel } from '../../lib/pricing';
+import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
 
 export default function ShopPage() {
   const { klass, student } = useOutletContext();
@@ -25,18 +27,37 @@ export default function ShopPage() {
 
   const buy = async (p) => {
     if (busy) return;
-    if (!confirm(`'${p.name}'을(를) ${fmt(p.price)}${klass.currency}에 살까요?`)) return;
+    const shownPrice = itemPrice(p.price, klass);
+    const previewTax = taxForPart(shownPrice, klass, 'shop').tax;
+    const previewTotal = shownPrice + previewTax;
+    if (!confirm(`'${p.name}'을(를) 살까요?\n상품가 ${fmt(shownPrice)} + 세금 ${fmt(previewTax)} = 총 ${fmt(previewTotal)}${klass.currency}`)) return;
     setBusy(true);
     try {
       const productRef = doc(db, 'classes', klass.id, 'products', p.id);
       const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
+      const classRef = doc(db, 'classes', klass.id);
+      const ledgerRef = doc(db, 'classes', klass.id, 'taxLedger', TAX_LEDGER_ID);
+      let paidPrice = shownPrice;
+      let subtotal = shownPrice;
+      let taxAmount = 0;
       await runTransaction(db, async (tx) => {
-        const [pSnap, sSnap] = [await tx.get(productRef), await tx.get(studentRef)];
+        const [pSnap, sSnap, kSnap] = [await tx.get(productRef), await tx.get(studentRef), await tx.get(classRef)];
         const pd = pSnap.data(), sd = sSnap.data();
         if (!pd || pd.qty <= 0) throw new Error('앗, 품절이에요!');
-        if (sd.cash < pd.price) throw new Error('현금이 부족해요. 예금을 찾거나 열심히 모아 보세요!');
+        const settings = { ...klass, ...(kSnap.data() || {}) };
+        subtotal = itemPrice(pd.price, settings);
+        taxAmount = taxForPart(subtotal, settings, 'shop').tax;
+        paidPrice = subtotal + taxAmount;
+        if (sd.cash < paidPrice) throw new Error('현금이 부족해요. 예금을 찾거나 열심히 모아 보세요!');
         tx.update(productRef, { qty: pd.qty - 1 });
-        tx.update(studentRef, { cash: sd.cash - pd.price });
+        tx.update(studentRef, { cash: sd.cash - paidPrice });
+        if (taxAmount > 0) {
+          tx.set(ledgerRef, {
+            pending: increment(taxAmount),
+            shop: increment(taxAmount),
+            updatedAt: Date.now(),
+          }, { merge: true });
+        }
       });
       await addDoc(collection(db, 'classes', klass.id, 'purchases'), {
         studentId: student.id,
@@ -44,7 +65,9 @@ export default function ShopPage() {
         productId: p.id,
         productName: p.name,
         emoji: p.emoji || '🎁',
-        price: p.price,
+        price: paidPrice,
+        subtotal,
+        tax: taxAmount,
         status: 'pending',
         createdAt: serverTimestamp(),
       });
@@ -59,6 +82,7 @@ export default function ShopPage() {
   return (
     <div className="space-y-4">
       <h2 className="text-2xl text-amber-600">🏪 학급 상점</h2>
+      <p className="text-xs text-gray-400 -mt-2">현재 물가: {pricePolicyLabel(klass, klass.currency)} · 선생님 설정에 따라 가격이 달라질 수 있어요.</p>
       {msg && (
         <div className={`rounded-2xl px-4 py-3 ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
           {msg.text}
@@ -67,14 +91,18 @@ export default function ShopPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {products.map((p) => {
           const soldOut = p.qty <= 0;
-          const canBuy = !soldOut && student.cash >= p.price;
+          const price = itemPrice(p.price, klass);
+          const tax = taxForPart(price, klass, 'shop').tax;
+          const total = price + tax;
+          const canBuy = !soldOut && student.cash >= total;
           return (
             <div key={p.id} className={`bg-white rounded-3xl shadow p-4 text-center ${soldOut ? 'opacity-50' : ''}`}>
               {p.imageUrl
                 ? <img src={p.imageUrl} alt="" className="w-20 h-20 rounded-2xl object-cover mx-auto mb-2" />
                 : <div className="text-5xl mb-2">{p.emoji}</div>}
               <div className="text-lg leading-tight">{p.name}</div>
-              <div className="text-amber-600 my-1">{fmt(p.price)} {klass.currency}</div>
+              <div className="text-amber-600 my-1">{fmt(total)} {klass.currency}</div>
+              {tax > 0 && <div className="text-[10px] text-gray-400">상품 {fmt(price)} + 세금 {fmt(tax)}</div>}
               <div className="text-xs text-gray-400 mb-2">{soldOut ? '품절' : `남은 수량 ${p.qty}개`}</div>
               <button
                 disabled={soldOut || busy}

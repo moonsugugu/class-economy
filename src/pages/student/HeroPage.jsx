@@ -8,11 +8,14 @@ import {
   monsterForLevel, battleChance, battleConfig, heroDateKey,
 } from '../../lib/hero';
 import HeroPreview from '../../three/Hero3D.jsx';
+import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
+import HeroBattleArena from '../../components/HeroBattleArena.jsx';
 
 export default function HeroPage() {
   const { klass, student } = useOutletContext();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [battlePhase, setBattlePhase] = useState('idle');
   const hero = normalizeHero(student.rpg);
   const power = heroPower(hero);
   const today = heroDateKey();
@@ -29,8 +32,11 @@ export default function HeroPage() {
       return;
     }
     setBusy(true);
+    setBattlePhase('charge');
     const roll = Math.random();
     try {
+      await new Promise((resolve) => setTimeout(resolve, 280));
+      setBattlePhase('attack');
       let battleResult;
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
@@ -65,10 +71,13 @@ export default function HeroPage() {
         tx.update(studentRef, update);
         battleResult = { won, monster, chance, currentPower, reward, attempt: attempts + 1, limit: settings.limit };
       });
+      setBattlePhase(battleResult.won ? 'win' : 'lose');
+      setTimeout(() => setBattlePhase('idle'), 2800);
       setMsg(battleResult.won
         ? { type: 'ok', text: `🎉 ${battleResult.monster.name}을(를) 물리쳤어요! ${fmt(battleResult.reward)}${klass.currency}를 받았어요. (${battleResult.attempt}/${battleResult.limit}회)` }
         : { type: 'err', text: `💥 아쉽게 졌어요. 승리 확률은 ${Math.round(battleResult.chance * 100)}%였어요. ${battleResult.reward > 0 ? `${fmt(battleResult.reward)}${klass.currency}를 받았어요.` : '패배 보상은 0이에요.'} (${battleResult.attempt}/${battleResult.limit}회)` });
     } catch (e) {
+      setBattlePhase('idle');
       setMsg({ type: 'err', text: e.message });
     } finally {
       setBusy(false);
@@ -108,11 +117,11 @@ export default function HeroPage() {
             {HERO_SLOTS.map(([slot, label]) => {
               const item = HERO_ITEM_MAP[hero.equipment[slot]];
               return (
-                <div key={slot} className="flex items-center gap-3 rounded-2xl bg-gray-50 px-3 py-2">
+                <div key={slot} className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${item ? 'border-indigo-100 bg-indigo-50/40' : 'border-gray-100 bg-gray-50'}`}>
                   <span className="text-xs text-gray-400 w-12">{label}</span>
-                  <span className="text-2xl">{item?.emoji || '▫️'}</span>
+                  <HeroItemVisual item={item} size={52} showLevel={false} />
                   <span className="text-sm text-gray-600">{item?.name || '미장착'}</span>
-                  <span className="ml-auto text-sm text-indigo-500">{item ? `+${item.power}` : ''}</span>
+                  <span className="ml-auto text-right text-sm text-indigo-500">{item ? `+${item.power}` : ''}<small className="block text-[9px] text-gray-400">전투력</small></span>
                 </div>
               );
             })}
@@ -120,6 +129,10 @@ export default function HeroPage() {
           <Link to="/student/hero/shop" className="block text-center text-sm text-indigo-500 underline mt-4">장비 바꾸러 가기 →</Link>
         </div>
       </div>
+
+      {nextMonster && hero.character && (
+        <HeroBattleArena hero={hero} power={power} monster={nextMonster} phase={battlePhase} chance={battleChance(power, nextMonster.power)} />
+      )}
 
       {nextMonster ? (
         <div className="bg-white rounded-3xl shadow p-5">

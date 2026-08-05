@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import {
   collection, doc, query, where, orderBy, limit as qlimit,
-  onSnapshot, getDocs, addDoc, runTransaction, serverTimestamp,
+  onSnapshot, getDocs, addDoc, runTransaction, increment, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt, periodKeys, rankAssets } from '../../lib/util';
@@ -12,6 +12,14 @@ import {
 } from '../../lib/stocks';
 import { applyScheduledTicks } from '../../lib/marketSync';
 import { isActiveStudent } from '../../lib/studentState';
+import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
+
+const stockTaxToClassUnits = (amount, cur, fx, kpu) => {
+  const value = Math.max(0, Number(amount) || 0);
+  if (cur === 'USD') return Math.floor((value * fx) / kpu);
+  if (cur === 'KRW') return Math.floor(value / kpu);
+  return Math.floor(value);
+};
 
 /* 미니 차트 */
 function Spark({ data, up }) {
@@ -78,11 +86,14 @@ export default function StocksPage() {
     if (!sel || n < 1) return;
     const marketRef = doc(db, ...MARKET_PATH(klass.id));
     const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
+    const classRef = doc(db, 'classes', klass.id);
+    const ledgerRef = doc(db, 'classes', klass.id, 'taxLedger', TAX_LEDGER_ID);
     let logged = null;
     try {
       await runTransaction(db, async (tx) => {
         const mkt = (await tx.get(marketRef)).data();
         const s = (await tx.get(studentRef)).data();
+        const settings = { ...klass, ...((await tx.get(classRef)).data() || {}) };
         const st = (mkt?.stocks || []).find((x) => x.symbol === sel.id);
         if (!st) throw new Error('지금은 거래할 수 없는 종목이에요.');
         const price = st.price;
@@ -90,6 +101,12 @@ export default function StocksPage() {
         const field = WALLET_FIELD[cur];
         const wallet = s[field] || 0;
         const h = s.holdings?.[sel.id] || { qty: 0, avg: 0 };
+        const currentFx = Number(mkt.fx) || fx;
+        const currentKpu = Number(settings.krwPerUnit) || kpu;
+        const baseAmount = price * n;
+        const taxPart = side === 'buy' ? 'stockBuy' : 'stockSell';
+        const taxNative = taxForPart(baseAmount, settings, taxPart).tax;
+        const taxFund = stockTaxToClassUnits(taxNative, cur, currentFx, currentKpu);
         const need = {
           KRW: '원이 부족해요! 은행 환전소에서 원(₩)으로 바꿔 오세요 💱',
           USD: '달러가 부족해요! 은행 환전소에서 달러($)로 바꿔 오세요 💱',
@@ -97,27 +114,36 @@ export default function StocksPage() {
         }[cur];
 
         if (side === 'buy') {
-          const cost = price * n;
-          if (wallet < cost) throw new Error(need);
+          const cost = baseAmount;
+          const debit = cost + taxNative;
+          if (wallet < debit) throw new Error(need);
           const nq = h.qty + n;
           tx.update(studentRef, {
-            [field]: Math.round((wallet - cost) * 100) / 100,
+            [field]: Math.round((wallet - debit) * 100) / 100,
             [`holdings.${sel.id}`]: {
               qty: nq,
-              avg: Math.round(((h.avg * h.qty + cost) / nq) * 100) / 100,
+              avg: Math.round(((h.avg * h.qty + debit) / nq) * 100) / 100,
               cur,
             },
           });
-          logged = { price, total: cost, cur, profit: null };
+          logged = { price, total: cost, cur, tax: taxNative, taxFund, net: -debit, profit: null };
         } else {
           if (h.qty < n) throw new Error('보유 수량이 부족해요!');
           const nq = h.qty - n;
           const gain = price * n;
+          const netGain = gain - taxNative;
           tx.update(studentRef, {
-            [field]: Math.round((wallet + gain) * 100) / 100,
+            [field]: Math.round((wallet + netGain) * 100) / 100,
             [`holdings.${sel.id}`]: nq === 0 ? { qty: 0, avg: 0, cur } : { qty: nq, avg: h.avg, cur },
           });
-          logged = { price, total: gain, cur, profit: Math.round((price - h.avg) * n * 100) / 100 };
+          logged = { price, total: gain, cur, tax: taxNative, taxFund, net: netGain, profit: Math.round(((price - h.avg) * n - taxNative) * 100) / 100 };
+        }
+        if (taxFund > 0) {
+          tx.set(ledgerRef, {
+            pending: increment(taxFund),
+            [taxPart]: increment(taxFund),
+            updatedAt: Date.now(),
+          }, { merge: true });
         }
       });
 
@@ -132,13 +158,18 @@ export default function StocksPage() {
         qty: n,
         price: logged.price,
         total: logged.total,
+        tax: logged.tax,
+        taxFund: logged.taxFund,
+        net: logged.net,
         cur: logged.cur,
         profit: logged.profit,
         at: Date.now(),
         createdAt: serverTimestamp(),
       });
 
-      flash('ok', side === 'buy' ? `📈 ${sel.name} ${n}주 매수 완료!` : `📉 ${sel.name} ${n}주 매도 완료!`);
+      flash('ok', side === 'buy'
+        ? `📈 ${sel.name} ${n}주 매수 완료! 세금 ${fmt(logged.tax)}${logged.cur}가 누적됐어요.`
+        : `📉 ${sel.name} ${n}주 매도 완료! 세금 ${fmt(logged.tax)}${logged.cur}가 누적됐어요.`);
       setSel(null); setQty(1);
     } catch (e) {
       flash('err', e.message);
@@ -301,6 +332,9 @@ export default function StocksPage() {
               총 {curMark(sel)}
               {fmt(Math.round(sel.price * Math.max(1, Math.floor(Number(qty) || 1)) * 100) / 100)}
               {curSuffix(sel)}
+            </div>
+            <div className="mb-4 rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs text-emerald-700">
+              매수 세금 {fmt(taxForPart(sel.price * Math.max(1, Math.floor(Number(qty) || 1)), klass, 'stockBuy').tax)} · 매도 세금 {fmt(taxForPart(sel.price * Math.max(1, Math.floor(Number(qty) || 1)), klass, 'stockSell').tax)} {curSuffix(sel) || stockCur(sel)}
             </div>
             <div className="flex gap-2">
               <button onClick={() => trade('buy')} className="flex-1 rounded-2xl py-3 bg-red-500 hover:bg-red-600 text-white text-lg">매수</button>

@@ -39,6 +39,8 @@ export const POLL_PRESETS = [
   },
 ];
 
+import { taxOfAmount } from './taxes';
+
 /** 총 급여 = 기본 월급 + 직업 수당 */
 export function grossPay(klass, job) {
   return Number(klass?.salary || 0) + Number(job?.salary || 0);
@@ -46,6 +48,6 @@ export function grossPay(klass, job) {
 
 /** 세금(원 단위 내림)과 실수령액 */
 export function taxOf(gross, taxRate) {
-  const tax = Math.floor(gross * (Number(taxRate || 0) / 100));
-  return { tax, net: gross - tax };
+  const { tax, net } = taxOfAmount(gross, taxRate);
+  return { tax, net };
 }

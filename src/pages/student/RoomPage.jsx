@@ -1,15 +1,17 @@
 import { useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { doc, updateDoc, runTransaction, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
+import { doc, updateDoc, runTransaction, increment, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import {
   SPECIES_GROUP, CHAR_ITEMS, FRIEND_ITEMS, isCompanion,
-  ITEMS, ITEM_MAP, SLOT_LABEL, SETS, setPrice,
+  ITEMS, ITEM_MAP, SLOT_LABEL, SETS,
   normalizeRoom, canPlaceAt, isStackableRoomItem,
 } from '../../lib/items';
 import RoomScene from '../../three/RoomScene.jsx';
 import { ThumbProvider, ItemThumb } from '../../three/Thumbs.jsx';
+import { itemPrice, pricePolicyLabel } from '../../lib/pricing';
+import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
 
 const SPACES = [
   ['room', '🛋️ 내 방'],
@@ -56,7 +58,16 @@ function RoomInner({ klass, student }) {
   const glRef = useRef(null);
 
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
+  const classRef = doc(db, 'classes', klass.id);
+  const ledgerRef = doc(db, 'classes', klass.id, 'taxLedger', TAX_LEDGER_ID);
   const inventory = student.inventory || [];
+  const costOf = (item) => itemPrice(item.price, klass);
+  const setPriceFor = (set, inv) => {
+    const need = set.items.filter((id) => !inv.includes(id) && ITEM_MAP[id]);
+    const full = need.reduce((sum, id) => sum + costOf(ITEM_MAP[id]), 0);
+    const price = Math.floor(full * (1 - set.off));
+    return { need, full, price, saved: full - price };
+  };
   const avatar = student.avatar || {};
   const maps = {
     room: normalizeRoom(student.room),
@@ -83,15 +94,22 @@ function RoomInner({ klass, student }) {
   const buyItem = async (item) => {
     const stackable = isStackableRoomItem(item.slot);
     if (inventory.includes(item.id) && !stackable) return;
-    if (!confirm(`'${item.name}'을(를) ${fmt(item.price)}${klass.currency}에 살까요?`)) return;
+    const price = costOf(item);
+    const previewTax = taxForPart(price, klass, 'item').tax;
+    const previewTotal = price + previewTax;
+    if (!confirm(`'${item.name}'을(를) 살까요?\n상품가 ${fmt(price)} + 세금 ${fmt(previewTax)} = 총 ${fmt(previewTotal)}${klass.currency}`)) return;
     try {
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
+        const settings = { ...klass, ...((await tx.get(classRef)).data() || {}) };
+        const currentPrice = itemPrice(item.price, settings);
+        const tax = taxForPart(currentPrice, settings, 'item').tax;
+        const total = currentPrice + tax;
         const inv = s.inventory || [];
         if (inv.includes(item.id) && !stackable) throw new Error('이미 가지고 있어요!');
-        if (s.cash < item.price) throw new Error('현금이 부족해요!');
+        if (s.cash < total) throw new Error('현금이 부족해요!');
         const upd = {
-          cash: s.cash - item.price,
+          cash: s.cash - total,
           inventory: stackable ? [...inv, item.id] : arrayUnion(item.id),
         };
         // 캐릭터를 처음 사면 바로 그 모습으로 바뀌어요
@@ -101,6 +119,13 @@ function RoomInner({ klass, student }) {
           upd.walking = arrayUnion(item.id);
         }
         tx.update(studentRef, upd);
+        if (tax > 0) {
+          tx.set(ledgerRef, {
+            pending: increment(tax),
+            item: increment(tax),
+            updatedAt: Date.now(),
+          }, { merge: true });
+        }
       });
       flash('ok', `🛍️ '${item.name}' 구매 완료!`);
     } catch (e) {
@@ -110,18 +135,30 @@ function RoomInner({ klass, student }) {
 
   /* ----- 세트 구매 ----- */
   const buySet = async (set) => {
-    const { need, full, price, saved } = setPrice(set, inventory);
+    const { need, full, price, saved } = setPriceFor(set, inventory);
     if (!need.length) return flash('err', '이미 세트를 다 가지고 있어요!');
-    if (!confirm(`${set.name}\n${need.length}개 아이템을 ${fmt(price)}${klass.currency}에 살까요?\n(따로 사면 ${fmt(full)} → ${fmt(saved)} 절약!)`)) return;
+    const previewTax = taxForPart(price, klass, 'item').tax;
+    const previewTotal = price + previewTax;
+    if (!confirm(`${set.name}\n${need.length}개 아이템을 살까요?\n상품가 ${fmt(price)} + 세금 ${fmt(previewTax)} = 총 ${fmt(previewTotal)}${klass.currency}\n(따로 사면 ${fmt(full)} → ${fmt(saved)} 절약!)`)) return;
     try {
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
+        const settings = { ...klass, ...((await tx.get(classRef)).data() || {}) };
         const inv = s.inventory || [];
         const stillNeed = set.items.filter((id) => !inv.includes(id) && ITEM_MAP[id]);
         if (!stillNeed.length) throw new Error('이미 다 가지고 있어요!');
-        const cost = Math.floor(stillNeed.reduce((a, id) => a + ITEM_MAP[id].price, 0) * (1 - set.off));
-        if (s.cash < cost) throw new Error('현금이 부족해요!');
-        tx.update(studentRef, { cash: s.cash - cost, inventory: [...inv, ...stillNeed] });
+        const cost = Math.floor(stillNeed.reduce((a, id) => a + itemPrice(ITEM_MAP[id].price, settings), 0) * (1 - set.off));
+        const tax = taxForPart(cost, settings, 'item').tax;
+        const total = cost + tax;
+        if (s.cash < total) throw new Error('현금이 부족해요!');
+        tx.update(studentRef, { cash: s.cash - total, inventory: [...inv, ...stillNeed] });
+        if (tax > 0) {
+          tx.set(ledgerRef, {
+            pending: increment(tax),
+            item: increment(tax),
+            updatedAt: Date.now(),
+          }, { merge: true });
+        }
       });
       flash('ok', `🎁 ${set.name} 구매 완료! ${fmt(saved)}${klass.currency} 아꼈어요.`);
     } catch (e) {
@@ -194,7 +231,8 @@ function RoomInner({ klass, student }) {
     updateDoc(studentRef, { [`roomSkin.${item.slot}`]: skin[item.slot] === item.id ? null : item.id });
 
   const refundItem = async (item) => {
-    if (!confirm(`'${item.name}'을(를) 구매가의 50%인 ${fmt(Math.floor(item.price * 0.5))}${klass.currency}에 환불할까요?`)) return;
+    const refundPrice = Math.floor(costOf(item) * 0.5);
+    if (!confirm(`'${item.name}'을(를) 구매가의 50%인 ${fmt(refundPrice)}${klass.currency}에 환불할까요?`)) return;
     try {
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
@@ -203,7 +241,7 @@ function RoomInner({ klass, student }) {
         if (inventoryIndex < 0) throw new Error('환불할 아이템을 찾지 못했어요.');
         inv.splice(inventoryIndex, 1);
         const upd = {
-          cash: (s.cash || 0) + Math.floor(item.price * 0.5),
+          cash: (s.cash || 0) + refundPrice,
           inventory: inv,
         };
 
@@ -293,6 +331,9 @@ function RoomInner({ klass, student }) {
         <button onClick={screenshot} className="ml-auto rounded-xl px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white shadow">
           📸 인증샷
         </button>
+      </div>
+      <div className="rounded-2xl border border-purple-100 bg-purple-50 px-4 py-2 text-xs text-purple-600">
+        🏷️ 공간 아이템 물가: {pricePolicyLabel(klass, klass.currency)} · 구매 후 환불은 실제 구매가의 50%예요.
       </div>
 
       {msg && (
@@ -457,7 +498,7 @@ function RoomInner({ klass, student }) {
                     <ItemThumb id={item.id} size={38} />
                     <div className="min-w-0 flex-1">
                       <div className="text-[11px] truncate">{item.name}</div>
-                      <div className="text-[10px] text-emerald-600">+{fmt(Math.floor(item.price * 0.5))} {klass.currency}</div>
+                      <div className="text-[10px] text-emerald-600">+{fmt(Math.floor(costOf(item) * 0.5))} {klass.currency}</div>
                       <button onClick={() => refundItem(item)} className="text-[10px] text-rose-500 underline">환불하기</button>
                     </div>
                   </div>
@@ -533,7 +574,7 @@ function RoomInner({ klass, student }) {
             <ItemThumb id={previewItem.id} size={190} />
             <h3 className="text-2xl text-purple-600">{previewItem.name}</h3>
             <p className="text-sm text-gray-500">구매하면 내 캐릭터로 선택해서 사용할 수 있어요.</p>
-            <div className="text-amber-600">{fmt(previewItem.price)} {klass.currency}</div>
+            <div className="text-amber-600">총 {fmt(costOf(previewItem) + taxForPart(costOf(previewItem), klass, 'item').tax)} {klass.currency}</div>
             <div className="flex gap-2">
               {!inventory.includes(previewItem.id) && (
                 <button onClick={() => { setPreviewItem(null); buyItem(previewItem); }} className="flex-1 rounded-xl py-2 bg-purple-500 text-white">구매하기</button>
@@ -562,7 +603,9 @@ function RoomInner({ klass, student }) {
           {shopCat === 'set' ? (
             <div className="grid sm:grid-cols-2 gap-3">
               {SETS.map((set) => {
-                const { need, full, price, saved } = setPrice(set, inventory);
+                const { need, full, price, saved } = setPriceFor(set, inventory);
+                const tax = taxForPart(price, klass, 'item').tax;
+                const total = price + tax;
                 const done = !need.length;
                 return (
                   <div key={set.id} className={`bg-white rounded-3xl shadow p-5 ${done ? 'opacity-60' : ''}`}>
@@ -581,9 +624,10 @@ function RoomInner({ klass, student }) {
                     ) : (
                       <button
                         onClick={() => buySet(set)}
-                        className={`w-full rounded-xl py-2 text-white ${student.cash >= price ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-300'}`}
+                        className={`w-full rounded-xl py-2 text-white ${student.cash >= total ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-300'}`}
                       >
-                        {fmt(price)} {klass.currency}
+                        {fmt(total)} {klass.currency}
+                        {tax > 0 && <span className="text-xs opacity-80 ml-1">(세금 {fmt(tax)})</span>}
                         <span className="text-xs line-through opacity-70 ml-2">{fmt(full)}</span>
                         <span className="text-xs ml-1">({set.off * 100}% 할인)</span>
                       </button>
@@ -599,6 +643,9 @@ function RoomInner({ klass, student }) {
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 mb-3">
                   {CHAR_ITEMS.filter((c) => c.group === g).map((c) => {
                     const has = inventory.includes(c.id);
+                    const price = costOf(c);
+                    const tax = taxForPart(price, klass, 'item').tax;
+                    const total = price + tax;
                     return (
                       <div key={c.id} className={`bg-white rounded-2xl shadow p-3 text-center ${has ? 'opacity-70' : ''}`}>
                         <ItemThumb id={c.id} size={64} />
@@ -621,10 +668,10 @@ function RoomInner({ klass, student }) {
                             <button
                               onClick={() => buyItem(c)}
                               className={`flex-1 rounded-xl py-1.5 text-[11px] text-white ${
-                                student.cash >= c.price ? 'bg-purple-400 hover:bg-purple-500' : 'bg-gray-300'
+                                student.cash >= total ? 'bg-purple-400 hover:bg-purple-500' : 'bg-gray-300'
                               }`}
                             >
-                              🔒 {fmt(c.price)}
+                              🔒 {fmt(total)}
                             </button>
                           </div>
                         )}
@@ -640,6 +687,9 @@ function RoomInner({ klass, student }) {
                 const has = inventory.includes(item.id);
                 const stackable = isStackableRoomItem(item.slot);
                 const ownedCount = inventory.filter((id) => id === item.id).length;
+                const price = costOf(item);
+                const tax = taxForPart(price, klass, 'item').tax;
+                const total = price + tax;
                 return (
                   <div key={item.id} className={`bg-white rounded-2xl shadow p-3 text-center ${has && !stackable ? 'opacity-60' : ''}`}>
                     <ItemThumb id={item.id} size={56} />
@@ -651,10 +701,10 @@ function RoomInner({ klass, student }) {
                       <button
                         onClick={() => buyItem(item)}
                         className={`w-full rounded-xl py-1.5 text-sm text-white ${
-                          student.cash >= item.price ? 'bg-purple-400 hover:bg-purple-500' : 'bg-gray-300'
+                          student.cash >= total ? 'bg-purple-400 hover:bg-purple-500' : 'bg-gray-300'
                         }`}
                       >
-                        {stackable && has ? `＋ 하나 더 구매 (${ownedCount}개 보유)` : `${fmt(item.price)} ${klass.currency}`}
+                        {stackable && has ? `＋ 하나 더 구매 (${ownedCount}개 보유)` : `${fmt(total)} ${klass.currency}`}
                       </button>
                     )}
                   </div>

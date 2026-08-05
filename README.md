@@ -50,7 +50,7 @@ npm run dev
 - **알림**: 학생 구매 실시간 알림 → "지급 완료" 처리
 - **주식**: "주식 시장 열기"로 40개 종목 생성, 실제 시세 불러오기 및 수동/자동(1분 59초) 시세 변동. 기본 하루 변동 횟수는 25회
 - **버그 신고·건의함**: 담임 화면에서 개발자 이메일 작성 창을 열고, `xdaethx@naver.com` 계정은 전체 학급 수신함을 별도 확인
-- **설정**: 화폐 단위(미소·달란트 등), 월급 금액, 예금/적금 이율, 주식 횟수, 용사 전투 횟수·승패 보상
+- **설정**: 화폐 단위(미소·달란트 등), 월급 금액, 예금/적금 이율, 주식 횟수, 용사 전투 횟수·승패 보상, 상점·내 공간·용사 아이템 물가(단위/퍼센트), 거래별 공동기금 세율
 
 ### 학생 화면 (하단 탭)
 - **마이**: 현금 + 예금 + 적금 + 주식 평가액 = 총자산 한눈에
@@ -65,8 +65,12 @@ npm run dev
 classes/{classId}
   ├─ code, name, teacherUid, currency, salary, depositRate, savingsRate, tickLimit
   ├─ heroBattleLimit, heroWinReward, heroLoseReward — 용사 전투 설정
+  ├─ priceInflationMode, priceInflationValue — 아이템 물가 상승 설정(기존 가격에 추가)
+  ├─ taxRate, taxSalaryRate, taxShopRate, taxSeatRate, taxItemRate — 거래별 세율 설정
+  ├─ taxStockBuyRate, taxStockSellRate — 주식 매수·매도 세율 설정
+  ├─ taxLedger/pending — 아직 공동기금에 반영하지 않은 세금 누적 원장
   ├─ students/{studentId}   — name, cash, deposit, depositLastAt, avatar, inventory, room, holdings, rpg
-  ├─ products/{productId}   — name, emoji, imageUrl, price, qty
+  ├─ products/{productId}   — name, emoji, imageUrl, price, qty, subtotal, tax
   ├─ purchases/{purchaseId} — studentName, productName, price, status(pending|done)
   ├─ accounts/{accountId}   — 적금: studentId, amount, rate, days, startAt, status
   ├─ market/main            — stocks[], fx, tickCount, history/시세 상태

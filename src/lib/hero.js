@@ -9,10 +9,22 @@ export const HERO_SLOTS = [
 ];
 
 export const HERO_RARITIES = {
-  common: { label: '일반', color: 'bg-slate-100 text-slate-600', weight: 8 },
-  rare: { label: '희귀', color: 'bg-sky-100 text-sky-700', weight: 4 },
-  elite: { label: '엘리트', color: 'bg-violet-100 text-violet-700', weight: 2 },
-  legendary: { label: '전설', color: 'bg-amber-100 text-amber-700', weight: 1 },
+  common: {
+    label: '일반', color: 'bg-slate-100 text-slate-600', weight: 8,
+    accent: '#94a3b8', surface: 'from-slate-50 via-white to-slate-100', border: 'border-slate-200', glow: 'shadow-slate-200',
+  },
+  rare: {
+    label: '희귀', color: 'bg-sky-100 text-sky-700', weight: 4,
+    accent: '#38bdf8', surface: 'from-sky-50 via-white to-cyan-100', border: 'border-sky-300', glow: 'shadow-sky-200',
+  },
+  elite: {
+    label: '엘리트', color: 'bg-violet-100 text-violet-700', weight: 2,
+    accent: '#a78bfa', surface: 'from-violet-50 via-white to-fuchsia-100', border: 'border-violet-300', glow: 'shadow-violet-200',
+  },
+  legendary: {
+    label: '전설', color: 'bg-amber-100 text-amber-700', weight: 1,
+    accent: '#f59e0b', surface: 'from-amber-50 via-yellow-50 to-orange-100', border: 'border-amber-400', glow: 'shadow-amber-200',
+  },
 };
 
 export const HERO_SHOP_REFRESH_LIMIT = 3;
@@ -92,6 +104,7 @@ const gearItems = HERO_SLOTS.flatMap(([slot]) => Array.from({ length: 20 }, (_, 
     level,
     rarity,
     rarityLabel: HERO_RARITIES[rarity].label,
+    visualKey: `${slot}-${Math.ceil(level / 5)}`,
     name: legacy?.name || `${HERO_RARITIES[rarity].label} ${GEAR_NAMES[slot][index]}`,
     emoji: legacy?.emoji || GEAR_EMOJIS[slot][index],
     price: legacy?.price || Math.round(50 + power * 10 + level * 15),
@@ -216,4 +229,3 @@ export function heroShopFor(classId, date = heroDateKey(), refreshes = 0) {
     weightedSample(HERO_GEAR_BY_SLOT[slot], random, 3).map((item) => item.id),
   ]));
 }
-

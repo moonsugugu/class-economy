@@ -25,8 +25,8 @@ export const Cy = ({ p = [0, 0, 0], rad = 0.5, rTop, rBot, h = 1, c, r = [0, 0, 
   </mesh>
 );
 
-export const Sp = ({ p = [0, 0, 0], rad = 0.5, c, sc = [1, 1, 1], e, o, m }) => (
-  <mesh position={p} scale={sc} castShadow receiveShadow>
+export const Sp = ({ p = [0, 0, 0], rad = 0.5, c, sc = [1, 1, 1], r = [0, 0, 0], e, o, m }) => (
+  <mesh position={p} rotation={r} scale={sc} castShadow receiveShadow>
     <sphereGeometry args={[rad, 24, 18]} />
     <Mat c={c} e={e} o={o} m={m} />
   </mesh>

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
   collection, doc, query, orderBy, limit as qlimit, onSnapshot,
-  addDoc, updateDoc, deleteDoc, increment, serverTimestamp,
+  addDoc, updateDoc, deleteDoc, getDoc, runTransaction, increment, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import { POLL_PRESETS } from '../../lib/jobs';
+import { TAX_PARTS, TAX_LEDGER_ID, taxRates } from '../../lib/taxes';
 
 const card = 'bg-white rounded-3xl shadow p-6';
 const input = 'rounded-xl border-2 border-gray-200 px-3 py-2 focus:border-indigo-400 outline-none';
@@ -17,15 +18,29 @@ export default function FundTab({ klass }) {
   const [spend, setSpend] = useState({ amount: '', memo: '' });
   const [poll, setPoll] = useState({ title: '', options: ['', '', ''] });
   const [msg, setMsg] = useState('');
+  const [pendingTax, setPendingTax] = useState({ amount: 0, parts: {} });
+  const [settling, setSettling] = useState(false);
 
   const classRef = doc(db, 'classes', klass.id);
+  const ledgerRef = doc(db, 'classes', klass.id, 'taxLedger', TAX_LEDGER_ID);
   const fund = klass.fund || 0;
-  const taxRate = klass.taxRate ?? 10;
+  const rates = taxRates(klass);
+
+  const loadPendingTax = async () => {
+    const snap = await getDoc(ledgerRef);
+    const data = snap.exists() ? snap.data() : {};
+    setPendingTax({
+      amount: Math.max(0, Math.floor(Number(data.pending) || 0)),
+      parts: Object.fromEntries(TAX_PARTS.map(({ key }) => [key, Math.max(0, Math.floor(Number(data[key]) || 0))])),
+    });
+  };
 
   useEffect(() => {
     const q = query(collection(db, 'classes', klass.id, 'fundLog'), orderBy('at', 'desc'), qlimit(30));
     return onSnapshot(q, (s) => setLogs(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
   }, [klass.id]);
+
+  useEffect(() => { loadPendingTax(); }, [klass.id]);
 
   useEffect(() => {
     const q = query(collection(db, 'classes', klass.id, 'polls'), orderBy('at', 'desc'), qlimit(10));
@@ -33,6 +48,47 @@ export default function FundTab({ klass }) {
   }, [klass.id]);
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3500); };
+
+  const settleTax = async () => {
+    if (settling) return;
+    setSettling(true);
+    let settled = 0;
+    try {
+      const settlementRef = doc(collection(db, 'classes', klass.id, 'fundLog'));
+      await runTransaction(db, async (tx) => {
+        const classSnap = await tx.get(classRef);
+        const ledgerSnap = await tx.get(ledgerRef);
+        if (!classSnap.exists() || !ledgerSnap.exists()) return;
+        const ledger = ledgerSnap.data() || {};
+        const amount = Math.max(0, Math.floor(Number(ledger.pending) || 0));
+        if (!amount) return;
+        const parts = Object.fromEntries(TAX_PARTS.map(({ key }) => [key, Math.max(0, Math.floor(Number(ledger[key]) || 0))]));
+        const ledgerUpdate = { pending: increment(-amount), updatedAt: Date.now() };
+        TAX_PARTS.forEach(({ key }) => {
+          if (parts[key] > 0) ledgerUpdate[key] = increment(-parts[key]);
+        });
+        tx.update(classRef, { fund: increment(amount) });
+        tx.update(ledgerRef, ledgerUpdate);
+        tx.set(settlementRef, {
+          type: 'tax-settlement',
+          amount,
+          parts,
+          memo: `누적 거래 세금 정산 (${klass.currency})`,
+          at: Date.now(),
+          createdAt: serverTimestamp(),
+        });
+        settled = amount;
+      });
+      await loadPendingTax();
+      flash(settled > 0
+        ? `🏛️ 누적 세금 ${fmt(settled)}${klass.currency}를 공동기금에 반영했어요.`
+        : '새로 계산할 누적 세금이 없어요.');
+    } catch (e) {
+      flash(`세금 정산에 실패했어요: ${e.message}`);
+    } finally {
+      setSettling(false);
+    }
+  };
 
   const useFund = async () => {
     const amt = Math.floor(Number(spend.amount));
@@ -78,8 +134,27 @@ export default function FundTab({ klass }) {
           <div className="text-white/80">우리 학급 공동기금</div>
           <div className="text-4xl tabular-nums">{fmt(fund)} <span className="text-lg">{klass.currency}</span></div>
           <div className="text-sm text-white/70 mt-1">
-            💸 월급을 줄 때마다 세금 <b>{taxRate}%</b>가 자동으로 여기 모여요
-            {taxRate === 0 && ' (지금은 0% — ⚙️설정에서 바꿀 수 있어요)'}
+            💸 거래 때마다 세금이 미정산 원장에 누적되고, 아래 버튼을 눌렀을 때 공동기금에 반영돼요
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {TAX_PARTS.map(({ key, label }) => (
+              <span key={key} className="rounded-lg bg-white/15 px-2 py-1 text-[11px]">
+                {label} {rates[key]}%
+              </span>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-black/10 px-3 py-2">
+            <div className="flex-1 min-w-44">
+              <div className="text-xs text-white/70">아직 공동기금에 반영하지 않은 누적 세금</div>
+              <div className="text-2xl font-bold tabular-nums">{fmt(pendingTax.amount)} {klass.currency}</div>
+            </div>
+            <button
+              onClick={settleTax}
+              disabled={settling}
+              className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-emerald-700 shadow disabled:opacity-50"
+            >
+              {settling ? '계산 중...' : '🧮 누적 세금 계산·반영'}
+            </button>
           </div>
         </div>
       </div>
@@ -190,12 +265,12 @@ export default function FundTab({ klass }) {
         ) : (
           logs.map((l) => (
             <div key={l.id} className="flex items-center gap-2 py-2 border-b border-gray-100 text-sm">
-              <span className={`px-2 py-0.5 rounded-lg text-xs ${l.type === 'tax' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                {l.type === 'tax' ? '세금 적립' : '사용'}
+              <span className={`px-2 py-0.5 rounded-lg text-xs ${l.type === 'tax' || l.type === 'tax-settlement' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                {l.type === 'tax' ? '세금 적립' : l.type === 'tax-settlement' ? '세금 정산' : '사용'}
               </span>
               <span className="flex-1">{l.memo}</span>
-              <span className={`tabular-nums ${l.type === 'tax' ? 'text-emerald-600' : 'text-rose-500'}`}>
-                {l.type === 'tax' ? '+' : '−'}{fmt(l.amount)}
+              <span className={`tabular-nums ${l.type === 'tax' || l.type === 'tax-settlement' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                {l.type === 'tax' || l.type === 'tax-settlement' ? '+' : '−'}{fmt(l.amount)}
               </span>
               <span className="text-[11px] text-gray-300 w-16 text-right hidden sm:block">
                 {new Date(l.at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
