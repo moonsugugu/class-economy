@@ -28,6 +28,10 @@ export const HERO_RARITIES = {
     label: '전설', color: 'bg-amber-100 text-amber-700', weight: 1,
     accent: '#f59e0b', surface: 'from-amber-50 via-yellow-50 to-orange-100', border: 'border-amber-400', glow: 'shadow-amber-200',
   },
+  transcendent: {
+    label: '초월', color: 'bg-fuchsia-100 text-fuchsia-700', weight: 0.25,
+    accent: '#ec4899', surface: 'from-pink-50 via-white to-cyan-100', border: 'border-fuchsia-400', glow: 'shadow-fuchsia-300',
+  },
 };
 
 export const HERO_SHOP_REFRESH_LIMIT = 3;
@@ -97,23 +101,28 @@ const POWER_BY_SLOT = {
   accessory: [6, 9, 12, 16, 21, 28, 34, 40, 46, 52, 58, 64, 69, 72, 75, 84, 98, 114, 130, 150],
 };
 
-const rarityOfLevel = (level) => (level <= 5 ? 'common' : level <= 10 ? 'rare' : level <= 15 ? 'elite' : 'legendary');
+const rarityOfLevel = (level) => (level <= 5 ? 'common' : level <= 10 ? 'rare' : level <= 15 ? 'elite' : level <= 19 ? 'legendary' : 'transcendent');
 
 const SPECIAL_STAT_LABELS = {
   bossCritChance: '보스전 크리티컬 확률',
   critDamage: '크리티컬 데미지',
 };
+const SPECIAL_STAT_SLOTS = new Set(['weapon', 'accessory', 'gloves']);
 
 // 장비 ID가 같으면 어느 기기에서 보더라도 같은 추가 능력치가 보이도록
 // 단계·부위에서 안정적으로 값을 만들어요. 기존 장비 ID와 기본 전투력은 그대로예요.
 function specialStatsFor(slot, level, rarity) {
-  if (rarity === 'common') return [];
+  const transcendent = level === 20 || rarity === 'transcendent';
+  if (!transcendent && !SPECIAL_STAT_SLOTS.has(slot)) return [];
+  if (!transcendent && rarity === 'common') return [];
   const seed = [...slot].reduce((sum, char) => sum + char.charCodeAt(0), level * 17);
   const firstKey = seed % 2 ? 'bossCritChance' : 'critDamage';
   const valueFor = (key, offset = 0) => key === 'bossCritChance'
     ? 1 + ((seed + offset * 11) % 5)
     : 1 + ((seed + offset * 17) % 10);
   const first = { key: firstKey, label: SPECIAL_STAT_LABELS[firstKey], value: valueFor(firstKey) };
+  // 초월 등급은 부위와 상관없이 추가 능력치 하나만 붙어요.
+  if (transcendent) return [first];
   if (rarity !== 'legendary') return [first];
   const secondKey = firstKey === 'bossCritChance' ? 'critDamage' : 'bossCritChance';
   return [first, { key: secondKey, label: SPECIAL_STAT_LABELS[secondKey], value: valueFor(secondKey, 1) }];
@@ -130,7 +139,7 @@ const gearItems = HERO_SLOTS.flatMap(([slot]) => Array.from({ length: 20 }, (_, 
     level,
     rarity,
     rarityLabel: HERO_RARITIES[rarity].label,
-    visualKey: `${slot}-${Math.ceil(level / 5)}`,
+    visualKey: `${slot}-${level === 20 ? 5 : Math.ceil(level / 5)}`,
     name: legacy?.name || `${HERO_RARITIES[rarity].label} ${GEAR_NAMES[slot][index]}`,
     emoji: legacy?.emoji || GEAR_EMOJIS[slot][index],
     price: legacy?.price || Math.round(50 + power * 10 + level * 15),
@@ -159,9 +168,10 @@ const petItems = Array.from({ length: 20 }, (_, index) => {
     visualKey: 'pet-' + level,
     name: PET_NAMES[index],
     emoji: PET_EMOJIS[index],
-    price: 180 + level * 95 + (rarity === 'legendary' ? 220 : 0),
+    price: 180 + level * 95 + (rarity === 'transcendent' ? 500 : rarity === 'legendary' ? 220 : 0),
     power: 0,
     critChance,
+    specialStats: level === 20 ? specialStatsFor('pet', level, rarity) : [],
   };
 });
 
@@ -249,15 +259,18 @@ export function formatHeroSpecialStats(item) {
     : [];
 }
 
-function equippedHeroGear(hero) {
-  return HERO_SLOTS
+function equippedHeroItems(hero) {
+  return [
+    ...HERO_SLOTS
     .map(([slot]) => HERO_ITEM_MAP[hero.equipment[slot]])
-    .filter((item) => item?.slot && item.slot !== 'pet');
+    .filter((item) => item?.slot && item.slot !== 'pet'),
+    HERO_ITEM_MAP[hero.pet],
+  ].filter(Boolean);
 }
 
 export function heroSpecialValue(raw, key) {
   const hero = normalizeHero(raw);
-  return equippedHeroGear(hero).reduce((total, item) => (
+  return equippedHeroItems(hero).reduce((total, item) => (
     total + (item.specialStats || [])
       .filter((stat) => stat.key === key)
       .reduce((sum, stat) => sum + (Number(stat.value) || 0), 0)

@@ -9,11 +9,38 @@ const RARITY_COLORS = {
   rare: { main: '#0284c7', light: '#67e8f9', dark: '#075985', glow: '#a5f3fc' },
   elite: { main: '#7c3aed', light: '#c4b5fd', dark: '#4c1d95', glow: '#e9d5ff' },
   legendary: { main: '#d97706', light: '#fde68a', dark: '#92400e', glow: '#fef3c7' },
+  transcendent: { main: '#ec4899', light: '#fde68a', dark: '#7e22ce', glow: '#67e8f9', rainbow: true },
 };
 
-const tierOf = (item) => item ? Math.ceil(item.level / 5) : 0;
+const RAINBOW_COLORS = ['#fb7185', '#fbbf24', '#4ade80', '#38bdf8', '#818cf8', '#e879f9'];
+const tierOf = (item) => item ? (item.level === 20 ? 5 : Math.ceil(item.level / 5)) : 0;
 const paletteOf = (item, fallback) => RARITY_COLORS[item?.rarity] || fallback;
-const RARITY_RANK = { common: 1, rare: 2, elite: 3, legendary: 4 };
+const RARITY_RANK = { common: 1, rare: 2, elite: 3, legendary: 4, transcendent: 5 };
+
+function RainbowOrbit({ radius = 0.4, y = 0, z = 0, size = 0.025 }) {
+  const orbitRef = useRef();
+  useFrame(({ clock }) => {
+    if (!orbitRef.current) return;
+    orbitRef.current.rotation.y = clock.getElapsedTime() * 1.8;
+    orbitRef.current.rotation.z = Math.sin(clock.getElapsedTime() * 2.2) * 0.12;
+  });
+  return (
+    <group ref={orbitRef} position={[0, y, z]}>
+      {RAINBOW_COLORS.map((color, index) => {
+        const angle = (index / RAINBOW_COLORS.length) * Math.PI * 2;
+        return (
+          <Sp
+            key={color}
+            p={[Math.cos(angle) * radius, Math.sin(angle) * radius, 0]}
+            rad={size}
+            c={color}
+            e={color}
+          />
+        );
+      })}
+    </group>
+  );
+}
 
 function HeroRarityAura({ hero }) {
   const groupRef = useRef();
@@ -29,23 +56,24 @@ function HeroRarityAura({ hero }) {
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
-    groupRef.current.rotation.y = t * (rank === 4 ? 0.5 : 0.25);
+    groupRef.current.rotation.y = t * (rank === 5 ? 0.8 : rank === 4 ? 0.5 : 0.25);
     groupRef.current.rotation.z = Math.sin(t * 1.4) * 0.03;
-    groupRef.current.scale.setScalar(1 + Math.sin(t * 2.3) * (rank === 4 ? 0.06 : 0.03));
+    groupRef.current.scale.setScalar(1 + Math.sin(t * 2.3) * (rank >= 4 ? 0.06 : 0.03));
   });
   if (rank < 3) return null;
 
   return (
     <group ref={groupRef} position={[0, 0.72, -0.24]}>
-      <pointLight color={palette.glow} intensity={rank === 4 ? 2.3 : 1.15} distance={2.7} />
-      <Sp p={[0, 0, 0]} rad={0.86} sc={[0.78, 1.28, 0.4]} c={palette.glow} e={palette.glow} o={rank === 4 ? 0.1 : 0.07} />
+      <pointLight color={palette.glow} intensity={rank === 5 ? 3.4 : rank === 4 ? 2.3 : 1.15} distance={2.7} />
+      <Sp p={[0, 0, 0]} rad={0.86} sc={[0.78, 1.28, 0.4]} c={palette.glow} e={palette.glow} o={rank >= 4 ? 0.1 : 0.07} />
       <To p={[0, 0, 0.1]} rad={0.72} tube={0.018} c={palette.light} e={palette.glow} r={[Math.PI / 2, 0, 0]} />
-      {rank === 4 && [-1, 1].map((side) => (
+      {rank >= 4 && [-1, 1].map((side) => (
         <group key={side} position={[side * 0.42, 0.1, 0.1]} rotation={[0, 0, side * 0.45]}>
           <Co p={[0, 0, 0]} rad={0.08} h={0.28} c={palette.light} e={palette.glow} />
           <Sp p={[0, 0.17, 0]} rad={0.035} c="#fff" e={palette.glow} />
         </group>
       ))}
+      {rank === 5 && <RainbowOrbit radius={0.72} y={0.04} z={0.12} size={0.035} />}
     </group>
   );
 }
@@ -127,6 +155,7 @@ function HeroHelmet({ item, female, hair }) {
           <Sp p={[0, 1.45, 0.3]} rad={0.045} c={p.glow} e={p.glow} />
         </group>
       )}
+      {tier >= 5 && <RainbowOrbit radius={0.42} y={0.12} z={0.08} size={0.032} />}
       <Sp p={[0, 1.29, -0.03]} rad={0.27} sc={[1.04, 0.34, 0.84]} c={hair} o={0.35} />
     </group>
   );
@@ -160,6 +189,7 @@ function HeroArmor({ item }) {
           {[-1, 1].map((s) => <Co key={s} p={[s * 0.2, 0.85, 0.03]} rad={0.06} h={0.22} c={p.light} e={p.glow} r={[0, 0, s * 0.45]} />)}
         </group>
       )}
+      {tier >= 5 && <RainbowOrbit radius={0.5} y={0.58} z={0.08} size={0.03} />}
     </group>
   );
 }
@@ -176,6 +206,7 @@ function HeroGloves({ item }) {
           <B p={[0, 0.015, 0.08]} s={[0.13, 0.12, 0.08]} c={p.light} />
           {tier >= 3 && <Sp p={[0, 0.02, 0.14]} rad={0.035} c={p.glow} e={p.glow} />}
           {tier >= 4 && <To p={[0, 0, 0.1]} rad={0.13} tube={0.012} c={p.glow} e={p.glow} />}
+          {tier >= 5 && <RainbowOrbit radius={0.12} y={0} z={0.1} size={0.018} />}
         </group>
       ))}
     </group>
@@ -193,6 +224,7 @@ function HeroShoes({ item }) {
           <B p={[s * 0.14, 0.12, 0.17]} s={[0.19, 0.1, 0.13]} c={p.light} />
           {tier >= 3 && <Co p={[s * 0.14, 0.24, 0]} rad={0.07} h={0.2} c={p.glow} e={p.glow} r={[0.25, 0, 0]} />}
           {tier >= 4 && <Sp p={[s * 0.14, 0.06, 0.2]} rad={0.04} c={p.glow} e={p.glow} />}
+          {tier >= 5 && <RainbowOrbit radius={0.16} y={0.12} z={0.08} size={0.018} />}
         </group>
       ))}
     </group>
@@ -229,6 +261,7 @@ function HeroWeapon({ item }) {
           <Sp p={[0, 0.42, 0.06]} rad={0.045} c="#fff" e={p.glow} />
         </group>
       )}
+      {tier >= 5 && <RainbowOrbit radius={0.3} y={0.38} z={0.08} size={0.025} />}
     </group>
   );
 }
@@ -250,6 +283,7 @@ function HeroAccessory({ item }) {
           </group>
         </Float>
       )}
+      {tier >= 5 && <RainbowOrbit radius={0.26} y={0.16} z={0.1} size={0.025} />}
     </group>
   );
 }
@@ -266,7 +300,7 @@ function HeroPet({ item }) {
   if (!item) return null;
   return (
     <group ref={petRef} position={[0.92, 0.3, 0.1]} scale={0.46}>
-      <pointLight color={palette.glow} intensity={item.rarity === 'legendary' ? 1.4 : 0.5} distance={1.8} />
+      <pointLight color={palette.glow} intensity={item.rarity === 'transcendent' ? 2.6 : item.rarity === 'legendary' ? 1.4 : 0.5} distance={1.8} />
       <Sp p={[0, 0, 0]} rad={0.36} sc={[1, 0.9, 0.85]} c={palette.main} m={0.45} />
       <Sp p={[-0.16, 0.27, 0]} rad={0.13} sc={[0.72, 1.15, 0.65]} c={palette.light} />
       <Sp p={[0.16, 0.27, 0]} rad={0.13} sc={[0.72, 1.15, 0.65]} c={palette.light} />
@@ -274,6 +308,7 @@ function HeroPet({ item }) {
       <Sp p={[0.1, 0.07, 0.3]} rad={0.04} c="#111827" />
       <Sp p={[0, -0.09, 0.3]} rad={0.04} c={palette.glow} e={palette.glow} />
       <To p={[0, 0, 0]} rad={0.48} tube={0.018} c={palette.light} e={palette.glow} />
+      {item.rarity === 'transcendent' && <RainbowOrbit radius={0.52} y={0} z={0.02} size={0.035} />}
     </group>
   );
 }
@@ -369,9 +404,9 @@ function HeroStage() {
 
 export default function HeroPreview({ hero, size = 180, animated = false, action = 'idle' }) {
   return (
-    <div className="relative overflow-hidden rounded-[1.6rem] border border-white/70 bg-gradient-to-b from-sky-100 via-indigo-100 to-violet-200 shadow-inner" style={{ width: size, height: size }}>
+    <div className="hero-preview-stage relative overflow-hidden rounded-[1.6rem] border border-indigo-200/70 shadow-inner" style={{ width: size, height: size }}>
       <Canvas shadows camera={{ position: [2.8, 1.6, 5.6], fov: 37 }} dpr={[1, 1.5]}>
-        <color attach="background" args={['#dbeafe']} />
+        <color attach="background" args={['#111b45']} />
         <ambientLight intensity={1.35} />
         <directionalLight castShadow position={[3, 5, 4]} intensity={2.4} shadow-mapSize={[1024, 1024]} />
         <directionalLight position={[-3, 2, -2]} intensity={0.75} color="#c4b5fd" />

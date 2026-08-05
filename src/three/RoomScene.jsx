@@ -11,6 +11,13 @@ import {
 } from '../lib/items';
 import { isWideSpace, spaceConfig } from '../lib/spaces';
 
+const WIDE_PALETTES = {
+  room: { wall: '#c9b8ee', floors: ['#e4dcff', '#c3afe8'] },
+  garden: { floors: ['#6fc8b1', '#4fa58f'] },
+  classroom: { wall: '#cfc2f1', floors: ['#9fb8e5'] },
+  cafe: { wall: '#5a3d63', floors: ['#4f335d', '#704260'] },
+};
+
 function Shell({ wall, floors, cols = COLS, rows = ROWS, wide = false }) {
   const cx = (c) => c - cols / 2;
   const cz = (r) => r - rows / 2;
@@ -60,10 +67,12 @@ function Shell({ wall, floors, cols = COLS, rows = ROWS, wide = false }) {
   );
 }
 
-function GardenShell({ cols = COLS, rows = ROWS, wide = false }) {
+function GardenShell({ cols = COLS, rows = ROWS, floorColors = GARDEN_FLOOR, wide = false }) {
   const cx = (c) => c - cols / 2;
   const cz = (r) => r - rows / 2;
-  const [fa, fb] = GARDEN_FLOOR;
+  const [fa, fb] = floorColors;
+  const soil = wide ? '#9b7653' : '#c9a468';
+  const fence = wide ? '#fef3c7' : '#ffffff';
   const posts = [];
   for (let c = 0; c <= cols; c++) {
     posts.push([cx(c), cz(0)], [cx(c), cz(rows)]);
@@ -86,16 +95,16 @@ function GardenShell({ cols = COLS, rows = ROWS, wide = false }) {
       {/* 흙 테두리 */}
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, 0]} receiveShadow>
         <planeGeometry args={[cols + 1.6, rows + 1.6]} />
-        <meshStandardMaterial color="#c9a468" roughness={1} />
+        <meshStandardMaterial color={soil} roughness={1} />
       </mesh>
       {/* 하얀 울타리 */}
       {posts.map(([x, z], i) => (
-        <B key={i} p={[x, 0.3, z]} s={[0.09, 0.6, 0.09]} c="#ffffff" />
+        <B key={i} p={[x, 0.3, z]} s={[0.09, 0.6, 0.09]} c={fence} />
       ))}
-      <B p={[0, 0.42, cz(0)]} s={[cols, 0.07, 0.05]} c="#ffffff" />
-      <B p={[0, 0.42, cz(rows)]} s={[cols, 0.07, 0.05]} c="#ffffff" />
-      <B p={[cx(0), 0.42, 0]} s={[0.05, 0.07, rows]} c="#ffffff" />
-      <B p={[cx(cols), 0.42, 0]} s={[0.05, 0.07, rows]} c="#ffffff" />
+      <B p={[0, 0.42, cz(0)]} s={[cols, 0.07, 0.05]} c={fence} />
+      <B p={[0, 0.42, cz(rows)]} s={[cols, 0.07, 0.05]} c={fence} />
+      <B p={[cx(0), 0.42, 0]} s={[0.05, 0.07, rows]} c={fence} />
+      <B p={[cx(cols), 0.42, 0]} s={[0.05, 0.07, rows]} c={fence} />
       {/* 해 + 구름 */}
       <Sp p={[-4, 5.2, -4]} rad={0.55} c="#fde047" e="#fde047" />
       <group position={[2.5, 4.6, -3.5]}>
@@ -118,10 +127,11 @@ function GardenShell({ cols = COLS, rows = ROWS, wide = false }) {
 }
 
 /* 🏫 교실 — 앞 칠판·마루·창가·천장 형광등이 있는 진짜 교실 */
-function ClassShell({ cols = COLS, rows = ROWS, wide = false }) {
+function ClassShell({ cols = COLS, rows = ROWS, floorColors = CLASS_FLOOR, wide = false }) {
   const cx = (c) => c - cols / 2;
   const cz = (r) => r - rows / 2;
-  const [fa] = CLASS_FLOOR;
+  const [fa] = floorColors;
+  const wall = wide ? WIDE_PALETTES.classroom.wall : '#f2ede2';
   return (
     <group>
       {/* 나무 마루 (긴 널판) */}
@@ -137,8 +147,8 @@ function ClassShell({ cols = COLS, rows = ROWS, wide = false }) {
       ))}
 
       {/* 교실 벽 (연한 미색) */}
-      <B p={[0, 1.75, cz(0) - 0.1]} s={[cols + 0.4, 3.5, 0.2]} c="#f2ede2" />
-      <B p={[cx(0) - 0.1, 1.75, 0]} s={[0.2, 3.5, rows + 0.4]} c="#f2ede2" />
+      <B p={[0, 1.75, cz(0) - 0.1]} s={[cols + 0.4, 3.5, 0.2]} c={wall} />
+      <B p={[cx(0) - 0.1, 1.75, 0]} s={[0.2, 3.5, rows + 0.4]} c={wall} />
       {/* 아래 나무 굽도리 + 허리 몰딩 */}
       <B p={[0, 0.2, cz(0) + 0.03]} s={[cols, 0.4, 0.07]} c="#c9a97e" />
       <B p={[cx(0) + 0.03, 0.2, 0]} s={[0.07, 0.4, rows]} c="#c9a97e" />
@@ -169,9 +179,12 @@ function ClassShell({ cols = COLS, rows = ROWS, wide = false }) {
       ))}
 
       {wide && (
-        <group position={[3.8, 0.03, 2.8]}>
-          <B p={[0, 0, 0]} s={[3.5, 0.04, 2.2]} c="#bfdbfe" />
-          {[-1.2, 0, 1.2].map((x) => <B key={x} p={[x, 0.05, 0]} s={[0.9, 0.07, 1.7]} c="#fef3c7" />)}
+        <group position={[3.5, 1.75, cz(0) + 0.03]}>
+          <B p={[0, 0, 0]} s={[3.8, 1.05, 0.06]} c="#5b4b87" />
+          <B p={[0, 0, 0.04]} s={[3.45, 0.72, 0.03]} c="#7c6bb1" />
+          <Sp p={[-1.15, 0.05, 0.08]} rad={0.12} c="#fbbf24" e="#fde68a" />
+          <Sp p={[0, 0.16, 0.08]} rad={0.14} c="#34d399" e="#a7f3d0" />
+          <Sp p={[1.15, -0.08, 0.08]} rad={0.11} c="#f472b6" e="#fbcfe8" />
         </group>
       )}
 
@@ -180,10 +193,11 @@ function ClassShell({ cols = COLS, rows = ROWS, wide = false }) {
 }
 
 /* ☕ 카페 — 벽돌 벽, 어두운 원목 바닥, 펜던트 조명 */
-function CafeShell({ cols = COLS, rows = ROWS, wide = false }) {
+function CafeShell({ cols = COLS, rows = ROWS, floorColors = CAFE_FLOOR, wide = false }) {
   const cx = (c) => c - cols / 2;
   const cz = (r) => r - rows / 2;
-  const [fa, fb] = CAFE_FLOOR;
+  const [fa, fb] = floorColors;
+  const backWall = wide ? WIDE_PALETTES.cafe.wall : '#8d5b45';
   return (
     <group>
       {/* 원목 바닥 (헤링본 느낌) */}
@@ -197,14 +211,16 @@ function CafeShell({ cols = COLS, rows = ROWS, wide = false }) {
         );
       })}
       {/* 벽돌 뒷벽 */}
-      <B p={[0, 1.7, cz(0) - 0.12]} s={[cols + 0.4, 3.4, 0.24]} c="#8d5b45" />
+      <B p={[0, 1.7, cz(0) - 0.12]} s={[cols + 0.4, 3.4, 0.24]} c={backWall} />
       {Array.from({ length: 11 }, (_, row) =>
         Array.from({ length: 9 }, (_, col) => (
           <B
             key={`${row}-${col}`}
             p={[cx(0) + 0.5 + col * 0.95 + (row % 2 ? 0.45 : 0), 0.3 + row * 0.29, cz(0) + 0.02]}
             s={[0.86, 0.22, 0.04]}
-            c={row % 3 === 0 ? '#9c6650' : row % 3 === 1 ? '#87553f' : '#a06e56'}
+            c={wide
+              ? (row % 3 === 0 ? '#78507d' : row % 3 === 1 ? '#684468' : '#895b86')
+              : (row % 3 === 0 ? '#9c6650' : row % 3 === 1 ? '#87553f' : '#a06e56')}
           />
         ))
       )}
@@ -258,9 +274,23 @@ export default function RoomScene({
   const targetRef = useRef([0.5, 1]);
   const [hover, setHover] = useState(null); // 배치 미리보기 셀
 
-  const wall = (wallId && ITEM_MAP[wallId]?.colors.a) || DEFAULT_WALL;
+  const wide = isWideSpace(mode);
+  const cols = wide ? COLS * 2 : COLS;
+  const rows = wide ? ROWS * 2 : ROWS;
+  const cx = (c) => c - cols / 2;
+  const cz = (r) => r - rows / 2;
+  const baseMode = spaceConfig(mode).baseId;
+  const garden = baseMode === 'garden';
+  const classroom = baseMode === 'classroom';
+  const cafe = baseMode === 'cafe';
+  const widePalette = WIDE_PALETTES[baseMode] || WIDE_PALETTES.room;
+  const wall = wide
+    ? (widePalette.wall || DEFAULT_WALL)
+    : (wallId && ITEM_MAP[wallId]?.colors.a) || DEFAULT_WALL;
   const fitem = floorId && ITEM_MAP[floorId];
-  const floors = fitem ? [fitem.colors.a, fitem.colors.b || fitem.colors.a] : DEFAULT_FLOOR;
+  const floors = wide
+    ? (widePalette.floors || DEFAULT_FLOOR)
+    : fitem ? [fitem.colors.a, fitem.colors.b || fitem.colors.a] : DEFAULT_FLOOR;
 
   const placingItem = placing ? ITEM_MAP[placing] : null;
 
@@ -275,16 +305,6 @@ export default function RoomScene({
       onSelectFurniture?.(null);
     }
   };
-
-  const wide = isWideSpace(mode);
-  const cols = wide ? COLS * 2 : COLS;
-  const rows = wide ? ROWS * 2 : ROWS;
-  const cx = (c) => c - cols / 2;
-  const cz = (r) => r - rows / 2;
-  const baseMode = spaceConfig(mode).baseId;
-  const garden = baseMode === 'garden';
-  const classroom = baseMode === 'classroom';
-  const cafe = baseMode === 'cafe';
 
   // 동반자들이 돌아다닐 수 있는 범위
   const bounds = {
@@ -306,9 +326,10 @@ export default function RoomScene({
     <div
       style={{ height }}
       className={`rounded-3xl overflow-hidden border-4 touch-none ${
-        garden ? 'border-emerald-200 bg-gradient-to-b from-sky-300 via-sky-200 to-emerald-100'
-          : classroom ? 'border-sky-200 bg-gradient-to-b from-sky-100 to-amber-50'
-          : cafe ? 'border-amber-700 bg-gradient-to-b from-orange-100 to-amber-50'
+        garden ? (wide ? 'border-teal-300 bg-gradient-to-b from-indigo-300 via-cyan-200 to-teal-200' : 'border-emerald-200 bg-gradient-to-b from-sky-300 via-sky-200 to-emerald-100')
+          : classroom ? (wide ? 'border-indigo-300 bg-gradient-to-b from-violet-200 via-indigo-100 to-sky-100' : 'border-sky-200 bg-gradient-to-b from-sky-100 to-amber-50')
+          : cafe ? (wide ? 'border-fuchsia-800 bg-gradient-to-b from-purple-300 via-pink-100 to-orange-100' : 'border-amber-700 bg-gradient-to-b from-orange-100 to-amber-50')
+          : wide ? 'border-violet-300 bg-gradient-to-b from-violet-200 via-fuchsia-100 to-cyan-100'
           : 'border-amber-200 bg-gradient-to-b from-sky-100 to-amber-50'
       }`}
     >
@@ -341,9 +362,9 @@ export default function RoomScene({
           shadow-camera-top={wide ? 18 : 8}
           shadow-camera-bottom={wide ? -18 : -8}
         />
-        {garden ? <GardenShell cols={cols} rows={rows} wide={wide} />
-          : classroom ? <ClassShell cols={cols} rows={rows} wide={wide} />
-          : cafe ? <CafeShell cols={cols} rows={rows} wide={wide} />
+        {garden ? <GardenShell cols={cols} rows={rows} floorColors={wide ? widePalette.floors : GARDEN_FLOOR} wide={wide} />
+          : classroom ? <ClassShell cols={cols} rows={rows} floorColors={wide ? widePalette.floors : CLASS_FLOOR} wide={wide} />
+          : cafe ? <CafeShell cols={cols} rows={rows} floorColors={wide ? widePalette.floors : CAFE_FLOOR} wide={wide} />
           : <Shell wall={wall} floors={floors} cols={cols} rows={rows} wide={wide} />}
 
         {/* 바닥 클릭/호버 레이어 */}

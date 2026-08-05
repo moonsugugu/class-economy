@@ -169,7 +169,7 @@ export default function HeroShopPage() {
     return (
       <div
         key={item.id}
-        className={`relative overflow-hidden rounded-3xl border-2 bg-gradient-to-br p-4 text-center shadow-lg transition hover:-translate-y-0.5 ${rarity?.surface || 'from-indigo-50 via-white to-pink-100'} ${rarity?.border || 'border-indigo-200'} ${owned ? 'ring-2 ring-emerald-300 ring-offset-2' : ''} ${!available ? 'opacity-70' : ''}`}
+        className={`relative overflow-hidden rounded-3xl border-2 bg-gradient-to-br p-4 text-center shadow-lg transition hover:-translate-y-0.5 ${item.rarity === 'transcendent' ? 'hero-card-transcendent' : (rarity?.surface || 'from-indigo-50 via-white to-pink-100')} ${rarity?.border || 'border-indigo-200'} ${owned ? 'ring-2 ring-emerald-300 ring-offset-2' : ''} ${!available ? 'opacity-70' : ''}`}
       >
         {rarity && <div className="absolute right-3 top-3 h-2 w-2 rounded-full" style={{ background: rarity.accent, boxShadow: `0 0 12px ${rarity.accent}` }} />}
         <HeroItemVisual item={item} size={96} className="mx-auto mb-2" />

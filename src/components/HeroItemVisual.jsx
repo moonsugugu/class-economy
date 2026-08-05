@@ -31,9 +31,10 @@ export function HeroItemVisual({ item, size = 76, className = '', showLevel = tr
 
   const theme = item.rarity ? HERO_RARITIES[item.rarity] : CHARACTER_THEME;
   const accent = theme.accent || '#818cf8';
+  const transcendent = item.rarity === 'transcendent';
   return (
     <div
-      className={`relative isolate flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 bg-gradient-to-br ${theme.surface} ${theme.border} shadow-lg ${className}`}
+      className={`relative isolate flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 ${transcendent ? 'hero-item-transcendent' : `bg-gradient-to-br ${theme.surface} ${theme.border}`} shadow-lg ${className}`}
       style={{
         width: size,
         height: size,
@@ -50,6 +51,7 @@ export function HeroItemVisual({ item, size = 76, className = '', showLevel = tr
         className="absolute bottom-1 left-1/2 h-2 w-2/3 -translate-x-1/2 rounded-full opacity-25 blur-md"
         style={{ background: accent }}
       />
+      {transcendent && <div className="hero-item-rainbow absolute inset-0" />}
       {item.rarity === 'elite' && (
         <div className="hero-item-rarity-aura absolute inset-2 rounded-xl border border-violet-300/70" />
       )}
@@ -59,6 +61,23 @@ export function HeroItemVisual({ item, size = 76, className = '', showLevel = tr
           <span className="hero-item-spark left-3 top-3" style={{ background: accent }} />
           <span className="hero-item-spark right-3 top-5" style={{ background: '#fff7ed' }} />
           <span className="hero-item-spark bottom-3 right-5" style={{ background: accent }} />
+        </>
+      )}
+      {transcendent && (
+        <>
+          <div className="hero-item-rarity-aura absolute inset-1 rounded-xl border-2 border-fuchsia-300/80" />
+          {['#fb7185', '#fbbf24', '#4ade80', '#38bdf8', '#a78bfa'].map((color, index) => (
+            <span
+              key={color}
+              className="hero-item-spark"
+              style={{
+                background: color,
+                left: `${15 + index * 17}%`,
+                top: index % 2 ? '72%' : '14%',
+                animationDelay: `${index * 120}ms`,
+              }}
+            />
+          ))}
         </>
       )}
       <span

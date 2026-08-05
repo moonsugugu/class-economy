@@ -199,7 +199,7 @@ export default function VisitPage() {
 
       {msg && <div className="rounded-2xl px-4 py-3 bg-emerald-50 text-emerald-700">{msg}</div>}
 
-      <div className="flex flex-wrap rounded-2xl bg-white shadow overflow-hidden w-fit">
+      <div className="flex min-w-0 max-w-full flex-nowrap overflow-x-auto rounded-2xl bg-white shadow w-fit">
         {SPACE_TABS.map((entry) => {
           const unlocked = isSpaceUnlocked(host, entry.id);
           return (
@@ -208,7 +208,7 @@ export default function VisitPage() {
               onClick={() => unlocked && setSpace(entry.id)}
               disabled={!unlocked}
               title={!unlocked ? '친구가 아직 구매하지 않은 공간이에요.' : entry.visitLabel}
-              className={`px-3 py-1.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-45 ${space === entry.id ? 'bg-pink-500 text-white' : 'text-gray-500'}`}
+              className={`shrink-0 whitespace-nowrap px-2 py-1 text-xs transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-2.5 ${space === entry.id ? 'bg-pink-500 text-white' : 'text-gray-500'}`}
             >
               {unlocked ? entry.icon : '🔒'} {entry.visitLabel}
             </button>

@@ -207,7 +207,7 @@ export default function HeroPage() {
       )}
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-3xl shadow-lg p-5 text-center">
+        <div className="hero-profile-panel text-white rounded-3xl shadow-lg p-5 text-center">
           {hero.character ? <HeroPreview hero={hero} size={210} /> : <div className="h-[210px] rounded-2xl bg-white/15 flex items-center justify-center text-7xl">❔</div>}
           {hero.character ? (
             <>
@@ -232,31 +232,33 @@ export default function HeroPage() {
           <div className="space-y-2">
             {HERO_SLOTS.map(([slot, label]) => {
               const item = HERO_ITEM_MAP[hero.equipment[slot]];
-              const specialStats = formatHeroSpecialStats(item);
+              const specialStats = formatHeroSpecialStats(item).map((stat) => stat
+                .replace('보스전 크리티컬 확률', '치명타 확률')
+                .replace('크리티컬 데미지', '치명타 피해'));
               return (
-                <div key={slot} className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${item ? 'border-indigo-100 bg-indigo-50/40' : 'border-gray-100 bg-gray-50'}`}>
-                  <span className="w-12 shrink-0 text-xs text-gray-400">{label}</span>
-                  <HeroItemVisual item={item} size={52} showLevel={false} />
-                  <span className="min-w-0 flex-1 text-sm text-gray-600">
-                    <span className="block whitespace-normal break-words leading-tight">{item?.name || '미장착'}</span>
-                    {item && <span className="text-[11px] font-semibold text-indigo-500">{item.level}단계 장비</span>}
-                    {specialStats.map((stat) => <span key={stat} className="block text-[10px] leading-tight text-fuchsia-500">✨ {stat}</span>)}
+                <div key={slot} className={`flex items-center gap-2 rounded-2xl border px-2 py-1.5 ${item ? 'border-indigo-100 bg-indigo-50/40' : 'border-gray-100 bg-gray-50'}`}>
+                  <span className="w-8 shrink-0 text-[10px] text-gray-400">{label}</span>
+                  <HeroItemVisual item={item} size={44} showLevel={false} />
+                  <span className="min-w-0 flex-1 overflow-hidden text-gray-600">
+                    <span className="block truncate text-[11px] leading-tight">{item?.name || '미장착'}</span>
+                    {item && <span className="block text-[9px] font-semibold leading-tight text-indigo-500">{item.level}단계 장비</span>}
+                    {specialStats.map((stat) => <span key={stat} title={stat} className="block whitespace-nowrap text-[8px] leading-[1.05] tracking-[-0.03em] text-fuchsia-500">✨ {stat}</span>)}
                   </span>
-                  <span className="ml-auto shrink-0 text-right text-sm text-indigo-500">{item ? `+${item.power}` : ''}<small className="block text-[9px] text-gray-400">전투력</small></span>
+                  <span className="w-10 shrink-0 text-right text-[10px] text-indigo-500">{item ? `+${item.power}` : ''}<small className="block text-[8px] text-gray-400">전투력</small></span>
                 </div>
               );
             })}
-            <div className={['flex items-center gap-3 rounded-2xl border px-3 py-2', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50' : 'border-gray-100 bg-gray-50'].join(' ')}>
-              <span className="text-xs text-gray-400 w-12">펫</span>
-              <HeroItemVisual item={HERO_ITEM_MAP[hero.pet]} size={52} showLevel={false} />
-              <span className="min-w-0 flex-1 text-sm text-gray-600">
-                <span className="block whitespace-normal break-words leading-tight">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
-                {HERO_ITEM_MAP[hero.pet] && <span className="text-[11px] font-semibold text-fuchsia-500">{HERO_ITEM_MAP[hero.pet].level}단계 펫</span>}
+            <div className={['flex items-center gap-2 rounded-2xl border px-2 py-1.5', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50' : 'border-gray-100 bg-gray-50'].join(' ')}>
+              <span className="w-8 shrink-0 text-[10px] text-gray-400">펫</span>
+              <HeroItemVisual item={HERO_ITEM_MAP[hero.pet]} size={44} showLevel={false} />
+              <span className="min-w-0 flex-1 overflow-hidden text-gray-600">
+                <span className="block truncate text-[11px] leading-tight">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
+                {HERO_ITEM_MAP[hero.pet] && <span className="block text-[9px] font-semibold leading-tight text-fuchsia-500">{HERO_ITEM_MAP[hero.pet].level}단계 펫</span>}
               </span>
-              <span className="ml-auto text-right text-sm text-fuchsia-600">
-                {bossCriticalChance(hero) > 0 ? <>보스 크리티컬 {bossCriticalChance(hero)}%</> : ''}
-                <small className="block text-[9px] text-gray-400">보스 데미지 2배</small>
-                {criticalDamageBonus(hero) > 0 && <small className="block text-[9px] text-fuchsia-400">크리티컬 데미지 +{criticalDamageBonus(hero)}%</small>}
+              <span className="w-16 shrink-0 text-right text-[8px] leading-tight text-fuchsia-600">
+                {bossCriticalChance(hero) > 0 && <span className="block whitespace-nowrap">치명타 확률 {bossCriticalChance(hero)}%</span>}
+                <small className="block text-[8px] text-gray-400">보스 피해 2배</small>
+                {criticalDamageBonus(hero) > 0 && <small className="block whitespace-nowrap text-[8px] text-fuchsia-400">치명타 피해 +{criticalDamageBonus(hero)}%</small>}
               </span>
             </div>
           </div>

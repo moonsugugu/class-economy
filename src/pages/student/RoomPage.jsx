@@ -372,7 +372,7 @@ function RoomInner({ klass, student }) {
       {/* 상단 */}
       <div className="flex items-center gap-2 flex-wrap">
         <h2 className="text-2xl text-purple-600">{spaceLabel}</h2>
-        <div className="flex flex-wrap rounded-2xl bg-white shadow overflow-hidden">
+        <div className="flex min-w-0 max-w-full flex-1 flex-nowrap overflow-x-auto rounded-2xl bg-white shadow">
           {SPACE_TABS.map((entry) => {
             const unlocked = isSpaceUnlocked(student, entry.id);
             const label = `${unlocked ? entry.icon : '🔒'} ${entry.label}`;
@@ -382,7 +382,7 @@ function RoomInner({ klass, student }) {
               onClick={() => selectSpace(entry)}
               disabled={spaceBusy === entry.id}
               title={entry.wide && !unlocked ? `${fmt(itemPrice(entry.unlockPrice || SPACE_UNLOCK_PRICE, klass))}${klass.currency}에 잠금 해제` : entry.label}
-              className={`px-3 py-1.5 text-sm transition disabled:opacity-60 ${space === entry.id ? 'bg-purple-500 text-white' : 'text-gray-500'}`}
+              className={`shrink-0 whitespace-nowrap px-2 py-1 text-xs transition disabled:opacity-60 sm:px-2.5 ${space === entry.id ? 'bg-purple-500 text-white' : 'text-gray-500'}`}
             >
               {label}
             </button>
