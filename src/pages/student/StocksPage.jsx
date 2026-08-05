@@ -11,6 +11,7 @@ import {
   pendingSchedule, SCHEDULE_LABEL, stockCur, WALLET_FIELD,
 } from '../../lib/stocks';
 import { applyScheduledTicks } from '../../lib/marketSync';
+import { isActiveStudent } from '../../lib/studentState';
 
 /* 미니 차트 */
 function Spark({ data, up }) {
@@ -320,7 +321,7 @@ function RankBoard({ klass, student, stocks, fx, kpu }) {
   useEffect(() => {
     (async () => {
       const snap = await getDocs(collection(db, 'classes', klass.id, 'students'));
-      setRows(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setRows(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter(isActiveStudent));
     })();
   }, [klass.id, period]);
 

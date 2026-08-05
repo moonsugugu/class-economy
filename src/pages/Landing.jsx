@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { useApp } from '../context/AppContext';
+import { isActiveStudent } from '../lib/studentState';
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -47,11 +48,12 @@ export default function Landing() {
       const classDoc = classSnap.docs[0];
       const studentsRef = collection(db, 'classes', classDoc.id, 'students');
       const stSnap = await getDocs(query(studentsRef, where('name', '==', n)));
+      const existingStudent = stSnap.docs.find((d) => isActiveStudent(d.data()));
       let studentId;
 
-      if (!stSnap.empty) {
+      if (existingStudent) {
         // 이미 있는 학생 — 비밀번호가 맞아야 들어갈 수 있어요
-        const docSnap = stSnap.docs[0];
+        const docSnap = existingStudent;
         const saved = String(docSnap.data().pin || '');
         if (saved && saved !== p) {
           setError('비밀번호가 달라요. 처음 정한 4자리를 입력해 주세요! 🔒 (잊었다면 선생님께 말씀드리세요)');

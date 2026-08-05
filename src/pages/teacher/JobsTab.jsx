@@ -6,6 +6,7 @@ import {
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import { JOB_PRESETS } from '../../lib/jobs';
+import { isActiveStudent } from '../../lib/studentState';
 
 const card = 'bg-white rounded-3xl shadow p-6';
 const input = 'rounded-xl border-2 border-gray-200 px-3 py-2 focus:border-indigo-400 outline-none';
@@ -26,7 +27,7 @@ export default function JobsTab({ klass }) {
 
   useEffect(() => {
     const q = query(collection(db, 'classes', klass.id, 'students'), orderBy('name'));
-    return onSnapshot(q, (s) => setStudents(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    return onSnapshot(q, (s) => setStudents(s.docs.map((d) => ({ id: d.id, ...d.data() })).filter(isActiveStudent)));
   }, [klass.id]);
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3500); };

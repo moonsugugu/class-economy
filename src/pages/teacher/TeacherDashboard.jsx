@@ -3,20 +3,22 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import {
   collection, doc, query, where, orderBy, onSnapshot,
   addDoc, updateDoc, deleteDoc, getDocs, setDoc, writeBatch,
-  runTransaction, increment, serverTimestamp,
+  runTransaction, increment, serverTimestamp, deleteField,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
-import { fmt, makeClassCode } from '../../lib/util';
+import { fmt, makeClassCode, rankAssets } from '../../lib/util';
 import {
   changePct, advance, usedTicks, makeInitialMarket, makeCustomStock,
-  MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, todayKey,
+  MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, DEFAULT_FX, todayKey,
   pendingSchedule, SCHEDULE_LABEL, fetchRealQuotes, applyRealPrices,
   DEFAULT_KRW_PER_UNIT,
 } from '../../lib/stocks';
 import { applyScheduledTicks } from '../../lib/marketSync';
 import { SHOP_PRESETS } from '../../lib/shopPresets';
 import { grossPay, taxOf } from '../../lib/jobs';
+import { isActiveStudent } from '../../lib/studentState';
+import { ITEM_MAP } from '../../lib/items';
 import SeatsTab from './SeatsTab.jsx';
 import ReportsTab from './ReportsTab.jsx';
 import JobsTab from './JobsTab.jsx';
@@ -235,6 +237,8 @@ function Center({ children }) {
 /* ---------- 학생 관리: 월급 지급 / 상벌점 화폐 증감 ---------- */
 function StudentsTab({ klass }) {
   const [students, setStudents] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [market, setMarket] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
@@ -248,7 +252,60 @@ function StudentsTab({ klass }) {
     );
   }, [klass.id]);
 
-  const sortedStudents = useMemo(() => sortStudents(students, sortMode), [students, sortMode]);
+  useEffect(() => {
+    const q = query(collection(db, 'classes', klass.id, 'accounts'), where('status', '==', 'active'));
+    return onSnapshot(q, (snap) =>
+      setAccounts(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+  }, [klass.id]);
+
+  useEffect(() => {
+    return onSnapshot(doc(db, ...MARKET_PATH(klass.id)), (snap) => {
+      setMarket(snap.exists() ? snap.data() : null);
+    });
+  }, [klass.id]);
+
+  const activeStudents = useMemo(() => students.filter(isActiveStudent), [students]);
+  const archivedStudents = useMemo(() => students.filter((s) => !isActiveStudent(s)), [students]);
+  const sortedStudents = useMemo(() => sortStudents(activeStudents, sortMode), [activeStudents, sortMode]);
+  const savingsByStudent = useMemo(() => {
+    const totals = new Map();
+    accounts.forEach((account) => {
+      totals.set(account.studentId, (totals.get(account.studentId) || 0) + (Number(account.amount) || 0));
+    });
+    return totals;
+  }, [accounts]);
+  const marketStocks = market?.stocks || [];
+  const fx = Number(market?.fx) || DEFAULT_FX;
+  const kpu = Number(klass.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
+
+  const stockValueOf = (student) => Object.entries(student.holdings || {}).reduce((total, [symbol, holding]) => {
+    const stock = marketStocks.find((item) => (item.symbol || item.id) === symbol);
+    const quantity = Number(holding?.qty) || 0;
+    if (!stock || quantity <= 0) return total;
+    const rawValue = Number(stock.price) * quantity;
+    if (stock.market === 'US') return total + (rawValue * fx) / kpu;
+    if (stock.market === 'KR') return total + rawValue / kpu;
+    return total + rawValue;
+  }, 0);
+
+  const spaceSpendingOf = (student) => (student.inventory || []).reduce(
+    (total, itemId) => total + (Number(ITEM_MAP[itemId]?.price) || 0),
+    0
+  );
+
+  const assetBreakdownOf = (student) => {
+    const savings = savingsByStudent.get(student.id) || 0;
+    const stocks = stockValueOf(student);
+    return {
+      total: Math.round(rankAssets(student, marketStocks, fx, kpu) + savings),
+      cash: Number(student.cash) || 0,
+      deposit: Number(student.deposit) || 0,
+      savings,
+      stocks,
+      spaceSpending: spaceSpendingOf(student),
+    };
+  };
 
   const toggle = (id) => setSelected((s) => {
     const n = new Set(s);
@@ -257,7 +314,7 @@ function StudentsTab({ klass }) {
   });
   const allSelected = sortedStudents.length > 0 && selected.size === sortedStudents.length;
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(sortedStudents.map((s) => s.id)));
-  const targets = students.filter((s) => selected.has(s.id));
+  const targets = activeStudents.filter((s) => selected.has(s.id));
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
 
@@ -303,14 +360,20 @@ function StudentsTab({ klass }) {
   };
 
   const removeStudent = async (s) => {
-    if (!confirm(`정말 '${s.name}' 학생 계정을 삭제할까요?\n현금, 예금, 주식 보유 내역 같은 학생 문서의 자산 정보가 사라져요.`)) return;
-    await deleteDoc(doc(db, 'classes', klass.id, 'students', s.id));
+    if (!confirm(`'${s.name}' 학생 계정을 보관할까요?\n학생 문서와 현금·예금·주식·거래 데이터는 삭제하지 않고 보관합니다.`)) return;
+    await updateDoc(doc(db, 'classes', klass.id, 'students', s.id), { archivedAt: serverTimestamp() });
     setSelected((prev) => {
       const next = new Set(prev);
       next.delete(s.id);
       return next;
     });
-    flash(`🗑️ ${s.name} 학생 계정을 삭제했어요.`);
+    flash(`📦 ${s.name} 학생 계정을 보관했어요. 기존 데이터는 보존돼요.`);
+  };
+
+  const restoreStudent = async (s) => {
+    if (!confirm(`'${s.name}' 학생 계정을 다시 활성화할까요?`)) return;
+    await updateDoc(doc(db, 'classes', klass.id, 'students', s.id), { archivedAt: deleteField() });
+    flash(`↩️ ${s.name} 학생 계정을 복구했어요.`);
   };
 
   const saveCustomOrder = async (ordered) => {
@@ -422,58 +485,93 @@ function StudentsTab({ klass }) {
           <span className="basis-full text-xs text-gray-400">
             행 왼쪽의 ↕ 손잡이를 끌어 놓으면 직접 순서로 저장돼요. 숫자순은 1, 2, 9, 10, 11처럼 정렬됩니다.
           </span>
+          <span className="basis-full text-xs text-gray-400">
+            총자산은 현금·예금·적금·주식과 원화/달러 환산액의 합계예요. 공간 지출비는 보유 아이템 가격표 기준이며 세트 할인은 기존 데이터에 없어 반영하지 않습니다.
+          </span>
         </div>
-        <table className="w-full text-left">
-          <thead>
-            <tr className="text-gray-400 text-sm border-b">
-              <th className="py-2 w-10"></th>
-              <th className="py-2"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-5 h-5" /></th>
-              <th>이름</th>
-              <th className="text-right">현금</th>
-              <th className="text-right">예금</th>
-              <th className="text-right w-20">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedStudents.map((s) => (
-              <tr
-                key={s.id}
-                draggable
-                onDragStart={() => setDraggingId(s.id)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => moveStudent(s.id)}
-                onDragEnd={() => setDraggingId(null)}
-                className={`border-b border-gray-100 hover:bg-indigo-50/40 ${draggingId === s.id ? 'opacity-50' : ''}`}
-              >
-                <td className="py-2 text-gray-300 cursor-grab select-none" title="끌어서 순서 바꾸기">↕</td>
-                <td className="py-2"><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="w-5 h-5" /></td>
-                <td className="text-lg">
-                  {s.avatar?.base || '🙂'} {s.name}
-                  {s.jobName && (
-                    <span className="ml-2 text-xs bg-teal-50 text-teal-700 rounded-lg px-2 py-0.5 align-middle">
-                      {s.jobEmoji} {s.jobName} +{fmt(s.jobSalary || 0)}
-                    </span>
-                  )}
-                </td>
-                <td className="text-right">{fmt(s.cash)} {klass.currency}</td>
-                <td className="text-right text-gray-500">{fmt(s.deposit)} {klass.currency}</td>
-                <td className="text-right">
-                  <button
-                    onClick={() => removeStudent(s)}
-                    className="rounded-lg px-2.5 py-1 text-sm bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition"
-                  >
-                    삭제
-                  </button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-left">
+            <thead>
+              <tr className="text-gray-400 text-sm border-b">
+                <th className="py-2 w-10"></th>
+                <th className="py-2"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-5 h-5" /></th>
+                <th>이름</th>
+                <th className="text-right">총자산</th>
+                <th className="text-right">현금</th>
+                <th className="text-right">예금</th>
+                <th className="text-right">적금</th>
+                <th className="text-right">주식 평가액</th>
+                <th className="text-right">공간 지출비</th>
+                <th className="text-right w-20">관리</th>
               </tr>
-            ))}
-            {!students.length && (
-              <tr><td colSpan={6} className="py-8 text-center text-gray-400">
-                아직 학생이 없어요. 학생들에게 학급 코드 <b>{klass.code}</b>를 알려 주세요!
-              </td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {sortedStudents.map((s) => {
+                const asset = assetBreakdownOf(s);
+                return (
+                  <tr
+                    key={s.id}
+                    draggable
+                    onDragStart={() => setDraggingId(s.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => moveStudent(s.id)}
+                    onDragEnd={() => setDraggingId(null)}
+                    className={`border-b border-gray-100 hover:bg-indigo-50/40 ${draggingId === s.id ? 'opacity-50' : ''}`}
+                  >
+                    <td className="py-2 text-gray-300 cursor-grab select-none" title="끌어서 순서 바꾸기">↕</td>
+                    <td className="py-2"><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="w-5 h-5" /></td>
+                    <td className="text-lg whitespace-nowrap">
+                      {s.avatar?.base || '🙂'} {s.name}
+                      {s.jobName && (
+                        <span className="ml-2 text-xs bg-teal-50 text-teal-700 rounded-lg px-2 py-0.5 align-middle">
+                          {s.jobEmoji} {s.jobName} +{fmt(s.jobSalary || 0)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-right font-semibold whitespace-nowrap">{fmt(asset.total)} {klass.currency}</td>
+                    <td className="text-right whitespace-nowrap">{fmt(asset.cash)} {klass.currency}</td>
+                    <td className="text-right text-gray-500 whitespace-nowrap">{fmt(asset.deposit)} {klass.currency}</td>
+                    <td className="text-right text-pink-600 whitespace-nowrap">{fmt(asset.savings)} {klass.currency}</td>
+                    <td className="text-right text-sky-600 whitespace-nowrap">{fmt(asset.stocks)} {klass.currency}</td>
+                    <td className="text-right text-purple-600 whitespace-nowrap">{fmt(asset.spaceSpending)} {klass.currency}</td>
+                    <td className="text-right">
+                      <button
+                        onClick={() => removeStudent(s)}
+                        className="rounded-lg px-2.5 py-1 text-sm bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition"
+                      >
+                        보관
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!activeStudents.length && (
+                <tr><td colSpan={10} className="py-8 text-center text-gray-400">
+                  아직 학생이 없어요. 학생들에게 학급 코드 <b>{klass.code}</b>를 알려 주세요!
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {archivedStudents.length > 0 && (
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <b className="text-amber-800">📦 보관된 학생 {archivedStudents.length}명</b>
+              <span className="text-xs text-amber-700">기존 데이터는 삭제되지 않았습니다.</span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {archivedStudents.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => restoreStudent(s)}
+                  className="rounded-xl bg-white px-3 py-2 text-sm text-amber-800 shadow-sm hover:bg-amber-100"
+                >
+                  {s.avatar?.base || '🙂'} {s.name} 복구
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1117,7 +1215,7 @@ function PinManager({ klass }) {
 
   useEffect(() => {
     const q = query(collection(db, 'classes', klass.id, 'students'), orderBy('name'));
-    return onSnapshot(q, (s) => setStudents(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    return onSnapshot(q, (s) => setStudents(s.docs.map((d) => ({ id: d.id, ...d.data() })).filter(isActiveStudent)));
   }, [klass.id]);
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };

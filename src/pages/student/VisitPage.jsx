@@ -8,6 +8,7 @@ import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import { ITEM_MAP, normalizeRoom } from '../../lib/items';
 import RoomScene from '../../three/RoomScene.jsx';
+import { isActiveStudent } from '../../lib/studentState';
 
 const SPACES = [
   ['room', '🛋️ 방'],
@@ -30,9 +31,10 @@ export default function VisitPage() {
     (async () => {
       const snap = await getDocs(collection(db, 'classes', klass.id, 'students'));
       setFriends(
-        snap.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => (b.roomLikes || []).length - (a.roomLikes || []).length)
+          snap.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .filter(isActiveStudent)
+            .sort((a, b) => (b.roomLikes || []).length - (a.roomLikes || []).length)
       );
     })();
   }, [klass.id]);

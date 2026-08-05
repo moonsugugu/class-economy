@@ -4,17 +4,18 @@
 
 ## 기술 스택
 - **Frontend**: React 19 + Vite + Tailwind CSS 4 + React Router 7
-- **Backend/DB**: Firebase (Google Authentication + Cloud Firestore 실시간 동기화)
-- **주식**: 한국 대표주 10개 + 미국 대표주 10개 — API 키 없이 쓸 수 있는 **모의 시세 시뮬레이션** (교사 대시보드에서 변동 → Firestore를 통해 모든 학생 화면에 실시간 반영)
+- **인증**: Firebase Google Authentication (선생님 로그인 전용)
+- **Backend/DB**: 홈서버 `api.moonsunezip.com` REST/WebSocket + PostgreSQL 17
+- **주식**: 한국 대표주 10개 + 미국 대표주 10개 — API 키 없이 쓸 수 있는 **모의 시세 시뮬레이션** (교사 대시보드에서 변동 → PostgreSQL API/WebSocket을 통해 모든 학생 화면에 실시간 반영)
 
 ## 시작하기
 
-### 1. Firebase 프로젝트 준비 (최초 1회, 약 5분)
+### 1. Firebase 프로젝트 준비 (선생님 Google 로그인용, 최초 1회)
 1. [Firebase 콘솔](https://console.firebase.google.com)에서 새 프로젝트를 만듭니다.
 2. **빌드 → Authentication → 로그인 방법**에서 **Google**을 사용 설정합니다.
-3. **빌드 → Firestore Database**를 생성합니다. (위치는 asia-northeast3 서울 추천)
-4. Firestore **규칙** 탭에 이 저장소의 `firestore.rules` 내용을 붙여넣고 게시합니다.
-5. **프로젝트 설정(⚙️) → 일반 → 내 앱 → 웹 앱 추가(</>)** 후 표시되는 `firebaseConfig` 값을 복사합니다.
+3. **프로젝트 설정(⚙️) → 일반 → 내 앱 → 웹 앱 추가(</>)** 후 표시되는 `firebaseConfig` 값을 복사합니다.
+
+Firestore는 운영 데이터 저장소로 사용하지 않습니다. 학급·학생·잔액·거래·주식 데이터는 홈서버 API를 통해 PostgreSQL에 저장됩니다.
 
 ### 2. 환경 변수 설정
 ```bash
@@ -27,6 +28,15 @@ cp .env.example .env
 npm install
 npm run dev
 ```
+
+## 데이터 보존 및 운영 구조
+
+- 선생님 로그인만 Firebase Google Authentication을 사용합니다.
+- 브라우저는 PostgreSQL에 직접 접속하지 않고 `https://api.moonsunezip.com`의 REST/WebSocket API를 사용합니다.
+- 기존 운영 데이터 경로는 `classes/{classId}/...`입니다. 기존 데이터가 있는 상태에서 `apps/class-economy/...`처럼 경로를 바꾸지 않습니다.
+- 새 기능을 추가할 때도 기존 `classes/{classId}` 경로와 문서 ID를 유지하고, 데이터 이동이 필요하면 별도 마이그레이션과 복구 절차를 먼저 준비합니다.
+- 학생 계정은 삭제 대신 보관(`archivedAt`)할 수 있으며, 보관 시 기존 자산·거래·하위 데이터를 삭제하지 않습니다.
+- PostgreSQL API 변경이나 스키마 변경은 홈서버 백업 확인 후 진행합니다. 이 저장소에서는 홈서버에 원격 명령을 실행하지 않습니다.
 
 ## 사용 흐름
 | 역할 | 방법 |
@@ -43,12 +53,12 @@ npm run dev
 
 ### 학생 화면 (하단 탭)
 - **마이**: 현금 + 예금 + 적금 + 주식 평가액 = 총자산 한눈에
-- **상점**: 잔액으로 구매 → 재고 차감 + 교사에게 알림 (Firestore 트랜잭션으로 품절/잔액 검증)
+- **상점**: 잔액으로 구매 → 재고 차감 + 교사에게 알림 (PostgreSQL API 트랜잭션으로 품절/잔액 검증)
 - **은행**: 예금(자유 입출금, 7일마다 이자 수령) / 적금(7·14·28일 약정, 높은 이율, 중도해지 시 원금만)
 - **주식**: 실시간 시세·미니 차트·평가손익, 매수/매도 (트랜잭션 처리)
 - **마이룸**: 캐릭터 선택(무료) + 모자/얼굴/액세서리 착용 + 가구 구매 후 8×5 격자 배치 + **Canvas 인증샷 PNG 저장**
 
-## 데이터 구조 (Firestore)
+## 데이터 구조 (PostgreSQL 문서 API의 기존 경로)
 ```
 classes/{classId}
   ├─ code, name, teacherUid, currency, salary, depositRate, savingsRate
