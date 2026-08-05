@@ -5,11 +5,12 @@ import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import {
   HERO_DUEL_LIMIT, HERO_DUEL_WIN_REWARD, battleChance, heroDateKey,
-  heroDuelExtraCost, heroDisplayName, heroPower, normalizeHero, HERO_ITEM_MAP,
+  heroDuelExtraCost, heroDuelWinReward, heroDisplayName, heroPower, normalizeHero, HERO_ITEM_MAP,
 } from '../../lib/hero';
 import { isActiveStudent } from '../../lib/studentState';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
 import HeroDuelArena from '../../components/HeroDuelArena.jsx';
+import VictoryFireworks from '../../components/VictoryFireworks.jsx';
 
 const sortByPower = (a, b) => b.power - a.power || String(a.name || '').localeCompare(String(b.name || ''), 'ko');
 
@@ -21,6 +22,7 @@ export default function HeroDuelPage() {
   const [msg, setMsg] = useState(null);
   const [battlePhase, setBattlePhase] = useState('idle');
   const [duelResult, setDuelResult] = useState(null);
+  const [fireworks, setFireworks] = useState(false);
   const today = heroDateKey();
   const myHero = normalizeHero(student.rpg);
   const myPower = heroPower(myHero);
@@ -46,9 +48,13 @@ export default function HeroDuelPage() {
   const myIndex = ordered.findIndex((item) => item.id === student.id);
   const above = myIndex >= 0 ? ordered.slice(Math.max(0, myIndex - 2), myIndex) : [];
   const below = myIndex >= 0 ? ordered.slice(myIndex + 1, myIndex + 3) : [];
-  const candidates = [...above, ...below];
+  const candidates = [...above, ...below].map((item) => ({
+    ...item,
+    rankDelta: ordered.findIndex((candidate) => candidate.id === item.id) - myIndex,
+  }));
   const selected = candidates.find((item) => item.id === selectedId) || null;
   const chance = selected ? battleChance(myPower, selected.power) : 0;
+  const selectedReward = selected ? heroDuelWinReward(selected.rankDelta) : HERO_DUEL_WIN_REWARD;
 
   useEffect(() => {
     if (selectedId && !selected) setSelectedId('');
@@ -100,7 +106,7 @@ export default function HeroDuelPage() {
         const opponentPower = heroPower(opponentHero);
         const winChance = battleChance(currentPower, opponentPower);
         const won = roll < winChance;
-        const reward = won ? HERO_DUEL_WIN_REWARD : 0;
+        const reward = won ? heroDuelWinReward(selected.rankDelta) : 0;
         const update = {
           heroDuel: {
             ...currentDuel,
@@ -114,6 +120,7 @@ export default function HeroDuelPage() {
               won,
               chance: winChance,
               reward,
+              rankDelta: selected.rankDelta,
               extraCost: currentExtraCost,
               at: Date.now(),
             },
@@ -130,6 +137,7 @@ export default function HeroDuelPage() {
           myPower: currentPower,
           chance: winChance,
           reward,
+          rankDelta: selected.rankDelta,
           extraCost: currentExtraCost,
           attempt: currentAttempts + 1,
         };
@@ -143,6 +151,10 @@ export default function HeroDuelPage() {
       );
       setDuelResult(result);
       setBattlePhase(result.won ? 'win' : 'lose');
+      if (result.won) {
+        setFireworks(true);
+        setTimeout(() => setFireworks(false), 3000);
+      }
       setTimeout(() => setBattlePhase('idle'), 1800);
     } catch (e) {
       flash('err', e.message);
@@ -177,6 +189,7 @@ export default function HeroDuelPage() {
 
   return (
     <div className="space-y-4">
+      <VictoryFireworks active={fireworks} />
       <div className="flex items-center gap-3 flex-wrap">
         <div>
           <h2 className="text-2xl text-rose-600">⚔️ 친구와 대결하기</h2>
@@ -201,7 +214,7 @@ export default function HeroDuelPage() {
         <div className="mt-4 flex flex-wrap gap-2 text-sm">
           <span className="rounded-xl bg-white/20 px-3 py-1.5">기본 대결 {Math.min(attempts, HERO_DUEL_LIMIT)} / {HERO_DUEL_LIMIT}회</span>
           {attempts >= HERO_DUEL_LIMIT && <span className="rounded-xl bg-white/20 px-3 py-1.5">추가 대결 1회 {extraCost}{klass.currency}</span>}
-          <span className="rounded-xl bg-white/20 px-3 py-1.5">승리 보상 {HERO_DUEL_WIN_REWARD}{klass.currency} · 패배 0</span>
+          <span className="rounded-xl bg-white/20 px-3 py-1.5">승리 보상 위 2칸 4 · 위 1칸 3 · 아래 1칸 2 · 아래 2칸 1</span>
         </div>
       </div>
 
@@ -244,11 +257,12 @@ export default function HeroDuelPage() {
                 <div className="flex-1">
                   <div className="text-xs text-gray-400">선택한 상대</div>
                   <h3 className="text-xl text-gray-700">{heroDisplayName(selected.hero)}</h3>
-                  <div className="text-sm text-gray-400">내 전투력 {fmt(myPower)} vs 상대 {fmt(selected.power)}</div>
+                  <div className="text-sm text-gray-400">내 전투력 {fmt(myPower)} vs 상대 {fmt(selected.power)} · {selected.rankDelta < 0 ? `위 ${Math.abs(selected.rankDelta)}칸` : `아래 ${selected.rankDelta}칸`}</div>
                 </div>
                 <div className="text-center">
                   <div className="text-xs text-gray-400">내 승리 확률</div>
                   <div className="text-4xl font-bold tabular-nums text-rose-500">{Math.round(chance * 100)}%</div>
+                  <div className="text-xs font-bold text-amber-500">승리 시 {selectedReward}{klass.currency}</div>
                 </div>
                 <button
                   onClick={challenge}

@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   collection, doc, query, orderBy, limit as qlimit, onSnapshot, getDocs,
-  addDoc, deleteDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp,
+  deleteDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, runTransaction,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { fmt } from '../../lib/util';
+import { fmt, periodKeys } from '../../lib/util';
 import { ITEM_MAP, normalizeRoom } from '../../lib/items';
 import RoomScene from '../../three/RoomScene.jsx';
 import { isActiveStudent } from '../../lib/studentState';
@@ -25,6 +25,11 @@ export default function VisitPage() {
   const [book, setBook] = useState([]);
   const [text, setText] = useState('');
   const [msg, setMsg] = useState('');
+  const [writeBusy, setWriteBusy] = useState(false);
+  const today = periodKeys().d;
+  const rewardState = student.guestbookRewards?.date === today ? student.guestbookRewards : null;
+  const todayRewardCount = Math.max(0, Math.min(5, Number(rewardState?.count) || 0));
+  const rewardedHostIds = Array.isArray(rewardState?.hostIds) ? rewardState.hostIds : [];
 
   // 친구 목록 (한 번만 읽어요)
   useEffect(() => {
@@ -68,18 +73,63 @@ export default function VisitPage() {
 
   const write = async (e) => {
     e.preventDefault();
+    if (writeBusy) return;
+    if (host.id === student.id) return flash('친구 공간에서만 방명록 보상을 받을 수 있어요.');
+    if (todayRewardCount >= 5) return flash('오늘 방명록 보상 5회를 모두 받았어요.');
+    if (rewardedHostIds.includes(host.id)) return flash('오늘은 이 친구에게 이미 방명록을 남겼어요. 다른 친구 공간을 방문해 주세요.');
     const t = text.trim();
     if (t.length < 2) return flash('한 마디만 더 써 주세요!');
-    await addDoc(collection(db, 'classes', klass.id, 'students', host.id, 'guestbook'), {
-      fromId: student.id,
-      fromName: student.name,
-      avatar: student.avatar?.base || '🙂',
-      text: t.slice(0, 200),
-      at: Date.now(),
-      createdAt: serverTimestamp(),
-    });
-    setText('');
-    flash('✍️ 방명록을 남겼어요!');
+    setWriteBusy(true);
+    const visitorRef = doc(db, 'classes', klass.id, 'students', student.id);
+    const hostRef = doc(db, 'classes', klass.id, 'students', host.id);
+    const guestbookRef = doc(collection(db, 'classes', klass.id, 'students', host.id, 'guestbook'));
+    try {
+      let rewardResult = null;
+      await runTransaction(db, async (tx) => {
+        const visitorSnap = await tx.get(visitorRef);
+        const hostSnap = await tx.get(hostRef);
+        if (!visitorSnap.exists() || !hostSnap.exists() || !isActiveStudent(hostSnap.data())) {
+          throw new Error('친구 정보를 찾을 수 없어요.');
+        }
+        const current = visitorSnap.data() || {};
+        const saved = current.guestbookRewards && typeof current.guestbookRewards === 'object'
+          ? current.guestbookRewards
+          : {};
+        const count = saved.date === today ? Math.max(0, Number(saved.count) || 0) : 0;
+        const hostIds = saved.date === today && Array.isArray(saved.hostIds) ? saved.hostIds : [];
+        if (count >= 5) throw new Error('오늘 방명록 보상 5회를 모두 받았어요.');
+        if (hostIds.includes(host.id)) throw new Error('오늘은 이 친구에게 이미 방명록을 남겼어요.');
+        const reward = count === 0 ? 2 : 1;
+        const nextCount = count + 1;
+        tx.update(visitorRef, {
+          cash: (Number(current.cash) || 0) + reward,
+          guestbookRewards: {
+            date: today,
+            count: nextCount,
+            hostIds: [...hostIds, host.id],
+            lastReward: reward,
+            updatedAt: Date.now(),
+          },
+        });
+        tx.set(guestbookRef, {
+          fromId: student.id,
+          fromName: student.name,
+          avatar: student.avatar?.base || '🙂',
+          text: t.slice(0, 200),
+          reward,
+          rewardDate: today,
+          at: Date.now(),
+          createdAt: serverTimestamp(),
+        });
+        rewardResult = { reward, count: nextCount };
+      });
+      setText('');
+      flash(`✍️ 방명록을 남겼어요! +${rewardResult.reward}${klass.currency} (오늘 ${rewardResult.count}/5회)`);
+    } catch (error) {
+      flash(error.message);
+    } finally {
+      setWriteBusy(false);
+    }
   };
 
   const remove = (g) => {
@@ -180,7 +230,12 @@ export default function VisitPage() {
 
       {/* 방명록 */}
       <div className="bg-white rounded-3xl shadow p-5">
-        <h3 className="text-xl mb-3">✍️ 방명록</h3>
+        <div className="mb-3 flex items-center gap-2 flex-wrap">
+          <h3 className="text-xl">✍️ 방명록</h3>
+          <span className="ml-auto rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-600">
+            오늘 보상 {todayRewardCount}/5회
+          </span>
+        </div>
         <form onSubmit={write} className="flex gap-2 mb-3">
           <input
             value={text}
@@ -189,8 +244,17 @@ export default function VisitPage() {
             placeholder={`${host.name}에게 한 마디 남기기...`}
             className="flex-1 rounded-2xl border-2 border-gray-200 px-4 py-2.5 focus:border-pink-400 outline-none"
           />
-          <button className="rounded-2xl px-5 bg-pink-500 hover:bg-pink-600 text-white shadow">남기기</button>
+          <button
+            disabled={writeBusy || host.id === student.id || todayRewardCount >= 5 || rewardedHostIds.includes(host.id)}
+            className="rounded-2xl px-5 bg-pink-500 hover:bg-pink-600 text-white shadow disabled:bg-gray-300"
+          >
+            {writeBusy ? '저장 중...' : '남기기'}
+          </button>
         </form>
+        <p className="mb-3 text-xs text-gray-400">
+          오늘 첫 방명록은 +2{klass.currency}, 이후 다른 친구에게 남기는 방명록은 +1{klass.currency} · 하루 최대 5회
+          {rewardedHostIds.includes(host.id) && ' · 오늘은 이미 이 친구에게 보상을 받았어요.'}
+        </p>
         {!book.length ? (
           <p className="text-gray-400 text-center py-6">첫 방명록을 남겨 보세요! 🎉</p>
         ) : (

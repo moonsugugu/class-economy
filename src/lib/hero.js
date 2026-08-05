@@ -247,6 +247,16 @@ export const HERO_DUEL_LIMIT = 10;
 export const HERO_DUEL_EXTRA_COST = 2;
 export const HERO_DUEL_WIN_REWARD = 2;
 
+// 친구 대결 순위 차이: 음수는 내 위, 양수는 내 아래예요.
+export function heroDuelWinReward(rankDelta) {
+  const delta = Number(rankDelta);
+  if (delta === -2) return 4;
+  if (delta === -1) return 3;
+  if (delta === 1) return 2;
+  if (delta === 2) return 1;
+  return HERO_DUEL_WIN_REWARD;
+}
+
 export function heroDuelExtraCost(attempts) {
   return Math.max(0, Number(attempts) || 0) >= HERO_DUEL_LIMIT ? HERO_DUEL_EXTRA_COST : 0;
 }

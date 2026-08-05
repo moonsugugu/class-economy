@@ -12,6 +12,7 @@ import HeroPreview from '../../three/Hero3D.jsx';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
 import HeroBattleArena from '../../components/HeroBattleArena.jsx';
 import MonsterVisual from '../../components/MonsterVisual.jsx';
+import VictoryFireworks from '../../components/VictoryFireworks.jsx';
 
 export default function HeroPage() {
   const { klass, student } = useOutletContext();
@@ -19,6 +20,7 @@ export default function HeroPage() {
   const [msg, setMsg] = useState(null);
   const [battlePhase, setBattlePhase] = useState('idle');
   const [battleFx, setBattleFx] = useState(null);
+  const [fireworks, setFireworks] = useState(false);
   const hero = normalizeHero(student.rpg);
   const power = heroPower(hero);
   const today = heroDateKey();
@@ -154,6 +156,10 @@ export default function HeroPage() {
       setBattleFx(battleResult);
       setBattlePhase(battleResult.won ? 'win' : 'lose');
       setTimeout(() => setBattlePhase('idle'), 2800);
+      if (battleResult.won) {
+        setFireworks(true);
+        setTimeout(() => setFireworks(false), 3000);
+      }
       const costText = battleResult.extraCost > 0
         ? ` 추가 도전 비용 ${fmt(battleResult.extraCost)}${klass.currency}를 냈어요.`
         : '';
@@ -181,6 +187,7 @@ export default function HeroPage() {
 
   return (
     <div className="space-y-4">
+      <VictoryFireworks active={fireworks} />
       <div className="flex items-center gap-3 flex-wrap">
         <div>
           <h2 className="text-2xl text-indigo-600">⚔️ 용사키우기</h2>

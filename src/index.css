@@ -129,6 +129,70 @@ input, select, textarea, button {
   pointer-events: none;
 }
 
+.victory-fireworks {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.firework-burst {
+  position: absolute;
+  left: var(--firework-x);
+  top: var(--firework-y);
+  width: 0;
+  height: 0;
+  animation: fireworkBurst 2.7s ease-out both;
+}
+
+.firework-core {
+  position: absolute;
+  left: -0.4rem;
+  top: -0.4rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 999px;
+  background: hsl(var(--firework-hue) 100% 72%);
+  box-shadow: 0 0 18px 7px hsl(var(--firework-hue) 100% 70% / .85);
+  animation: fireworkCore 1.4s ease-out both;
+}
+
+.firework-spark {
+  position: absolute;
+  left: -0.16rem;
+  top: -0.16rem;
+  width: 0.32rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  transform-origin: 50% 100%;
+  transform: rotate(var(--firework-angle)) translateY(0) scaleY(0);
+  background: linear-gradient(to top, transparent, hsl(var(--firework-hue) 100% 80%), #fff);
+  box-shadow: 0 0 9px hsl(var(--firework-hue) 100% 70% / .95);
+  animation: fireworkSpark 1.7s ease-out both;
+}
+
+@keyframes fireworkBurst {
+  0% { opacity: 0; transform: scale(.35); }
+  10% { opacity: 1; transform: scale(1); }
+  78% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.08); }
+}
+
+@keyframes fireworkCore {
+  0%, 12% { opacity: 0; transform: scale(.2); }
+  24% { opacity: 1; transform: scale(1.2); }
+  70% { opacity: .4; transform: scale(.45); }
+  100% { opacity: 0; transform: scale(0); }
+}
+
+@keyframes fireworkSpark {
+  0% { opacity: 0; transform: rotate(var(--firework-angle)) translateY(0) scaleY(0); }
+  16% { opacity: 1; transform: rotate(var(--firework-angle)) translateY(-0.35rem) scaleY(.7); }
+  72% { opacity: .9; transform: rotate(var(--firework-angle)) translateY(calc(var(--firework-distance) * -1)) scaleY(1); }
+  100% { opacity: 0; transform: rotate(var(--firework-angle)) translateY(calc(var(--firework-distance) * -1.15)) scaleY(.35); }
+}
+
 @keyframes monsterAuraPulse {
   0%, 100% { transform: scale(.9); opacity: .35; }
   50% { transform: scale(1.15); opacity: .75; }
