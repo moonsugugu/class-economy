@@ -26,6 +26,35 @@ import InviteQR from '../../components/InviteQR.jsx';
 const card = 'bg-white rounded-3xl shadow p-6';
 const input = 'rounded-xl border-2 border-gray-200 px-3 py-2 focus:border-indigo-400 outline-none';
 const btn = 'rounded-xl px-4 py-2 text-white shadow transition disabled:opacity-40';
+const koCollator = new Intl.Collator('ko-KR', { sensitivity: 'base', numeric: false });
+const naturalCollator = new Intl.Collator('ko-KR', { sensitivity: 'base', numeric: true });
+
+const firstNumber = (value) => {
+  const found = String(value || '').match(/\d+/);
+  return found ? Number(found[0]) : null;
+};
+
+const sortStudents = (students, mode) => {
+  const list = [...students];
+  if (mode === 'custom') {
+    return list.sort((a, b) => {
+      const ao = Number.isFinite(a.sortOrder) ? a.sortOrder : Number.MAX_SAFE_INTEGER;
+      const bo = Number.isFinite(b.sortOrder) ? b.sortOrder : Number.MAX_SAFE_INTEGER;
+      return ao - bo || naturalCollator.compare(a.name || '', b.name || '');
+    });
+  }
+  if (mode === 'number') {
+    return list.sort((a, b) => {
+      const an = firstNumber(a.name);
+      const bn = firstNumber(b.name);
+      if (an !== null && bn !== null && an !== bn) return an - bn;
+      if (an !== null && bn === null) return -1;
+      if (an === null && bn !== null) return 1;
+      return naturalCollator.compare(a.name || '', b.name || '');
+    });
+  }
+  return list.sort((a, b) => koCollator.compare(a.name || '', b.name || ''));
+};
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
@@ -210,19 +239,24 @@ function StudentsTab({ klass }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [msg, setMsg] = useState('');
+  const [sortMode, setSortMode] = useState('name');
+  const [draggingId, setDraggingId] = useState(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'classes', klass.id, 'students'), orderBy('name'));
-    return onSnapshot(q, (snap) => setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    return onSnapshot(collection(db, 'classes', klass.id, 'students'), (snap) =>
+      setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
   }, [klass.id]);
+
+  const sortedStudents = useMemo(() => sortStudents(students, sortMode), [students, sortMode]);
 
   const toggle = (id) => setSelected((s) => {
     const n = new Set(s);
     n.has(id) ? n.delete(id) : n.add(id);
     return n;
   });
-  const allSelected = students.length > 0 && selected.size === students.length;
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(students.map((s) => s.id)));
+  const allSelected = sortedStudents.length > 0 && selected.size === sortedStudents.length;
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(sortedStudents.map((s) => s.id)));
   const targets = students.filter((s) => selected.has(s.id));
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
@@ -269,8 +303,39 @@ function StudentsTab({ klass }) {
   };
 
   const removeStudent = async (s) => {
-    if (!confirm(`정말 '${s.name}' 학생을 삭제할까요? 자산이 모두 사라져요.`)) return;
+    if (!confirm(`정말 '${s.name}' 학생 계정을 삭제할까요?\n현금, 예금, 주식 보유 내역 같은 학생 문서의 자산 정보가 사라져요.`)) return;
     await deleteDoc(doc(db, 'classes', klass.id, 'students', s.id));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(s.id);
+      return next;
+    });
+    flash(`🗑️ ${s.name} 학생 계정을 삭제했어요.`);
+  };
+
+  const saveCustomOrder = async (ordered) => {
+    const batch = writeBatch(db);
+    ordered.forEach((s, index) => {
+      batch.update(doc(db, 'classes', klass.id, 'students', s.id), { sortOrder: index + 1 });
+    });
+    await batch.commit();
+  };
+
+  const moveStudent = async (targetId) => {
+    if (!draggingId || draggingId === targetId) return;
+    const from = sortedStudents.findIndex((s) => s.id === draggingId);
+    const to = sortedStudents.findIndex((s) => s.id === targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...sortedStudents];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setSortMode('custom');
+    setStudents((prev) => prev.map((s) => {
+      const found = next.find((n) => n.id === s.id);
+      return found ? { ...s, sortOrder: next.findIndex((n) => n.id === s.id) + 1 } : s;
+    }));
+    await saveCustomOrder(next);
+    flash('↕️ 학생 순서를 저장했어요.');
   };
 
   // ⚡ 빠른 지급: 버튼 한 번으로 선택 학생에게 즉시 지급
@@ -336,19 +401,51 @@ function StudentsTab({ klass }) {
       </div>
 
       <div className={card}>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <h3 className="text-xl mr-auto">🧑‍🎓 학생 목록</h3>
+          <span className="text-sm text-gray-400">정렬</span>
+          {[
+            ['name', 'ㄱㄴㄷ순'],
+            ['number', '숫자순'],
+            ['custom', '직접 순서'],
+          ].map(([mode, label]) => (
+            <button
+              key={mode}
+              onClick={() => setSortMode(mode)}
+              className={`rounded-xl px-3 py-1.5 text-sm transition ${
+                sortMode === mode ? 'bg-indigo-500 text-white shadow' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="basis-full text-xs text-gray-400">
+            행 왼쪽의 ↕ 손잡이를 끌어 놓으면 직접 순서로 저장돼요. 숫자순은 1, 2, 9, 10, 11처럼 정렬됩니다.
+          </span>
+        </div>
         <table className="w-full text-left">
           <thead>
             <tr className="text-gray-400 text-sm border-b">
+              <th className="py-2 w-10"></th>
               <th className="py-2"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-5 h-5" /></th>
               <th>이름</th>
               <th className="text-right">현금</th>
               <th className="text-right">예금</th>
-              <th className="text-right w-16"></th>
+              <th className="text-right w-20">관리</th>
             </tr>
           </thead>
           <tbody>
-            {students.map((s) => (
-              <tr key={s.id} className="border-b border-gray-100 hover:bg-indigo-50/40">
+            {sortedStudents.map((s) => (
+              <tr
+                key={s.id}
+                draggable
+                onDragStart={() => setDraggingId(s.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => moveStudent(s.id)}
+                onDragEnd={() => setDraggingId(null)}
+                className={`border-b border-gray-100 hover:bg-indigo-50/40 ${draggingId === s.id ? 'opacity-50' : ''}`}
+              >
+                <td className="py-2 text-gray-300 cursor-grab select-none" title="끌어서 순서 바꾸기">↕</td>
                 <td className="py-2"><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="w-5 h-5" /></td>
                 <td className="text-lg">
                   {s.avatar?.base || '🙂'} {s.name}
@@ -361,12 +458,17 @@ function StudentsTab({ klass }) {
                 <td className="text-right">{fmt(s.cash)} {klass.currency}</td>
                 <td className="text-right text-gray-500">{fmt(s.deposit)} {klass.currency}</td>
                 <td className="text-right">
-                  <button onClick={() => removeStudent(s)} className="text-gray-300 hover:text-rose-500">🗑️</button>
+                  <button
+                    onClick={() => removeStudent(s)}
+                    className="rounded-lg px-2.5 py-1 text-sm bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition"
+                  >
+                    삭제
+                  </button>
                 </td>
               </tr>
             ))}
             {!students.length && (
-              <tr><td colSpan={5} className="py-8 text-center text-gray-400">
+              <tr><td colSpan={6} className="py-8 text-center text-gray-400">
                 아직 학생이 없어요. 학생들에게 학급 코드 <b>{klass.code}</b>를 알려 주세요!
               </td></tr>
             )}
