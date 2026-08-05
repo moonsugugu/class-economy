@@ -23,6 +23,7 @@ export default function HeroPage() {
   const today = heroDateKey();
   const config = battleConfig(klass);
   const usedToday = hero.battleDate === today ? hero.battleCount : 0;
+  const extraAttempts = Math.max(0, usedToday - config.limit);
   const nextMonster = hero.clearedLevel < 100 ? monsterForLevel(hero.clearedLevel + 1) : null;
   const bossProgress = nextMonster?.boss ? Math.min(nextMonster.maxHp, hero.bossProgress[nextMonster.level] || 0) : 0;
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
@@ -34,6 +35,11 @@ export default function HeroPage() {
       setMsg({ type: 'err', text: '먼저 용사키우기 상점에서 남자 또는 여자 용사를 구매해 주세요.' });
       return;
     }
+    const needsExtraAttempt = usedToday >= config.limit;
+    if (needsExtraAttempt && !window.confirm(
+      `오늘 기본 도전 ${config.limit}회를 모두 사용했어요.\n` +
+      `추가 도전 1회에 ${config.extraBattleCost}${klass.currency}를 지불하고 도전할까요?`
+    )) return;
     setBusy(true);
     setBattlePhase('charge');
     const roll = Math.random();
@@ -48,7 +54,15 @@ export default function HeroPage() {
         const level = current.clearedLevel + 1;
         if (level > 100) throw new Error('이미 100단계까지 모두 정복했어요!');
         const attempts = current.battleDate === today ? current.battleCount : 0;
-        if (attempts >= settings.limit) throw new Error(`오늘 전투 도전 횟수를 모두 사용했어요. (${settings.limit}회) 내일 다시 도전해 주세요.`);
+        const extraAttempt = attempts >= settings.limit;
+        if (extraAttempt && !needsExtraAttempt) {
+          throw new Error('기본 도전 횟수가 방금 소진됐어요. 추가 도전 버튼을 다시 눌러 주세요.');
+        }
+        const extraCost = extraAttempt ? settings.extraBattleCost : 0;
+        const currentCash = Number(s.cash) || 0;
+        if (extraCost > 0 && currentCash < extraCost) {
+          throw new Error(`추가 도전에는 ${extraCost}${klass.currency}가 필요해요.`);
+        }
         const monster = monsterForLevel(level);
         const currentPower = heroPower(current);
         const chance = battleChance(currentPower, monster.power);
@@ -86,28 +100,35 @@ export default function HeroPage() {
           },
         };
         const update = { rpg: nextHero };
-        if (reward > 0) update.cash = (s.cash || 0) + reward;
+        if (extraCost > 0 || reward > 0) {
+          update.cash = Math.round((currentCash - extraCost + reward) * 100) / 100;
+        }
         tx.update(studentRef, update);
         battleResult = {
           won, monster, chance, currentPower, reward,
           damage: damageResult.damage, critical: damageResult.critical,
           bossDamage: nextBossDamage, bossHp: monster.maxHp, bossDefeated,
-          attempt: attempts + 1, limit: settings.limit,
+          attempt: attempts + 1, limit: settings.limit, extraCost,
         };
       });
       setBattleFx(battleResult);
       setBattlePhase(battleResult.won ? 'win' : 'lose');
       setTimeout(() => setBattlePhase('idle'), 2800);
+      const costText = battleResult.extraCost > 0
+        ? ` 추가 도전 비용 ${fmt(battleResult.extraCost)}${klass.currency}를 냈어요.`
+        : '';
       setMsg(battleResult.won
-        ? { type: 'ok', text: `🎉 ${battleResult.monster.name}을(를) 물리쳤어요! ${fmt(battleResult.reward)}${klass.currency}를 받았어요. (${battleResult.attempt}/${battleResult.limit}회)` }
-        : { type: 'err', text: `💥 아쉽게 졌어요. 승리 확률은 ${Math.round(battleResult.chance * 100)}%였어요. ${battleResult.reward > 0 ? `${fmt(battleResult.reward)}${klass.currency}를 받았어요.` : '패배 보상은 0이에요.'} (${battleResult.attempt}/${battleResult.limit}회)` });
+        ? { type: 'ok', text: `🎉 ${battleResult.monster.name}을(를) 물리쳤어요! ${fmt(battleResult.reward)}${klass.currency}를 받았어요.${costText} (${battleResult.attempt}/${battleResult.limit}회)` }
+        : { type: 'err', text: `💥 아쉽게 졌어요. 승리 확률은 ${Math.round(battleResult.chance * 100)}%였어요. ${battleResult.reward > 0 ? `${fmt(battleResult.reward)}${klass.currency}를 받았어요.` : '패배 보상은 0이에요.'}${costText} (${battleResult.attempt}/${battleResult.limit}회)` });
       if (battleResult.won && battleResult.monster.boss) {
         setMsg({
           type: 'ok',
           text: '💥 ' + battleResult.monster.name + '에게 ' + fmt(battleResult.damage) + ' 데미지' +
             (battleResult.critical ? ' (크리티컬 2배!)' : '') + '! ' +
             (battleResult.bossDefeated ? '보스를 쓰러뜨렸어요!' : '아직 보스 HP가 남았어요.') +
-            ' 보상 ' + fmt(battleResult.reward) + klass.currency + ' (' + battleResult.attempt + '/' + battleResult.limit + '회)',
+            ' 보상 ' + fmt(battleResult.reward) + klass.currency +
+            (battleResult.extraCost > 0 ? ' · 추가 도전 비용 ' + fmt(battleResult.extraCost) + klass.currency : '') +
+            ' (' + battleResult.attempt + '/' + battleResult.limit + '회)',
         });
       }
     } catch (e) {
@@ -154,7 +175,10 @@ export default function HeroPage() {
                 <div key={slot} className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${item ? 'border-indigo-100 bg-indigo-50/40' : 'border-gray-100 bg-gray-50'}`}>
                   <span className="text-xs text-gray-400 w-12">{label}</span>
                   <HeroItemVisual item={item} size={52} showLevel={false} />
-                  <span className="text-sm text-gray-600">{item?.name || '미장착'}</span>
+                  <span className="min-w-0 flex-1 text-sm text-gray-600">
+                    <span className="block truncate">{item?.name || '미장착'}</span>
+                    {item && <span className="text-[11px] font-semibold text-indigo-500">{item.level}단계 장비</span>}
+                  </span>
                   <span className="ml-auto text-right text-sm text-indigo-500">{item ? `+${item.power}` : ''}<small className="block text-[9px] text-gray-400">전투력</small></span>
                 </div>
               );
@@ -162,7 +186,10 @@ export default function HeroPage() {
             <div className={['flex items-center gap-3 rounded-2xl border px-3 py-2', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50' : 'border-gray-100 bg-gray-50'].join(' ')}>
               <span className="text-xs text-gray-400 w-12">펫</span>
               <HeroItemVisual item={HERO_ITEM_MAP[hero.pet]} size={52} showLevel={false} />
-              <span className="text-sm text-gray-600">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
+              <span className="min-w-0 flex-1 text-sm text-gray-600">
+                <span className="block truncate">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
+                {HERO_ITEM_MAP[hero.pet] && <span className="text-[11px] font-semibold text-fuchsia-500">{HERO_ITEM_MAP[hero.pet].level}단계 펫</span>}
+              </span>
               <span className="ml-auto text-right text-sm text-fuchsia-600">
                 {HERO_ITEM_MAP[hero.pet] ? <>보스 크리티컬 {bossCriticalChance(hero)}%</> : ''}
                 <small className="block text-[9px] text-gray-400">보스 데미지 2배</small>
@@ -203,14 +230,19 @@ export default function HeroPage() {
             </div>
             <button
               onClick={battle}
-              disabled={busy || !hero.character || usedToday >= config.limit}
+              disabled={busy || !hero.character}
               className="ml-auto rounded-2xl px-5 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-gray-300 text-white shadow font-bold"
             >
-              {busy ? '전투 중...' : usedToday >= config.limit ? '오늘 도전 완료' : '⚔️ 전투 시작'}
+              {busy ? '전투 중...' : usedToday >= config.limit ? `⚔️ 추가 도전 (${config.extraBattleCost}${klass.currency})` : '⚔️ 전투 시작'}
             </button>
           </div>
           {!hero.character && <p className="text-sm text-rose-500 mt-4">상점에서 캐릭터를 먼저 구매해야 전투할 수 있어요.</p>}
-          <div className="text-xs text-gray-400 mt-3">오늘 도전 {Math.min(usedToday, config.limit)} / {config.limit}회 · 전투력 비율 승률 {Math.round(battleChance(power, nextMonster.power) * 100)}%</div>
+          <div className="text-xs text-gray-400 mt-3">
+            오늘 기본 도전 {Math.min(usedToday, config.limit)} / {config.limit}회
+            {extraAttempts > 0 && <> · 추가 도전 {extraAttempts}회</>}
+            {' · '}전투력 비율 승률 {Math.round(battleChance(power, nextMonster.power) * 100)}%
+            {usedToday >= config.limit && <> · 추가 1회 {config.extraBattleCost}{klass.currency}</>}
+          </div>
         </div>
       ) : (
         <div className="bg-amber-50 text-amber-700 rounded-3xl shadow p-6 text-center">🏆 100단계 정복 완료! 진정한 경제 용사예요.</div>

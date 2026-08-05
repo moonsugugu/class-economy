@@ -80,6 +80,7 @@ export default function StocksPage() {
     if (c === 'KRW') return amount / kpu;
     return amount;
   };
+  const classPriceLabel = (s) => `(약 ${fmt(Math.max(0, Math.round(inUnits(s.price, s))))}${klass.currency})`;
 
   const trade = async (side) => {
     const n = Math.floor(Number(qty));
@@ -292,7 +293,9 @@ export default function StocksPage() {
                   <span>{MARKET_LABEL[s.market] || '🏫'}</span>
                   <span className="flex-1">{s.name}</span>
                   <Spark data={s.history} up={pct >= 0} />
-                  <span className="w-24 text-right tabular-nums text-sm">{priceLabel(s)}</span>
+                  <span className="w-40 text-right tabular-nums text-sm whitespace-nowrap">
+                    {priceLabel(s)} <span className="text-[11px] text-gray-400 font-normal">{classPriceLabel(s)}</span>
+                  </span>
                   <span className={`w-16 text-right text-sm tabular-nums ${pct > 0 ? 'text-red-500' : pct < 0 ? 'text-blue-500' : 'text-gray-400'}`}>
                     {pct > 0 ? '▲' : pct < 0 ? '▼' : '−'}{Math.abs(pct).toFixed(1)}%
                   </span>
@@ -311,7 +314,9 @@ export default function StocksPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50" onClick={() => setSel(null)}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-xl mb-1">{MARKET_LABEL[sel.market] || '🏫'} {sel.name}</h3>
-            <div className="text-3xl text-blue-600 tabular-nums mb-1">{priceLabel(sel)}</div>
+            <div className="text-3xl text-blue-600 tabular-nums mb-1">
+              {priceLabel(sel)} <span className="text-sm font-normal text-gray-400">{classPriceLabel(sel)}</span>
+            </div>
             <div className="text-sm text-gray-400 mb-4">
               보유 {(student.holdings?.[sel.id]?.qty || 0)}주 · 내 지갑{' '}
               {{

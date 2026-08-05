@@ -217,12 +217,15 @@ export function battleChance(power, monsterPower) {
   return clamp(power / (power + monsterPower), 0, 1);
 }
 
+export const HERO_EXTRA_BATTLE_COST = 15;
+
 export function battleConfig(klass = {}) {
   const numberOr = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
   return {
     limit: clamp(Math.floor(numberOr(klass.heroBattleLimit, 10)), 1, 100),
     winReward: clamp(Math.floor(numberOr(klass.heroWinReward, 20)), 0, 100000),
     loseReward: clamp(Math.floor(numberOr(klass.heroLoseReward, 0)), 0, 100000),
+    extraBattleCost: HERO_EXTRA_BATTLE_COST,
   };
 }
 

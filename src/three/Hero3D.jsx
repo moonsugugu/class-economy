@@ -61,17 +61,19 @@ function HeroFace({ female, skin, hair }) {
       <Sp p={[-0.095, 1.09, 0.316]} rad={0.012} c="#fff" e="#fff" />
       <Sp p={[0.115, 1.09, 0.316]} rad={0.012} c="#fff" e="#fff" />
       <Sp p={[0, 0.99, 0.28]} rad={0.022} c="#c47d70" />
-      <Sp p={[0, 0.94, 0.28]} rad={0.028} sc={[1.8, 0.5, 0.5]} c="#b45359" />
       <Sp p={[-0.23, 1.02, 0.14]} rad={0.065} sc={[1.1, 0.55, 0.3]} c="#fda4af" />
       <Sp p={[0.23, 1.02, 0.14]} rad={0.065} sc={[1.1, 0.55, 0.3]} c="#fda4af" />
       <Sp p={[0, 1.29, -0.015]} rad={0.28} sc={[1.05, 0.42, 0.86]} c={hair} />
       {female ? (
         <group>
+          {/* 뒤통수까지 이어지는 긴 머리 — 몸 뒤쪽을 덮어 대머리처럼 보이지 않게 해요. */}
+          <Sp p={[0, 0.7, -0.24]} rad={0.26} sc={[1.2, 1.85, 0.58]} c={hair} />
+          <Sp p={[-0.3, 0.68, -0.17]} rad={0.12} sc={[0.85, 2.6, 0.72]} c={hair} />
+          <Sp p={[0.3, 0.68, -0.17]} rad={0.12} sc={[0.85, 2.6, 0.72]} c={hair} />
           <Sp p={[-0.24, 1.08, -0.02]} rad={0.105} sc={[0.75, 1.65, 0.78]} c={hair} />
           <Sp p={[0.24, 1.08, -0.02]} rad={0.105} sc={[0.75, 1.65, 0.78]} c={hair} />
           <Sp p={[-0.31, 0.78, -0.06]} rad={0.13} sc={[0.78, 1.75, 0.68]} c={hair} />
           <Sp p={[0.31, 0.78, -0.06]} rad={0.13} sc={[0.78, 1.75, 0.68]} c={hair} />
-          <Sp p={[0, 0.84, -0.12]} rad={0.22} sc={[1.3, 1.6, 0.45]} c={hair} />
           <Sp p={[0, 1.34, -0.12]} rad={0.17} sc={[0.9, 0.5, 0.75]} c={hair} />
         </group>
       ) : (
@@ -258,7 +260,6 @@ function HeroPet({ item }) {
 function HeroFigure({ rawHero, animated = false, action = 'idle' }) {
   const figureRef = useRef();
   const hero = normalizeHero(rawHero);
-  const character = HERO_ITEM_MAP[hero.character];
   const female = hero.character === 'hero_female';
   const helmet = HERO_ITEM_MAP[hero.equipment.helmet];
   const weapon = HERO_ITEM_MAP[hero.equipment.weapon];
@@ -324,12 +325,6 @@ function HeroFigure({ rawHero, animated = false, action = 'idle' }) {
       <HeroPet item={HERO_ITEM_MAP[hero.pet]} />
       <HeroFace female={female} skin={skin} hair={hair} />
       <HeroHelmet item={helmet} female={female} hair={hair} />
-      {character && (
-        <group position={[0, 0.91, 0.31]}>
-          <Sp p={[0, 0, 0]} rad={0.08} c={female ? '#fb7185' : '#38bdf8'} e={female ? '#fb7185' : '#38bdf8'} />
-          <Sp p={[0, 0, 0.06]} rad={0.035} c="#fff" e="#fff" />
-        </group>
-      )}
     </group>
   );
 }

@@ -25,6 +25,9 @@ const SYMBOL_MAP = {
 };
 
 const FX_SYMBOL = 'USDKRW=X'; // 원/달러 환율
+const QUOTE_CACHE_MS = 60_000;
+let quoteCache = null;
+let quoteCacheAt = 0;
 
 /** 종목 하나의 현재가를 가져와요 (실패하면 null) */
 async function priceOf(yahooSymbol) {
@@ -52,7 +55,7 @@ async function priceOf(yahooSymbol) {
   }
 }
 
-async function pricesWithLimit(entries, concurrency = 12) {
+async function pricesWithLimit(entries, concurrency = 6) {
   const results = Array(entries.length);
   let cursor = 0;
   const worker = async () => {
@@ -75,7 +78,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'GET 요청만 허용돼요' });
   }
   // 같은 값을 5분 동안 재사용해서 호출 수를 아껴요
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=900');
+  res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=300');
+
+  if (quoteCache && Date.now() - quoteCacheAt < QUOTE_CACHE_MS) {
+    return res.status(200).json({ ok: true, ...quoteCache, cached: true });
+  }
 
   const entries = Object.entries(SYMBOL_MAP);
   const results = await pricesWithLimit(entries);
@@ -88,10 +95,14 @@ export default async function handler(req, res) {
   });
 
   const fxRaw = await priceOf(FX_SYMBOL);
-  const fx = fxRaw ? Math.round(fxRaw) : null;
+  const fx = fxRaw ? Math.round(fxRaw) : quoteCache?.fx || null;
 
   if (!Object.keys(prices).length) {
+    if (quoteCache) return res.status(200).json({ ok: true, ...quoteCache, stale: true });
     return res.status(502).json({ ok: false, error: '시세 서버에서 값을 받지 못했어요' });
   }
-  return res.status(200).json({ ok: true, prices, fx, at: Date.now() });
+  const mergedPrices = { ...(quoteCache?.prices || {}), ...prices };
+  quoteCache = { prices: mergedPrices, fx, at: Date.now() };
+  quoteCacheAt = Date.now();
+  return res.status(200).json({ ok: true, ...quoteCache, partial: Object.keys(prices).length < entries.length });
 }
