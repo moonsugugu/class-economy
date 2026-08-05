@@ -117,15 +117,17 @@ export default function StudentLayout() {
 
       {currentEvents.length > 0 && (
         <div className="mx-3 mb-4 rounded-2xl border border-amber-200 bg-amber-50 text-amber-900 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 text-xs font-bold whitespace-nowrap overflow-hidden">
-            <span className="shrink-0 rounded-full bg-amber-400 px-2 py-1 text-white">📢 이벤트 발생</span>
-            <div className="event-ticker-track">
-              {currentEvents.map((event) => (
-                <span key={`${event.id}-${event.at || ''}`} className="mr-8">
-                  <b>{event.title}</b> · {event.description} · <strong className="text-amber-700">효과: {eventEffectSummary(event)}</strong>
-                  {Number(event.multiplier) > 1 && <em className="ml-2 not-italic">({event.multiplier}배 적용)</em>}
-                </span>
-              ))}
+          <div className="flex items-center gap-2 px-3 py-2 text-xs font-bold">
+            <span className="relative z-10 shrink-0 rounded-full bg-amber-400 px-2 py-1 text-white shadow-sm">📢 이벤트 발생</span>
+            <div className="relative min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+              <div className="event-ticker-track">
+                {currentEvents.map((event) => (
+                  <span key={`${event.id}-${event.at || ''}`} className="mr-8">
+                    <b>{event.title}</b> · {event.description} · <strong className="text-amber-700">효과: {eventEffectSummary(event)}</strong>
+                    {Number(event.multiplier) > 1 && <em className="ml-2 not-italic">({event.multiplier}배 적용)</em>}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </div>

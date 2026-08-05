@@ -16,6 +16,7 @@ input, select, textarea, button {
 }
 
 .event-ticker-track {
+  width: max-content;
   min-width: max-content;
   animation: eventTicker 20s linear infinite;
 }

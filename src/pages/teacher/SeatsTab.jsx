@@ -28,6 +28,7 @@ export default function SeatsTab({ klass }) {
   const [draft, setDraft] = useState(null); // {rows, cols, seats:Set}
   const [manage, setManage] = useState(null); // 선택된 seatKey
   const [assignTo, setAssignTo] = useState('');
+  const [randomBusy, setRandomBusy] = useState(false);
   const [minutes, setMinutes] = useState(10);
   const [startPrice, setStartPrice] = useState(10);
   const [priorityMinutes, setPriorityMinutes] = useState(10);
@@ -301,7 +302,52 @@ export default function SeatsTab({ klass }) {
     flash('자리 소유권을 모두 초기화했어요.');
   };
 
+  const randomAssign = async () => {
+    if (randomBusy) return;
+    if (!layout) return flash('먼저 자리 배치도를 만들어 주세요.');
+    if (live || priorityLive) return flash('경매나 고정자리 선택권 시장이 진행 중일 때는 랜덤 배치를 할 수 없어요.');
+    const openKeys = (layout.seats || []).filter((key) => !seats[key]);
+    const assignedIds = new Set(Object.values(seats).map((seat) => seat?.ownerId).filter(Boolean));
+    const waitingStudents = students.filter((student) => !assignedIds.has(student.id));
+    const count = Math.min(openKeys.length, waitingStudents.length);
+    if (!count) return flash(openKeys.length ? '아직 배치되지 않은 학생이 없어요.' : '빈 자리가 없어요.');
+    if (!window.confirm(`이미 배치된 학생은 제외하고 ${count}명을 빈 자리에 랜덤 배치할까요?`)) return;
+
+    const shuffle = (items) => {
+      const next = [...items];
+      for (let index = next.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+      }
+      return next;
+    };
+
+    setRandomBusy(true);
+    try {
+      const batch = writeBatch(db);
+      const timestamp = Date.now();
+      const randomizedStudents = shuffle(waitingStudents).slice(0, count);
+      const randomizedKeys = shuffle(openKeys);
+      randomizedStudents.forEach((student, index) => {
+        batch.set(doc(db, 'classes', klass.id, 'seats', randomizedKeys[index]), {
+          ownerId: student.id,
+          ownerName: student.name,
+          price: 0,
+          at: timestamp,
+        });
+      });
+      await batch.commit();
+      flash(`🎲 미배치 학생 ${count}명을 빈 자리에 랜덤 배치했어요.`);
+    } catch (error) {
+      flash(`랜덤 배치에 실패했어요: ${error.message}`);
+    } finally {
+      setRandomBusy(false);
+    }
+  };
+
   const grid = editing ? draft : layout;
+  const assignedStudentIds = new Set(Object.values(seats).map((seat) => seat?.ownerId).filter(Boolean));
+  const availableStudents = students.filter((student) => !assignedStudentIds.has(student.id));
 
   return (
     <div className="space-y-4">
@@ -443,6 +489,9 @@ export default function SeatsTab({ klass }) {
               <button onClick={startEdit} className={btn + ' bg-indigo-400 hover:bg-indigo-500 text-sm ml-auto'}>
                 {layout ? '✏️ 배치 편집' : '🪑 배치도 만들기 (5×5)'}
               </button>
+              {layout && <button onClick={randomAssign} disabled={randomBusy || live || priorityLive} className={btn + ' bg-violet-500 hover:bg-violet-600 text-sm'}>
+                {randomBusy ? '🎲 배치 중...' : '🎲 미배치 학생 랜덤 배치'}
+              </button>}
               {layout && <button onClick={resetAll} className="text-sm text-gray-400 underline">소유권 전체 초기화</button>}
             </>
           )}
@@ -490,7 +539,7 @@ export default function SeatsTab({ klass }) {
                     ) : live && bid ? (
                       <div className="text-[11px] text-rose-500 leading-tight">{bid.studentName}<br />{fmt(bid.amount)}</div>
                     ) : (
-                      <div className="text-[11px] text-gray-300">빈 자리</div>
+                      <div className="text-[11px] text-gray-300">빈 자리 · 클릭</div>
                     )}
                   </button>
                 );
@@ -523,10 +572,11 @@ export default function SeatsTab({ klass }) {
                 <div className="flex gap-2">
                   <select value={assignTo} onChange={(e) => setAssignTo(e.target.value)} className={input + ' flex-1'}>
                     <option value="">학생 선택...</option>
-                    {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    {availableStudents.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                   <button onClick={assign} disabled={!assignTo} className={btn + ' bg-teal-500 hover:bg-teal-600'}>지정</button>
                 </div>
+                {!availableStudents.length && <p className="text-xs text-gray-400">아직 배치되지 않은 학생이 없어요.</p>}
               </>
             )}
             <button onClick={() => setManage(null)} className="w-full text-gray-400 text-sm underline">닫기</button>
