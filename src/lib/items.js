@@ -514,10 +514,10 @@ export function occupancyOf(roomMap) {
   return occ;
 }
 
-export function canPlaceAt(roomMap, key, item, rot = 0, ignoreKey = null) {
+export function canPlaceAt(roomMap, key, item, rot = 0, ignoreKey = null, cols = ROOM_COLS, rows = ROOM_ROWS) {
   const [r, c] = key.split('-').map(Number);
   const [w, d] = footprintOf(item, rot);
-  if (r < 0 || c < 0 || r + d > ROOM_ROWS || c + w > ROOM_COLS) return false;
+  if (r < 0 || c < 0 || r + d > rows || c + w > cols) return false;
   const occ = occupancyOf(roomMap);
   return cellsOf(key, item, rot).every((k) => !occ[k] || occ[k] === ignoreKey);
 }

@@ -6,20 +6,18 @@ import { fmt } from '../../lib/util';
 import {
   SPECIES_GROUP, CHAR_ITEMS, FRIEND_ITEMS, isCompanion,
   ITEMS, ITEM_MAP, SLOT_LABEL, SETS,
-  normalizeRoom, canPlaceAt, isStackableRoomItem,
+  normalizeRoom, canPlaceAt, isStackableRoomItem, ROOM_COLS, ROOM_ROWS,
 } from '../../lib/items';
 import RoomScene from '../../three/RoomScene.jsx';
 import { ThumbProvider, ItemThumb } from '../../three/Thumbs.jsx';
 import { itemPrice, pricePolicyLabel } from '../../lib/pricing';
 import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
+import {
+  SPACE_TABS, SPACE_UNLOCK_PRICE, spaceConfig, isSpaceUnlocked,
+} from '../../lib/spaces';
 
-const SPACES = [
-  ['room', '🛋️ 내 방'],
-  ['garden', '🌳 정원'],
-  ['classroom', '🏫 교실'],
-  ['cafe', '☕ 카페'],
-];
-const SPACE_KEYS = SPACES.map(([id]) => id);
+const SPACES = SPACE_TABS.map(({ id, icon, label }) => [id, `${icon} ${label}`]);
+const SPACE_KEYS = SPACE_TABS.map(({ id }) => id);
 
 // 상점 분류 → 아이템 슬롯
 const CATS = [
@@ -55,6 +53,7 @@ function RoomInner({ klass, student }) {
   const [shopCat, setShopCat] = useState('char');
   const [msg, setMsg] = useState(null);
   const [previewItem, setPreviewItem] = useState(null);
+  const [spaceBusy, setSpaceBusy] = useState(null);
   const glRef = useRef(null);
 
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
@@ -69,13 +68,12 @@ function RoomInner({ klass, student }) {
     return { need, full, price, saved: full - price };
   };
   const avatar = student.avatar || {};
-  const maps = {
-    room: normalizeRoom(student.room),
-    garden: normalizeRoom(student.garden),
-    classroom: normalizeRoom(student.classroom),
-    cafe: normalizeRoom(student.cafe),
-  };
-  const activeMap = maps[space];
+  const maps = Object.fromEntries(SPACE_TABS.map(({ id, mapField }) => [id, normalizeRoom(student[mapField])]));
+  const activeMap = maps[space] || {};
+  const activeSpace = spaceConfig(space);
+  const grid = activeSpace.wide
+    ? { cols: ROOM_COLS * 2, rows: ROOM_ROWS * 2 }
+    : { cols: ROOM_COLS, rows: ROOM_ROWS };
   const skin = student.roomSkin || {};
 
   // 함께 다니는 친구·애완동물 (없으면 가진 것 전부)
@@ -88,6 +86,58 @@ function RoomInner({ klass, student }) {
   const flash = (type, text) => {
     setMsg({ type, text });
     setTimeout(() => setMsg(null), 3000);
+  };
+
+  const selectSpace = (entry) => {
+    if (spaceBusy) return;
+    if (entry.wide && !isSpaceUnlocked(student, entry.id)) {
+      purchaseSpace(entry);
+      return;
+    }
+    setSpace(entry.id);
+    setPlacing(null);
+    setSelected(null);
+  };
+
+  const purchaseSpace = async (entry) => {
+    if (!entry.wide || isSpaceUnlocked(student, entry.id) || spaceBusy) return;
+    const previewPrice = itemPrice(entry.unlockPrice || SPACE_UNLOCK_PRICE, klass);
+    const previewTax = taxForPart(previewPrice, klass, 'item').tax;
+    const previewTotal = previewPrice + previewTax;
+    if (!confirm(`'${entry.label}'을(를) 열까요?\n공간 가격 ${fmt(previewPrice)} + 세금 ${fmt(previewTax)} = 총 ${fmt(previewTotal)}${klass.currency}`)) return;
+    setSpaceBusy(entry.id);
+    try {
+      await runTransaction(db, async (tx) => {
+        const studentSnap = await tx.get(studentRef);
+        const classSnap = await tx.get(classRef);
+        const current = studentSnap.data() || {};
+        const settings = { ...klass, ...(classSnap.data() || {}) };
+        if (isSpaceUnlocked(current, entry.id)) throw new Error('이미 열려 있는 공간이에요.');
+        const price = itemPrice(entry.unlockPrice || SPACE_UNLOCK_PRICE, settings);
+        const tax = taxForPart(price, settings, 'item').tax;
+        const total = price + tax;
+        if ((Number(current.cash) || 0) < total) throw new Error('현금이 부족해요.');
+        tx.update(studentRef, {
+          cash: (Number(current.cash) || 0) - total,
+          [`spaceUnlocks.${entry.id}`]: true,
+        });
+        if (tax > 0) {
+          tx.set(ledgerRef, {
+            pending: increment(tax),
+            item: increment(tax),
+            updatedAt: Date.now(),
+          }, { merge: true });
+        }
+      });
+      setSpace(entry.id);
+      setPlacing(null);
+      setSelected(null);
+      flash('ok', `🔓 ${entry.label}을(를) 열었어요! 이제 ${fmt(previewTotal)}${klass.currency}가 사용됐어요.`);
+    } catch (e) {
+      flash('err', e.message);
+    } finally {
+      setSpaceBusy(null);
+    }
   };
 
   /* ----- 구매 ----- */
@@ -178,7 +228,7 @@ function RoomInner({ klass, student }) {
       return;
     }
     const prevKey = null;
-    if (!canPlaceAt(activeMap, key, item, 0, prevKey)) {
+    if (!canPlaceAt(activeMap, key, item, 0, prevKey, grid.cols, grid.rows)) {
       flash('err', '거기엔 놓을 수 없어요! (공간이 부족해요)');
       return;
     }
@@ -192,7 +242,7 @@ function RoomInner({ klass, student }) {
     if (!pl) return;
     const item = ITEM_MAP[pl.id];
     const newRot = ((pl.rot || 0) + 1) % 4;
-    if (!canPlaceAt(activeMap, selected, item, newRot, selected)) {
+    if (!canPlaceAt(activeMap, selected, item, newRot, selected, grid.cols, grid.rows)) {
       flash('err', '회전할 공간이 없어요!');
       return;
     }
@@ -207,8 +257,13 @@ function RoomInner({ klass, student }) {
   // 아이템 종류에 맞는 공간으로 자동 전환하며 배치 시작
   const SLOT_SPACE = { garden: 'garden', class: 'classroom', cafe: 'cafe' };
   const startPlacing = (item) => {
-    const dest = SLOT_SPACE[item.slot]
-      || (item.slot === 'room' && space === 'garden' ? 'room' : space); // 조명은 지금 공간에 그대로
+    const currentBase = spaceConfig(space).baseId;
+    const slotDest = SLOT_SPACE[item.slot];
+    const dest = item.slot === 'room' && currentBase !== 'room'
+      ? 'room'
+      : slotDest
+        ? (currentBase === slotDest ? space : slotDest)
+        : space; // 조명은 지금 공간에 그대로
     if (dest !== space) setSpace(dest);
     setPlacing(placing === item.id ? null : item.id);
     setSelected(null);
@@ -310,23 +365,29 @@ function RoomInner({ klass, student }) {
   });
   const selectedItem = selected && activeMap[selected] ? ITEM_MAP[activeMap[selected].id] : null;
   const myChars = CHAR_ITEMS.filter((c) => inventory.includes(c.id));
-  const spaceLabel = SPACES.find(([id]) => id === space)[1];
+  const spaceLabel = SPACES.find(([id]) => id === space)?.[1] || '🛋️ 내 방';
 
   return (
     <div className="space-y-4">
       {/* 상단 */}
       <div className="flex items-center gap-2 flex-wrap">
         <h2 className="text-2xl text-purple-600">{spaceLabel}</h2>
-        <div className="flex rounded-2xl bg-white shadow overflow-hidden">
-          {SPACES.map(([id, label]) => (
+        <div className="flex flex-wrap rounded-2xl bg-white shadow overflow-hidden">
+          {SPACE_TABS.map((entry) => {
+            const unlocked = isSpaceUnlocked(student, entry.id);
+            const label = `${unlocked ? entry.icon : '🔒'} ${entry.label}`;
+            return (
             <button
-              key={id}
-              onClick={() => { setSpace(id); setPlacing(null); setSelected(null); }}
-              className={`px-3 py-1.5 text-sm transition ${space === id ? 'bg-purple-500 text-white' : 'text-gray-500'}`}
+              key={entry.id}
+              onClick={() => selectSpace(entry)}
+              disabled={spaceBusy === entry.id}
+              title={entry.wide && !unlocked ? `${fmt(itemPrice(entry.unlockPrice || SPACE_UNLOCK_PRICE, klass))}${klass.currency}에 잠금 해제` : entry.label}
+              className={`px-3 py-1.5 text-sm transition disabled:opacity-60 ${space === entry.id ? 'bg-purple-500 text-white' : 'text-gray-500'}`}
             >
               {label}
             </button>
-          ))}
+            );
+          })}
         </div>
         <button onClick={screenshot} className="ml-auto rounded-xl px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white shadow">
           📸 인증샷

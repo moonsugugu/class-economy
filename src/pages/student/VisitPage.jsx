@@ -9,13 +9,7 @@ import { fmt, periodKeys } from '../../lib/util';
 import { ITEM_MAP, normalizeRoom } from '../../lib/items';
 import RoomScene from '../../three/RoomScene.jsx';
 import { isActiveStudent } from '../../lib/studentState';
-
-const SPACES = [
-  ['room', '🛋️ 방'],
-  ['garden', '🌳 정원'],
-  ['classroom', '🏫 교실'],
-  ['cafe', '☕ 카페'],
-];
+import { SPACE_TABS, spaceConfig, spaceGuestbookLabel, isSpaceUnlocked } from '../../lib/spaces';
 
 export default function VisitPage() {
   const { klass, student } = useOutletContext();
@@ -75,6 +69,7 @@ export default function VisitPage() {
     e.preventDefault();
     if (writeBusy) return;
     if (host.id === student.id) return flash('친구 공간에서만 방명록 보상을 받을 수 있어요.');
+    if (!isSpaceUnlocked(host, space)) return flash('친구가 아직 이 공간을 열지 않았어요.');
     if (todayRewardCount >= 5) return flash('오늘 방명록 보상 5회를 모두 받았어요.');
     if (rewardedHostIds.includes(host.id)) return flash('오늘은 이 친구에게 이미 방명록을 남겼어요. 다른 친구 공간을 방문해 주세요.');
     const t = text.trim();
@@ -91,6 +86,7 @@ export default function VisitPage() {
         if (!visitorSnap.exists() || !hostSnap.exists() || !isActiveStudent(hostSnap.data())) {
           throw new Error('친구 정보를 찾을 수 없어요.');
         }
+        if (!isSpaceUnlocked(hostSnap.data(), space)) throw new Error('친구가 아직 이 공간을 열지 않았어요.');
         const current = visitorSnap.data() || {};
         const saved = current.guestbookRewards && typeof current.guestbookRewards === 'object'
           ? current.guestbookRewards
@@ -118,6 +114,8 @@ export default function VisitPage() {
           text: t.slice(0, 200),
           reward,
           rewardDate: today,
+          space,
+          spaceLabel: spaceGuestbookLabel(space),
           at: Date.now(),
           createdAt: serverTimestamp(),
         });
@@ -151,8 +149,8 @@ export default function VisitPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {friends.map((f) => {
-              const items = ['room', 'garden', 'classroom', 'cafe']
-                .reduce((a, sp) => a + Object.keys(f[sp] || {}).length, 0);
+              const items = SPACE_TABS
+                .reduce((a, entry) => a + Object.keys(f[entry.mapField] || {}).length, 0);
               const likes = (f.roomLikes || []).length;
               const me = f.id === student.id;
               return (
@@ -178,7 +176,9 @@ export default function VisitPage() {
   }
 
   /* ---------- 친구 방 구경 화면 ---------- */
-  const roomMap = normalizeRoom(host[space]);
+  const currentSpace = spaceConfig(space);
+  const currentSpaceUnlocked = isSpaceUnlocked(host, space);
+  const roomMap = normalizeRoom(host[currentSpace.mapField]);
   const skin = host.roomSkin || {};
   const companions = (host.walking || []).map((id) => ITEM_MAP[id]).filter(Boolean).slice(0, 8);
   const liked = (host.roomLikes || []).includes(student.id);
@@ -199,19 +199,28 @@ export default function VisitPage() {
 
       {msg && <div className="rounded-2xl px-4 py-3 bg-emerald-50 text-emerald-700">{msg}</div>}
 
-      <div className="flex rounded-2xl bg-white shadow overflow-hidden w-fit">
-        {SPACES.map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setSpace(id)}
-            className={`px-3 py-1.5 text-sm transition ${space === id ? 'bg-pink-500 text-white' : 'text-gray-500'}`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex flex-wrap rounded-2xl bg-white shadow overflow-hidden w-fit">
+        {SPACE_TABS.map((entry) => {
+          const unlocked = isSpaceUnlocked(host, entry.id);
+          return (
+            <button
+              key={entry.id}
+              onClick={() => unlocked && setSpace(entry.id)}
+              disabled={!unlocked}
+              title={!unlocked ? '친구가 아직 구매하지 않은 공간이에요.' : entry.visitLabel}
+              className={`px-3 py-1.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-45 ${space === entry.id ? 'bg-pink-500 text-white' : 'text-gray-500'}`}
+            >
+              {unlocked ? entry.icon : '🔒'} {entry.visitLabel}
+            </button>
+          );
+        })}
       </div>
 
-      {Object.keys(roomMap).length === 0 ? (
+      {!currentSpaceUnlocked ? (
+        <div className="bg-white rounded-3xl shadow p-10 text-center text-gray-400">
+          이 친구는 아직 {currentSpace.label}을(를) 열지 않았어요.
+        </div>
+      ) : Object.keys(roomMap).length === 0 ? (
         <div className="bg-white rounded-3xl shadow p-10 text-center text-gray-400">
           이 공간은 아직 비어 있어요. 다른 공간을 구경해 보세요!
         </div>
@@ -263,7 +272,10 @@ export default function VisitPage() {
               <span className="text-xl">{g.avatar}</span>
               <div className="flex-1">
                 <div className="text-sm text-gray-500">{g.fromName}</div>
-                <div className="text-gray-700">{g.text}</div>
+                <div className="text-gray-700">
+                  {g.spaceLabel && <span className="mr-1 text-xs font-bold text-pink-400">({g.spaceLabel})</span>}
+                  {g.text}
+                </div>
               </div>
               <span className="text-[11px] text-gray-300">
                 {new Date(g.at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}

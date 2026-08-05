@@ -164,6 +164,24 @@ function HeroArmor({ item }) {
   );
 }
 
+function HeroGloves({ item }) {
+  if (!item) return null;
+  const tier = tierOf(item);
+  const p = paletteOf(item, RARITY_COLORS.common);
+  return (
+    <group>
+      {[-1, 1].map((side) => (
+        <group key={side} position={[side * 0.39, 0.34, 0.14]} rotation={[0, 0, side * 0.12]}>
+          <Sp p={[0, 0, 0]} rad={0.095} sc={[0.82, 1.05, 0.78]} c={p.main} m={tier > 1 ? 0.65 : 0.2} />
+          <B p={[0, 0.015, 0.08]} s={[0.13, 0.12, 0.08]} c={p.light} />
+          {tier >= 3 && <Sp p={[0, 0.02, 0.14]} rad={0.035} c={p.glow} e={p.glow} />}
+          {tier >= 4 && <To p={[0, 0, 0.1]} rad={0.13} tube={0.012} c={p.glow} e={p.glow} />}
+        </group>
+      ))}
+    </group>
+  );
+}
+
 function HeroShoes({ item }) {
   const tier = tierOf(item);
   const p = paletteOf(item, { main: '#334155', light: '#64748b', dark: '#1e293b', glow: '#cbd5e1' });
@@ -267,6 +285,7 @@ function HeroFigure({ rawHero, animated = false, action = 'idle' }) {
   const helmet = HERO_ITEM_MAP[hero.equipment.helmet];
   const weapon = HERO_ITEM_MAP[hero.equipment.weapon];
   const armor = HERO_ITEM_MAP[hero.equipment.armor];
+  const gloves = HERO_ITEM_MAP[hero.equipment.gloves];
   const shoes = HERO_ITEM_MAP[hero.equipment.shoes];
   const accessory = HERO_ITEM_MAP[hero.equipment.accessory];
   const skin = female ? '#f4c7b3' : '#edb38e';
@@ -284,11 +303,11 @@ function HeroFigure({ rawHero, animated = false, action = 'idle' }) {
     figure.position.z = 0;
     figure.rotation.y = Math.sin(t * 1.4) * 0.035;
     figure.rotation.z = Math.sin(t * 1.8) * 0.018;
-    figure.scale.setScalar(1.52);
+    figure.scale.setScalar(1.28);
 
     if (action === 'charge') {
       figure.position.y = baseY + Math.sin(t * 8) * 0.025;
-      figure.scale.setScalar(1.52 + Math.sin(t * 10) * 0.025);
+      figure.scale.setScalar(1.28 + Math.sin(t * 10) * 0.025);
     }
     if (action === 'attack') {
       figure.position.x = Math.sin(t * 16) * 0.065;
@@ -311,7 +330,7 @@ function HeroFigure({ rawHero, animated = false, action = 'idle' }) {
   });
 
   return (
-    <group ref={figureRef} position={[0, -1.18, 0]} scale={1.52}>
+    <group ref={figureRef} position={[0, -1.18, 0]} scale={1.28}>
       <HeroShoes item={shoes} />
       <HeroRarityAura hero={hero} />
       {/* 어린 용사의 실루엣: 큰 머리, 짧은 팔다리, 넓은 어깨로 기존 노인 느낌을 없앴어요. */}
@@ -323,6 +342,7 @@ function HeroFigure({ rawHero, animated = false, action = 'idle' }) {
       <Sp p={[0.38, 0.54, 0.02]} rad={0.12} sc={[0.8, 1.3, 0.85]} c={armorPalette.main} r={[0, 0, 0.22]} />
       <Sp p={[-0.39, 0.34, 0.1]} rad={0.085} c={skin} />
       <Sp p={[0.39, 0.34, 0.1]} rad={0.085} c={skin} />
+      <HeroGloves item={gloves} />
       <HeroWeapon item={weapon} />
       <HeroAccessory item={accessory} />
       <HeroPet item={HERO_ITEM_MAP[hero.pet]} />
@@ -350,10 +370,7 @@ function HeroStage() {
 export default function HeroPreview({ hero, size = 180, animated = false, action = 'idle' }) {
   return (
     <div className="relative overflow-hidden rounded-[1.6rem] border border-white/70 bg-gradient-to-b from-sky-100 via-indigo-100 to-violet-200 shadow-inner" style={{ width: size, height: size }}>
-      <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-full bg-white/60 px-2 py-1 text-[9px] font-bold tracking-[0.18em] text-indigo-500 backdrop-blur">
-        HERO LAB
-      </div>
-      <Canvas shadows camera={{ position: [2.35, 1.42, 4.15], fov: 32 }} dpr={[1, 1.5]}>
+      <Canvas shadows camera={{ position: [2.8, 1.6, 5.6], fov: 37 }} dpr={[1, 1.5]}>
         <color attach="background" args={['#dbeafe']} />
         <ambientLight intensity={1.35} />
         <directionalLight castShadow position={[3, 5, 4]} intensity={2.4} shadow-mapSize={[1024, 1024]} />
@@ -361,11 +378,11 @@ export default function HeroPreview({ hero, size = 180, animated = false, action
         <pointLight position={[0, 1.7, 1.5]} intensity={1.2} color="#fef3c7" />
         <HeroStage />
         <HeroFigure rawHero={hero} animated={animated} action={action} />
-        <ContactShadows position={[0, -1.34, 0]} opacity={0.32} scale={2.1} blur={2.5} far={2} />
+        <ContactShadows position={[0, -1.34, 0]} opacity={0.32} scale={2.45} blur={2.5} far={2.4} />
         <OrbitControls
           enablePan={false}
-          minDistance={2.8}
-          maxDistance={4.7}
+          minDistance={3.6}
+          maxDistance={6.8}
           minPolarAngle={Math.PI / 2.9}
           maxPolarAngle={Math.PI / 1.75}
           target={[0, 0.15, 0]}

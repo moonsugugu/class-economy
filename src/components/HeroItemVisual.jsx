@@ -4,6 +4,7 @@ const SLOT_MARKS = {
   helmet: '머리',
   weapon: '손',
   armor: '몸',
+  gloves: '장갑',
   shoes: '발',
   accessory: '장신구',
   character: '용사',

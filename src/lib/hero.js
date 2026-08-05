@@ -4,6 +4,7 @@ export const HERO_SLOTS = [
   ['helmet', '헬멧'],
   ['weapon', '무기'],
   ['armor', '갑옷'],
+  ['gloves', '장갑'],
   ['shoes', '신발'],
   ['accessory', '장신구'],
 ];
@@ -40,6 +41,7 @@ const GEAR_NAMES = {
   helmet: ['천 모자', '가죽 모자', '나무 헬멧', '청동 헬멧', '철제 헬멧', '강철 헬멧', '은빛 투구', '금빛 투구', '마법 투구', '수정 투구', '기사 헬멧', '빛의 헬멧', '왕국 투구', '성기사 투구', '고대 투구', '용의 투구', '화염 투구', '폭풍 투구', '별빛 투구', '천공의 투구'],
   weapon: ['나무 막대기', '돌칼', '청동검', '철검', '강철검', '은빛 검', '금빛 검', '독검', '번개 창', '얼음 도끼', '불꽃 검', '빛의 검', '왕국 검', '성기사 검', '고대 검', '용의 검', '화염 대검', '폭풍 창', '별빛 활', '천공의 검'],
   armor: ['천 갑옷', '가죽 조끼', '나무 갑옷', '청동 갑옷', '사슬 갑옷', '강철 갑옷', '은빛 갑옷', '금빛 갑옷', '마법 갑옷', '수정 갑옷', '기사 갑옷', '빛의 갑옷', '왕국 갑옷', '성기사 갑옷', '고대 갑옷', '용의 갑옷', '화염 갑옷', '폭풍 갑옷', '별빛 갑옷', '천공의 갑옷'],
+  gloves: ['천 장갑', '가죽 장갑', '나무 건틀릿', '청동 건틀릿', '철제 건틀릿', '강철 건틀릿', '은빛 건틀릿', '금빛 건틀릿', '마법 장갑', '수정 건틀릿', '기사 건틀릿', '빛의 건틀릿', '왕국 건틀릿', '성기사 건틀릿', '고대 건틀릿', '용의 건틀릿', '화염 건틀릿', '폭풍 건틀릿', '별빛 건틀릿', '천공의 건틀릿'],
   shoes: ['가죽 샌들', '천 신발', '나무 신발', '청동 장화', '전투화', '강철 장화', '은빛 장화', '금빛 장화', '바람 장화', '얼음 장화', '날개 신발', '빛의 장화', '왕국 장화', '성기사 장화', '고대 장화', '용의 발톱', '화염 장화', '폭풍 장화', '별빛 장화', '천공의 장화'],
   accessory: ['행운의 부적', '나무 구슬', '청동 반지', '철 팔찌', '마법 목걸이', '불꽃 루비', '은빛 반지', '금빛 반지', '바람 보석', '얼음 보석', '기사의 문장', '빛의 목걸이', '왕국 인장', '성기사 메달', '고대 유물', '왕의 보석', '화염 보석', '폭풍 보석', '별빛 보석', '천공의 보석'],
 };
@@ -48,6 +50,7 @@ const GEAR_EMOJIS = {
   helmet: ['🧢', '🧢', '⛑️', '⛑️', '🪖', '🪖', '🛡️', '👑', '🔮', '💎', '🪖', '✨', '👑', '🛡️', '🏺', '🐲', '🔥', '🌪️', '🌟', '☄️'],
   weapon: ['🪵', '🪨', '🗡️', '⚔️', '⚔️', '🗡️', '⚔️', '🦂', '🔱', '🪓', '🔥', '✨', '⚔️', '🗡️', '🏺', '🗡️', '🔥', '🌪️', '🏹', '⚔️'],
   armor: ['🥋', '🥋', '🪵', '🛡️', '⛓️', '🛡️', '🛡️', '👑', '🔮', '💎', '🛡️', '✨', '👑', '🛡️', '🏺', '🐉', '🔥', '🌪️', '🌟', '☄️'],
+  gloves: ['🧤', '🧤', '🥊', '🥊', '🛡️', '🛡️', '⚙️', '✨', '🔮', '💎', '🥊', '🌟', '👑', '🛡️', '🏺', '🐉', '🔥', '🌪️', '🌟', '☄️'],
   shoes: ['👡', '👞', '👞', '🥾', '🥾', '🥾', '👢', '👢', '💨', '❄️', '🪽', '✨', '👢', '🥾', '🏺', '🐾', '🔥', '🌪️', '🌟', '☄️'],
   accessory: ['🍀', '🟤', '🟠', '⚙️', '🔮', '♦️', '⚪', '🟡', '💨', '❄️', '🏅', '✨', '🔱', '🏵️', '🏺', '👑', '🔥', '🌪️', '🌟', '☄️'],
 };
@@ -89,15 +92,36 @@ const POWER_BY_SLOT = {
   helmet: [3, 5, 7, 9, 11, 12, 16, 20, 24, 27, 30, 37, 44, 51, 58, 65, 78, 91, 105, 120],
   weapon: [5, 8, 11, 14, 17, 18, 26, 34, 41, 45, 48, 61, 74, 86, 96, 105, 125, 145, 168, 195],
   armor: [4, 7, 10, 13, 17, 22, 30, 38, 45, 52, 58, 70, 84, 98, 112, 145, 170, 195, 220, 250],
+  gloves: [3, 6, 9, 12, 16, 20, 27, 34, 42, 50, 58, 70, 82, 94, 108, 124, 142, 162, 184, 210],
   shoes: [3, 5, 7, 10, 12, 15, 22, 28, 33, 37, 40, 50, 60, 70, 78, 85, 102, 120, 140, 165],
   accessory: [6, 9, 12, 16, 21, 28, 34, 40, 46, 52, 58, 64, 69, 72, 75, 84, 98, 114, 130, 150],
 };
 
 const rarityOfLevel = (level) => (level <= 5 ? 'common' : level <= 10 ? 'rare' : level <= 15 ? 'elite' : 'legendary');
 
+const SPECIAL_STAT_LABELS = {
+  bossCritChance: '보스전 크리티컬 확률',
+  critDamage: '크리티컬 데미지',
+};
+
+// 장비 ID가 같으면 어느 기기에서 보더라도 같은 추가 능력치가 보이도록
+// 단계·부위에서 안정적으로 값을 만들어요. 기존 장비 ID와 기본 전투력은 그대로예요.
+function specialStatsFor(slot, level, rarity) {
+  if (rarity === 'common') return [];
+  const seed = [...slot].reduce((sum, char) => sum + char.charCodeAt(0), level * 17);
+  const firstKey = seed % 2 ? 'bossCritChance' : 'critDamage';
+  const valueFor = (key, offset = 0) => key === 'bossCritChance'
+    ? 1 + ((seed + offset * 11) % 5)
+    : 1 + ((seed + offset * 17) % 10);
+  const first = { key: firstKey, label: SPECIAL_STAT_LABELS[firstKey], value: valueFor(firstKey) };
+  if (rarity !== 'legendary') return [first];
+  const secondKey = firstKey === 'bossCritChance' ? 'critDamage' : 'bossCritChance';
+  return [first, { key: secondKey, label: SPECIAL_STAT_LABELS[secondKey], value: valueFor(secondKey, 1) }];
+}
+
 const gearItems = HERO_SLOTS.flatMap(([slot]) => Array.from({ length: 20 }, (_, index) => {
   const level = index + 1;
-  const legacy = LEGACY_GEAR[slot][level];
+  const legacy = (LEGACY_GEAR[slot] || {})[level];
   const rarity = rarityOfLevel(level);
   const power = POWER_BY_SLOT[slot][index];
   return {
@@ -111,6 +135,7 @@ const gearItems = HERO_SLOTS.flatMap(([slot]) => Array.from({ length: 20 }, (_, 
     emoji: legacy?.emoji || GEAR_EMOJIS[slot][index],
     price: legacy?.price || Math.round(50 + power * 10 + level * 15),
     power,
+    specialStats: specialStatsFor(slot, level, rarity),
   };
 }));
 
@@ -212,19 +237,56 @@ export function heroPower(raw) {
   return characterPower + gearPower;
 }
 
+export function formatHeroSpecialStat(stat) {
+  if (!stat?.key || !Number.isFinite(Number(stat.value))) return '';
+  const label = stat.label || SPECIAL_STAT_LABELS[stat.key] || stat.key;
+  return `${label} +${Math.max(0, Number(stat.value))}%`;
+}
+
+export function formatHeroSpecialStats(item) {
+  return Array.isArray(item?.specialStats)
+    ? item.specialStats.map(formatHeroSpecialStat).filter(Boolean)
+    : [];
+}
+
+function equippedHeroGear(hero) {
+  return HERO_SLOTS
+    .map(([slot]) => HERO_ITEM_MAP[hero.equipment[slot]])
+    .filter((item) => item?.slot && item.slot !== 'pet');
+}
+
+export function heroSpecialValue(raw, key) {
+  const hero = normalizeHero(raw);
+  return equippedHeroGear(hero).reduce((total, item) => (
+    total + (item.specialStats || [])
+      .filter((stat) => stat.key === key)
+      .reduce((sum, stat) => sum + (Number(stat.value) || 0), 0)
+  ), 0);
+}
+
 export function bossCriticalChance(raw) {
   const hero = normalizeHero(raw);
-  return HERO_ITEM_MAP[hero.pet]?.critChance || 0;
+  return clamp(
+    (HERO_ITEM_MAP[hero.pet]?.critChance || 0) + heroSpecialValue(hero, 'bossCritChance'),
+    0,
+    100,
+  );
+}
+
+export function criticalDamageBonus(raw) {
+  return heroSpecialValue(raw, 'critDamage');
 }
 
 export function battleDamage(power, monster, raw, criticalRoll = Math.random()) {
   const base = Math.max(1, Math.floor(Number(power) || 0));
   const criticalChance = monster?.boss ? bossCriticalChance(raw) : 0;
   const critical = criticalChance > 0 && criticalRoll < criticalChance / 100;
+  const criticalDamage = criticalDamageBonus(raw);
   return {
-    damage: critical ? base * 2 : base,
+    damage: critical ? Math.floor(base * (2 + criticalDamage / 100)) : base,
     critical,
     criticalChance,
+    criticalDamage,
   };
 }
 

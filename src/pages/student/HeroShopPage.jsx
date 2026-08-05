@@ -5,7 +5,7 @@ import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import {
   HERO_ITEMS, HERO_SLOTS, HERO_PETS, HERO_PET_SLOT, HERO_RARITIES, HERO_SHOP_REFRESH_LIMIT,
-  normalizeHero, heroDateKey, heroShopFor,
+  normalizeHero, formatHeroSpecialStats, heroDateKey, heroShopFor,
 } from '../../lib/hero';
 import HeroPreview from '../../three/Hero3D.jsx';
 import { HeroItemVisual, HeroRarityBadge } from '../../components/HeroItemVisual.jsx';
@@ -173,7 +173,7 @@ export default function HeroShopPage() {
       >
         {rarity && <div className="absolute right-3 top-3 h-2 w-2 rounded-full" style={{ background: rarity.accent, boxShadow: `0 0 12px ${rarity.accent}` }} />}
         <HeroItemVisual item={item} size={96} className="mx-auto mb-2" />
-        <div className="text-sm text-gray-700">{item.name}</div>
+        <div className="text-sm text-gray-700 whitespace-normal break-words leading-tight">{item.name}</div>
         <div className="flex justify-center gap-1 my-1">
           <HeroRarityBadge item={item} />
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-500">{item.level}단계</span>
@@ -181,6 +181,9 @@ export default function HeroShopPage() {
         <div className="text-xs text-indigo-500">
           {item.slot === 'pet' ? <>보스전 크리티컬 {item.critChance}% · 데미지 2배</> : <>전투력 +{item.power}</>}
         </div>
+        {formatHeroSpecialStats(item).map((stat) => (
+          <div key={stat} className="text-[10px] leading-tight text-fuchsia-500 whitespace-normal break-words">✨ {stat}</div>
+        ))}
         <div className="text-xs text-amber-600 mb-2">{fmt(total)} {klass.currency}</div>
         {tax > 0 && <div className="text-[10px] text-gray-400 mb-1">상품 {fmt(price)} + 세금 {fmt(tax)}</div>}
         {owned ? (
@@ -239,7 +242,7 @@ export default function HeroShopPage() {
               <div key={item.id} className="relative overflow-hidden rounded-3xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-pink-100 p-4 text-center shadow-lg">
                 <HeroPreview hero={previewHero} size={150} />
                 <HeroItemVisual item={item} size={58} className="mx-auto -mt-7 border-white" />
-                <div className="text-sm text-gray-700 mt-2">{item.name}</div>
+                <div className="text-sm text-gray-700 mt-2 whitespace-normal break-words leading-tight">{item.name}</div>
                 <div className="text-xs text-indigo-500">전투력 +{item.power}</div>
                 <div className="text-xs text-amber-600 mb-2">총 {fmt(costOf(item) + taxForPart(costOf(item), klass, 'item').tax)} {klass.currency}</div>
                 {hero.owned.includes(item.id) ? (

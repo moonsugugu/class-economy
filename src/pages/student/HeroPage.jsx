@@ -6,7 +6,7 @@ import { fmt } from '../../lib/util';
 import {
   HERO_ITEM_MAP, HERO_SLOTS, normalizeHero, heroPower,
   monsterForLevel, battleChance, battleConfig, heroDateKey, battleDamage, bossCriticalChance,
-  heroExtraBattleCost, heroDisplayName,
+  criticalDamageBonus, formatHeroSpecialStats, heroExtraBattleCost, heroDisplayName,
 } from '../../lib/hero';
 import HeroPreview from '../../three/Hero3D.jsx';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
@@ -111,7 +111,7 @@ export default function HeroPage() {
         const won = roll < chance;
         const damageResult = won
           ? battleDamage(currentPower, monster, current)
-          : { damage: 0, critical: false, criticalChance: bossCriticalChance(current) };
+          : { damage: 0, critical: false, criticalChance: bossCriticalChance(current), criticalDamage: criticalDamageBonus(current) };
         const reward = won ? settings.winReward : settings.loseReward;
         const previousBossDamage = current.bossProgress[monster.level] || 0;
         const nextBossDamage = monster.boss
@@ -134,6 +134,7 @@ export default function HeroPage() {
             reward,
             damage: damageResult.damage,
             critical: damageResult.critical,
+            criticalDamage: damageResult.criticalDamage,
             bossDamage: nextBossDamage,
             bossHp: monster.maxHp,
             bossDefeated,
@@ -149,6 +150,7 @@ export default function HeroPage() {
         battleResult = {
           won, monster, chance, currentPower, reward,
           damage: damageResult.damage, critical: damageResult.critical,
+          criticalDamage: damageResult.criticalDamage,
           bossDamage: nextBossDamage, bossHp: monster.maxHp, bossDefeated,
           attempt: attempts + 1, limit: settings.limit, extraCost,
         };
@@ -170,7 +172,7 @@ export default function HeroPage() {
         setMsg({
           type: 'ok',
           text: '💥 ' + battleResult.monster.name + '에게 ' + fmt(battleResult.damage) + ' 데미지' +
-            (battleResult.critical ? ' (크리티컬 2배!)' : '') + '! ' +
+            (battleResult.critical ? ` (크리티컬 ${(2 + (battleResult.criticalDamage || 0) / 100).toFixed(2).replace(/\.00$/, '')}배!)` : '') + '! ' +
             (battleResult.bossDefeated ? '보스를 쓰러뜨렸어요!' : '아직 보스 HP가 남았어요.') +
             ' 보상 ' + fmt(battleResult.reward) + klass.currency +
             (battleResult.extraCost > 0 ? ' · 추가 도전 비용 ' + fmt(battleResult.extraCost) + klass.currency : '') +
@@ -230,15 +232,17 @@ export default function HeroPage() {
           <div className="space-y-2">
             {HERO_SLOTS.map(([slot, label]) => {
               const item = HERO_ITEM_MAP[hero.equipment[slot]];
+              const specialStats = formatHeroSpecialStats(item);
               return (
                 <div key={slot} className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${item ? 'border-indigo-100 bg-indigo-50/40' : 'border-gray-100 bg-gray-50'}`}>
-                  <span className="text-xs text-gray-400 w-12">{label}</span>
+                  <span className="w-12 shrink-0 text-xs text-gray-400">{label}</span>
                   <HeroItemVisual item={item} size={52} showLevel={false} />
                   <span className="min-w-0 flex-1 text-sm text-gray-600">
-                    <span className="block truncate">{item?.name || '미장착'}</span>
+                    <span className="block whitespace-normal break-words leading-tight">{item?.name || '미장착'}</span>
                     {item && <span className="text-[11px] font-semibold text-indigo-500">{item.level}단계 장비</span>}
+                    {specialStats.map((stat) => <span key={stat} className="block text-[10px] leading-tight text-fuchsia-500">✨ {stat}</span>)}
                   </span>
-                  <span className="ml-auto text-right text-sm text-indigo-500">{item ? `+${item.power}` : ''}<small className="block text-[9px] text-gray-400">전투력</small></span>
+                  <span className="ml-auto shrink-0 text-right text-sm text-indigo-500">{item ? `+${item.power}` : ''}<small className="block text-[9px] text-gray-400">전투력</small></span>
                 </div>
               );
             })}
@@ -246,12 +250,13 @@ export default function HeroPage() {
               <span className="text-xs text-gray-400 w-12">펫</span>
               <HeroItemVisual item={HERO_ITEM_MAP[hero.pet]} size={52} showLevel={false} />
               <span className="min-w-0 flex-1 text-sm text-gray-600">
-                <span className="block truncate">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
+                <span className="block whitespace-normal break-words leading-tight">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
                 {HERO_ITEM_MAP[hero.pet] && <span className="text-[11px] font-semibold text-fuchsia-500">{HERO_ITEM_MAP[hero.pet].level}단계 펫</span>}
               </span>
               <span className="ml-auto text-right text-sm text-fuchsia-600">
-                {HERO_ITEM_MAP[hero.pet] ? <>보스 크리티컬 {bossCriticalChance(hero)}%</> : ''}
+                {bossCriticalChance(hero) > 0 ? <>보스 크리티컬 {bossCriticalChance(hero)}%</> : ''}
                 <small className="block text-[9px] text-gray-400">보스 데미지 2배</small>
+                {criticalDamageBonus(hero) > 0 && <small className="block text-[9px] text-fuchsia-400">크리티컬 데미지 +{criticalDamageBonus(hero)}%</small>}
               </span>
             </div>
           </div>

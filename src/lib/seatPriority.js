@@ -21,7 +21,10 @@ export function priorityStep(value) {
 export function priorityRankPrice(market, rank) {
   const base = priorityBasePrice(market?.basePrice);
   const step = priorityStep(market?.step);
-  return base + Math.max(0, Math.floor(Number(rank) || 1) - 1) * step;
+  const slots = prioritySlots(market?.slots);
+  const normalizedRank = Math.max(1, Math.min(slots, Math.floor(Number(rank) || 1)));
+  // 1등에게 가장 먼저 고를 권리가 있으므로 가장 비싸고, 뒤 순위일수록 낮아져요.
+  return base + Math.max(0, slots - normalizedRank) * step;
 }
 
 export function priorityRankLabel(rank) {
