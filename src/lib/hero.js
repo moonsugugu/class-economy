@@ -8,6 +8,8 @@ export const HERO_SLOTS = [
   ['accessory', '장신구'],
 ];
 
+export const HERO_PET_SLOT = ['pet', '펫'];
+
 export const HERO_RARITIES = {
   common: {
     label: '일반', color: 'bg-slate-100 text-slate-600', weight: 8,
@@ -112,7 +114,34 @@ const gearItems = HERO_SLOTS.flatMap(([slot]) => Array.from({ length: 20 }, (_, 
   };
 }));
 
-export const HERO_ITEMS = [...HERO_CHARACTERS, ...gearItems];
+const PET_NAMES = [
+  '별빛 토끼', '구름 여우', '바다 물개', '초원 판다', '불꽃 고양이',
+  '달빛 늑대', '숲의 사슴', '번개 매', '보석 거북', '얼음 펭귄',
+  '황금 원숭이', '유성 드래곤', '밤의 부엉이', '태양 사자', '폭풍 독수리',
+  '심연의 뱀', '천공의 고래', '마력 유니콘', '고대 그리핀', '신성한 봉황',
+];
+const PET_EMOJIS = ['🐇', '🦊', '🦭', '🐼', '🐈', '🐺', '🦌', '🦅', '🐢', '🐧', '🐒', '🐲', '🦉', '🦁', '🦅', '🐍', '🐳', '🦄', '🪽', '🔥'];
+const petItems = Array.from({ length: 20 }, (_, index) => {
+  const level = index + 1;
+  const rarity = rarityOfLevel(level);
+  const critChance = Math.round(5 + (level - 1) * (75 / 19));
+  return {
+    id: 'hero_pet_' + level,
+    slot: 'pet',
+    level,
+    rarity,
+    rarityLabel: HERO_RARITIES[rarity].label,
+    visualKey: 'pet-' + level,
+    name: PET_NAMES[index],
+    emoji: PET_EMOJIS[index],
+    price: 180 + level * 95 + (rarity === 'legendary' ? 220 : 0),
+    power: 0,
+    critChance,
+  };
+});
+
+export const HERO_PETS = petItems;
+export const HERO_ITEMS = [...HERO_CHARACTERS, ...gearItems, ...petItems];
 export const HERO_ITEM_MAP = Object.fromEntries(HERO_ITEMS.map((item) => [item.id, item]));
 export const HERO_GEAR_BY_SLOT = Object.fromEntries(HERO_SLOTS.map(([slot]) => [
   slot, gearItems.filter((item) => item.slot === slot),
@@ -130,11 +159,20 @@ export function normalizeHero(raw = {}) {
   const character = owned.includes(raw.character) && HERO_ITEM_MAP[raw.character]?.slot === 'character'
     ? raw.character
     : null;
+  const pet = owned.includes(raw.pet) && HERO_ITEM_MAP[raw.pet]?.slot === 'pet'
+    ? raw.pet
+    : null;
+  const bossProgress = raw.bossProgress && typeof raw.bossProgress === 'object'
+    ? Object.fromEntries(Object.entries(raw.bossProgress)
+      .map(([level, damage]) => [level, Math.max(0, Number(damage) || 0)]))
+    : {};
   const shop = raw.shop && typeof raw.shop === 'object' ? { ...raw.shop } : {};
   return {
     character,
+    pet,
     owned,
     equipment,
+    bossProgress,
     clearedLevel: clamp(Number(raw.clearedLevel) || 0, 0, 100),
     battleDate: raw.battleDate || '',
     battleCount: Math.max(0, Number(raw.battleCount) || 0),
@@ -156,6 +194,22 @@ export function heroPower(raw) {
   return characterPower + gearPower;
 }
 
+export function bossCriticalChance(raw) {
+  const hero = normalizeHero(raw);
+  return HERO_ITEM_MAP[hero.pet]?.critChance || 0;
+}
+
+export function battleDamage(power, monster, raw, criticalRoll = Math.random()) {
+  const base = Math.max(1, Math.floor(Number(power) || 0));
+  const criticalChance = monster?.boss ? bossCriticalChance(raw) : 0;
+  const critical = criticalChance > 0 && criticalRoll < criticalChance / 100;
+  return {
+    damage: critical ? base * 2 : base,
+    critical,
+    criticalChance,
+  };
+}
+
 export function battleChance(power, monsterPower) {
   if (power <= 0) return 0;
   if (monsterPower <= 0) return 1;
@@ -172,26 +226,65 @@ export function battleConfig(klass = {}) {
   };
 }
 
-const MONSTER_NAMES = [
-  '풀숲 슬라임', '길 잃은 박쥐', '돌멩이 고블린', '사나운 멧돼지', '동굴 거미',
-  '불씨 임프', '숲의 오크', '독 늪지괴물', '얼음 늑대', '황야의 미노타우로스',
+const MONSTER_ARCHETYPES = [
+  { kind: 'slime', name: '슬라임', emoji: '🟢', radius: '42% 58% 52% 48%' },
+  { kind: 'bat', name: '박쥐', emoji: '🦇', radius: '48% 52% 44% 56%' },
+  { kind: 'goblin', name: '고블린', emoji: '👺', radius: '36% 64% 58% 42%' },
+  { kind: 'boar', name: '멧돼지', emoji: '🐗', radius: '54% 46% 48% 52%' },
+  { kind: 'spider', name: '거미', emoji: '🕷️', radius: '50%' },
+  { kind: 'imp', name: '임프', emoji: '👹', radius: '45% 55% 60% 40%' },
+  { kind: 'orc', name: '오크', emoji: '👺', radius: '38% 62% 50% 50%' },
+  { kind: 'swamp', name: '늪지괴물', emoji: '🐊', radius: '60% 40% 42% 58%' },
+  { kind: 'wolf', name: '얼음 늑대', emoji: '🐺', radius: '46% 54% 54% 46%' },
+  { kind: 'bull', name: '미노타우로스', emoji: '🐂', radius: '42% 58% 58% 42%' },
+  { kind: 'plant', name: '가시꽃', emoji: '🌺', radius: '48% 52% 35% 65%' },
+  { kind: 'mushroom', name: '버섯요정', emoji: '🍄', radius: '58% 42% 48% 52%' },
+  { kind: 'crab', name: '불꽃 게', emoji: '🦀', radius: '50% 50% 44% 56%' },
+  { kind: 'jellyfish', name: '전기 해파리', emoji: '🪼', radius: '54% 46% 62% 38%' },
+  { kind: 'dragon', name: '아기 드래곤', emoji: '🐉', radius: '44% 56% 52% 48%' },
+  { kind: 'sphinx', name: '사막 스핑크스', emoji: '🦁', radius: '46% 54% 46% 54%' },
+  { kind: 'robot', name: '고철 로봇', emoji: '🤖', radius: '18% 82% 22% 78%' },
+  { kind: 'ghost', name: '달빛 유령', emoji: '👻', radius: '52% 48% 38% 62%' },
+  { kind: 'kraken', name: '심해 문어', emoji: '🐙', radius: '50% 50% 60% 40%' },
+  { kind: 'phoenix', name: '불사조', emoji: '🦅', radius: '42% 58% 48% 52%' },
 ];
-const MONSTER_EMOJIS = ['🟢', '🦇', '👺', '🐗', '🕷️', '👹', '👺', '🐊', '🐺', '🐂'];
+const MONSTER_VARIANTS = ['새벽', '황혼', '청록', '자홍', '별빛'];
+const MONSTER_PALETTES = [
+  ['#34d399', '#065f46'], ['#60a5fa', '#1e3a8a'], ['#f472b6', '#831843'],
+  ['#fbbf24', '#92400e'], ['#a78bfa', '#4c1d95'], ['#fb7185', '#881337'],
+  ['#22d3ee', '#164e63'], ['#bef264', '#365314'], ['#fb923c', '#7c2d12'],
+  ['#c084fc', '#581c87'],
+];
+
+const MONSTER_DESIGNS = Array.from({ length: 100 }, (_, index) => {
+  const level = index + 1;
+  const species = MONSTER_ARCHETYPES[index % MONSTER_ARCHETYPES.length];
+  const variantIndex = Math.floor(index / MONSTER_ARCHETYPES.length) % MONSTER_VARIANTS.length;
+  const palette = MONSTER_PALETTES[(index * 7 + variantIndex) % MONSTER_PALETTES.length];
+  const boss = level % 10 === 0;
+  return {
+    level,
+    name: `${MONSTER_VARIANTS[variantIndex]} ${species.name}`,
+    emoji: species.emoji,
+    boss,
+    power: Math.floor(30 + level * 4.5 + Math.pow(level, 1.2) * 1.5),
+    maxHp: boss ? Math.floor(250 + level * 70 + level * level * 0.8) : 1,
+    visual: {
+      key: `monster-${level}`,
+      kind: species.kind,
+      radius: species.radius,
+      body: palette[0],
+      accent: palette[1],
+      variant: variantIndex,
+      mark: (index * 13 + 7) % 10,
+      emoji: species.emoji,
+    },
+  };
+});
 
 export function monsterForLevel(level) {
   const safeLevel = clamp(Math.floor(Number(level) || 1), 1, 100);
-  const tier = Math.floor((safeLevel - 1) / 10);
-  const numberInTier = (safeLevel - 1) % 10;
-  const baseName = MONSTER_NAMES[tier % MONSTER_NAMES.length];
-  const boss = safeLevel % 10 === 0;
-  const power = Math.floor(30 + safeLevel * 4.5 + Math.pow(safeLevel, 1.2) * 1.5);
-  return {
-    level: safeLevel,
-    name: boss ? `${baseName} 대장` : `${baseName} ${numberInTier + 1}호`,
-    emoji: boss ? '👑' : MONSTER_EMOJIS[tier % MONSTER_EMOJIS.length],
-    power,
-    boss,
-  };
+  return MONSTER_DESIGNS[safeLevel - 1];
 }
 
 function hashSeed(value) {
@@ -224,8 +317,8 @@ export function heroShopFor(classId, date = heroDateKey(), refreshes = 0) {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
     return state / 4294967296;
   };
-  return Object.fromEntries(HERO_SLOTS.map(([slot]) => [
+  return Object.fromEntries([...HERO_SLOTS, HERO_PET_SLOT].map(([slot]) => [
     slot,
-    weightedSample(HERO_GEAR_BY_SLOT[slot], random, 3).map((item) => item.id),
+    weightedSample(slot === 'pet' ? HERO_PETS : HERO_GEAR_BY_SLOT[slot], random, 3).map((item) => item.id),
   ]));
 }

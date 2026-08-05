@@ -10,7 +10,7 @@ import { useApp } from '../../context/AppContext';
 import { fmt, makeClassCode, rankAssets } from '../../lib/util';
 import {
   changePct, advance, usedTicks, makeInitialMarket, makeCustomStock, mergeSeedStocks,
-  MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, AUTO_TICK_MS, DEFAULT_FX, todayKey,
+  MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, MAX_TICK_LIMIT, normalizedTickLimit, AUTO_TICK_MS, DEFAULT_FX, todayKey,
   pendingSchedule, SCHEDULE_LABEL, fetchRealQuotes, applyRealPrices,
   DEFAULT_KRW_PER_UNIT,
 } from '../../lib/stocks';
@@ -835,7 +835,7 @@ function StocksTab({ klass }) {
   const migrated = useRef(false);
 
   const mref = doc(db, ...MARKET_PATH(klass.id));
-  const limit = Number(klass.tickLimit ?? DEFAULT_TICK_LIMIT);
+  const limit = normalizedTickLimit(klass.tickLimit ?? DEFAULT_TICK_LIMIT);
   const used = usedTicks(market);
   const left = Math.max(0, limit - used);
 
@@ -1146,14 +1146,17 @@ function SettingsTab({ klass }) {
   const init = () => ({
     name: klass.name, currency: klass.currency, salary: klass.salary,
     depositRate: klass.depositRate, savingsRate: klass.savingsRate,
-    tickLimit: klass.tickLimit ?? DEFAULT_TICK_LIMIT,
+    tickLimit: normalizedTickLimit(klass.tickLimit ?? DEFAULT_TICK_LIMIT),
     heroBattleLimit: klass.heroBattleLimit ?? 10,
     heroWinReward: klass.heroWinReward ?? 20,
     heroLoseReward: klass.heroLoseReward ?? 0,
     priceInflationMode: klass.priceInflationMode ?? PRICE_MODE_UNIT,
     priceInflationValue: klass.priceInflationValue ?? 0,
     taxRate: klass.taxRate ?? 10,
-    ...Object.fromEntries(TAX_PARTS.map(({ field }) => [field, klass[field] ?? klass.taxRate ?? 10])),
+    ...Object.fromEntries(TAX_PARTS.map(({ key, field }) => [
+      field,
+      key === 'stockBuy' ? 0 : key === 'stockSell' ? 5 : klass[field] ?? klass.taxRate ?? 10,
+    ])),
     krwPerUnit: klass.krwPerUnit ?? DEFAULT_KRW_PER_UNIT,
   });
   const [form, setForm] = useState(init);
@@ -1163,8 +1166,9 @@ function SettingsTab({ klass }) {
 
   const save = async (e) => {
     e.preventDefault();
-    const taxValues = Object.fromEntries(TAX_PARTS.map(({ field }) => [
-      field, Math.max(0, Math.min(100, Number(form[field]) || 0)),
+    const taxValues = Object.fromEntries(TAX_PARTS.map(({ key, field }) => [
+      field,
+      key === 'stockBuy' ? 0 : key === 'stockSell' ? 5 : Math.max(0, Math.min(100, Number(form[field]) || 0)),
     ]));
     await updateDoc(doc(db, 'classes', klass.id), {
       name: form.name.trim() || klass.name,
@@ -1172,7 +1176,7 @@ function SettingsTab({ klass }) {
       salary: Number(form.salary) || 0,
       depositRate: Number(form.depositRate) || 0,
       savingsRate: Number(form.savingsRate) || 0,
-      tickLimit: Math.max(1, Math.min(100, Number(form.tickLimit) || DEFAULT_TICK_LIMIT)),
+      tickLimit: Math.max(1, Math.min(MAX_TICK_LIMIT, Number(form.tickLimit) || DEFAULT_TICK_LIMIT)),
       heroBattleLimit: Math.max(1, Math.min(100, Number(form.heroBattleLimit) || 10)),
       heroWinReward: Math.max(0, Math.min(100000, Number(form.heroWinReward) || 0)),
       heroLoseReward: Math.max(0, Math.min(100000, Number(form.heroLoseReward) || 0)),
@@ -1233,6 +1237,8 @@ function SettingsTab({ klass }) {
               max="100"
               value={form[taxField]}
               onChange={(e) => setForm({ ...form, [taxField]: e.target.value })}
+              disabled={taxField === 'taxStockBuyRate' || taxField === 'taxStockSellRate'}
+              readOnly={taxField === 'taxStockBuyRate' || taxField === 'taxStockSellRate'}
               className={input + ' w-24 text-right'}
             />
             <span className="text-sm text-gray-500">%</span>

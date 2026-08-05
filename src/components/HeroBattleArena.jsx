@@ -1,5 +1,6 @@
 import HeroPreview from '../three/Hero3D.jsx';
 import { fmt } from '../lib/util';
+import MonsterVisual from './MonsterVisual.jsx';
 
 const phaseText = {
   idle: '전투 준비 완료',
@@ -9,7 +10,7 @@ const phaseText = {
   lose: '💥 아쉬워요! 다시 장비를 점검해 보세요.',
 };
 
-export default function HeroBattleArena({ hero, power = 0, monster, phase = 'idle', chance = 0 }) {
+export default function HeroBattleArena({ hero, power = 0, monster, phase = 'idle', chance = 0, bossDamage = 0, battleFx = null }) {
   const heroAction = phase === 'attack' ? 'attack' : phase === 'charge' ? 'charge' : phase;
   const monsterMotion = phase === 'attack' ? 'battle-monster-attack' : phase === 'win' || phase === 'lose' ? 'battle-monster-hit' : '';
   const showActionFx = phase === 'attack' || phase === 'win' || phase === 'lose';
@@ -52,10 +53,27 @@ export default function HeroBattleArena({ hero, power = 0, monster, phase = 'idl
 
         <div className="relative flex flex-col items-center justify-end">
           <div className="mb-1 rounded-full bg-rose-500/10 px-3 py-1 text-[10px] font-bold text-rose-600">NEXT MONSTER</div>
-          <div className={`flex h-[172px] w-[172px] items-center justify-center rounded-[2rem] border-2 border-white/80 bg-gradient-to-b from-rose-50 to-orange-100 shadow-inner ${monsterMotion}`}>
-            <div className="battle-monster text-[6.5rem] drop-shadow-[0_10px_6px_rgba(124,45,18,.22)]">{monster.emoji}</div>
+          <div className={['flex h-[172px] w-[172px] items-center justify-center rounded-[2rem] border-2 border-white/80 bg-gradient-to-b from-rose-50 to-orange-100 shadow-inner', monsterMotion].join(' ')}>
+            <div className="battle-monster drop-shadow-[0_10px_6px_rgba(124,45,18,.22)]">
+              <MonsterVisual monster={monster} size={132} />
+            </div>
           </div>
           <div className="mt-[-6px] rounded-full bg-rose-500 px-3 py-1 text-xs font-bold text-white shadow-lg">{monster.name} · 전투력 {fmt(monster.power)}</div>
+          {monster.boss && (
+            <div className="mt-2 w-full max-w-[172px]">
+              <div className="mb-1 flex justify-between text-[10px] font-bold text-fuchsia-700">
+                <span>보스 HP</span>
+                <span>{fmt(Math.max(0, monster.maxHp - bossDamage))} / {fmt(monster.maxHp)}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-fuchsia-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-fuchsia-500 to-rose-500 transition-all"
+                  style={{ width: Math.max(0, Math.min(100, ((monster.maxHp - bossDamage) / monster.maxHp) * 100)) + '%' }}
+                />
+              </div>
+              {battleFx?.critical && <div className="mt-1 text-center text-[10px] font-black text-amber-600 animate-pulse">CRITICAL ×2</div>}
+            </div>
+          )}
         </div>
       </div>
 

@@ -13,6 +13,42 @@ const RARITY_COLORS = {
 
 const tierOf = (item) => item ? Math.ceil(item.level / 5) : 0;
 const paletteOf = (item, fallback) => RARITY_COLORS[item?.rarity] || fallback;
+const RARITY_RANK = { common: 1, rare: 2, elite: 3, legendary: 4 };
+
+function HeroRarityAura({ hero }) {
+  const groupRef = useRef();
+  const items = [
+    HERO_ITEM_MAP[hero.character],
+    ...Object.values(hero.equipment || {}).map((id) => HERO_ITEM_MAP[id]),
+    HERO_ITEM_MAP[hero.pet],
+  ].filter(Boolean);
+  const item = items.sort((a, b) => (RARITY_RANK[b.rarity] || 0) - (RARITY_RANK[a.rarity] || 0))[0];
+  const rank = RARITY_RANK[item?.rarity] || 0;
+  const palette = RARITY_COLORS[item?.rarity] || RARITY_COLORS.common;
+
+  useFrame(({ clock }) => {
+    if (!groupRef.current) return;
+    const t = clock.getElapsedTime();
+    groupRef.current.rotation.y = t * (rank === 4 ? 0.5 : 0.25);
+    groupRef.current.rotation.z = Math.sin(t * 1.4) * 0.03;
+    groupRef.current.scale.setScalar(1 + Math.sin(t * 2.3) * (rank === 4 ? 0.06 : 0.03));
+  });
+  if (rank < 3) return null;
+
+  return (
+    <group ref={groupRef} position={[0, 0.72, -0.24]}>
+      <pointLight color={palette.glow} intensity={rank === 4 ? 2.3 : 1.15} distance={2.7} />
+      <Sp p={[0, 0, 0]} rad={0.86} sc={[0.78, 1.28, 0.4]} c={palette.glow} e={palette.glow} o={rank === 4 ? 0.1 : 0.07} />
+      <To p={[0, 0, 0.1]} rad={0.72} tube={0.018} c={palette.light} e={palette.glow} r={[Math.PI / 2, 0, 0]} />
+      {rank === 4 && [-1, 1].map((side) => (
+        <group key={side} position={[side * 0.42, 0.1, 0.1]} rotation={[0, 0, side * 0.45]}>
+          <Co p={[0, 0, 0]} rad={0.08} h={0.28} c={palette.light} e={palette.glow} />
+          <Sp p={[0, 0.17, 0]} rad={0.035} c="#fff" e={palette.glow} />
+        </group>
+      ))}
+    </group>
+  );
+}
 
 function HeroFace({ female, skin, hair }) {
   return (
@@ -33,6 +69,9 @@ function HeroFace({ female, skin, hair }) {
         <group>
           <Sp p={[-0.24, 1.08, -0.02]} rad={0.105} sc={[0.75, 1.65, 0.78]} c={hair} />
           <Sp p={[0.24, 1.08, -0.02]} rad={0.105} sc={[0.75, 1.65, 0.78]} c={hair} />
+          <Sp p={[-0.31, 0.78, -0.06]} rad={0.13} sc={[0.78, 1.75, 0.68]} c={hair} />
+          <Sp p={[0.31, 0.78, -0.06]} rad={0.13} sc={[0.78, 1.75, 0.68]} c={hair} />
+          <Sp p={[0, 0.84, -0.12]} rad={0.22} sc={[1.3, 1.6, 0.45]} c={hair} />
           <Sp p={[0, 1.34, -0.12]} rad={0.17} sc={[0.9, 0.5, 0.75]} c={hair} />
         </group>
       ) : (
@@ -192,6 +231,30 @@ function HeroAccessory({ item }) {
   );
 }
 
+function HeroPet({ item }) {
+  const petRef = useRef();
+  const palette = RARITY_COLORS[item?.rarity] || RARITY_COLORS.common;
+  useFrame(({ clock }) => {
+    if (!petRef.current) return;
+    const t = clock.getElapsedTime();
+    petRef.current.position.y = 0.3 + Math.sin(t * 3.2) * 0.08;
+    petRef.current.rotation.y = Math.sin(t * 1.8) * 0.25;
+  });
+  if (!item) return null;
+  return (
+    <group ref={petRef} position={[0.92, 0.3, 0.1]} scale={0.46}>
+      <pointLight color={palette.glow} intensity={item.rarity === 'legendary' ? 1.4 : 0.5} distance={1.8} />
+      <Sp p={[0, 0, 0]} rad={0.36} sc={[1, 0.9, 0.85]} c={palette.main} m={0.45} />
+      <Sp p={[-0.16, 0.27, 0]} rad={0.13} sc={[0.72, 1.15, 0.65]} c={palette.light} />
+      <Sp p={[0.16, 0.27, 0]} rad={0.13} sc={[0.72, 1.15, 0.65]} c={palette.light} />
+      <Sp p={[-0.1, 0.07, 0.3]} rad={0.04} c="#111827" />
+      <Sp p={[0.1, 0.07, 0.3]} rad={0.04} c="#111827" />
+      <Sp p={[0, -0.09, 0.3]} rad={0.04} c={palette.glow} e={palette.glow} />
+      <To p={[0, 0, 0]} rad={0.48} tube={0.018} c={palette.light} e={palette.glow} />
+    </group>
+  );
+}
+
 function HeroFigure({ rawHero, animated = false, action = 'idle' }) {
   const figureRef = useRef();
   const hero = normalizeHero(rawHero);
@@ -246,6 +309,7 @@ function HeroFigure({ rawHero, animated = false, action = 'idle' }) {
   return (
     <group ref={figureRef} position={[0, -1.18, 0]} scale={1.52}>
       <HeroShoes item={shoes} />
+      <HeroRarityAura hero={hero} />
       {/* 어린 용사의 실루엣: 큰 머리, 짧은 팔다리, 넓은 어깨로 기존 노인 느낌을 없앴어요. */}
       <Sp p={[-0.14, 0.36, 0]} rad={0.14} sc={[0.82, 1.5, 0.82]} c="#26364f" />
       <Sp p={[0.14, 0.36, 0]} rad={0.14} sc={[0.82, 1.5, 0.82]} c="#26364f" />
@@ -257,6 +321,7 @@ function HeroFigure({ rawHero, animated = false, action = 'idle' }) {
       <Sp p={[0.39, 0.34, 0.1]} rad={0.085} c={skin} />
       <HeroWeapon item={weapon} />
       <HeroAccessory item={accessory} />
+      <HeroPet item={HERO_ITEM_MAP[hero.pet]} />
       <HeroFace female={female} skin={skin} hair={hair} />
       <HeroHelmet item={helmet} female={female} hair={hair} />
       {character && (

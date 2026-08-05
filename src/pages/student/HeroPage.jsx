@@ -5,23 +5,26 @@ import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import {
   HERO_ITEM_MAP, HERO_SLOTS, normalizeHero, heroPower,
-  monsterForLevel, battleChance, battleConfig, heroDateKey,
+  monsterForLevel, battleChance, battleConfig, heroDateKey, battleDamage, bossCriticalChance,
 } from '../../lib/hero';
 import HeroPreview from '../../three/Hero3D.jsx';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
 import HeroBattleArena from '../../components/HeroBattleArena.jsx';
+import MonsterVisual from '../../components/MonsterVisual.jsx';
 
 export default function HeroPage() {
   const { klass, student } = useOutletContext();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [battlePhase, setBattlePhase] = useState('idle');
+  const [battleFx, setBattleFx] = useState(null);
   const hero = normalizeHero(student.rpg);
   const power = heroPower(hero);
   const today = heroDateKey();
   const config = battleConfig(klass);
   const usedToday = hero.battleDate === today ? hero.battleCount : 0;
   const nextMonster = hero.clearedLevel < 100 ? monsterForLevel(hero.clearedLevel + 1) : null;
+  const bossProgress = nextMonster?.boss ? Math.min(nextMonster.maxHp, hero.bossProgress[nextMonster.level] || 0) : 0;
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
   const classRef = doc(db, 'classes', klass.id);
 
@@ -50,10 +53,21 @@ export default function HeroPage() {
         const currentPower = heroPower(current);
         const chance = battleChance(currentPower, monster.power);
         const won = roll < chance;
+        const damageResult = won
+          ? battleDamage(currentPower, monster, current)
+          : { damage: 0, critical: false, criticalChance: bossCriticalChance(current) };
         const reward = won ? settings.winReward : settings.loseReward;
+        const previousBossDamage = current.bossProgress[monster.level] || 0;
+        const nextBossDamage = monster.boss
+          ? Math.min(monster.maxHp, previousBossDamage + damageResult.damage)
+          : previousBossDamage;
+        const bossDefeated = !monster.boss || nextBossDamage >= monster.maxHp;
         const nextHero = {
           ...current,
-          clearedLevel: won ? level : current.clearedLevel,
+          clearedLevel: won && bossDefeated ? level : current.clearedLevel,
+          bossProgress: monster.boss
+            ? { ...current.bossProgress, [level]: nextBossDamage }
+            : current.bossProgress,
           battleDate: today,
           battleCount: attempts + 1,
           lastBattle: {
@@ -62,6 +76,11 @@ export default function HeroPage() {
             power: currentPower,
             monsterPower: monster.power,
             reward,
+            damage: damageResult.damage,
+            critical: damageResult.critical,
+            bossDamage: nextBossDamage,
+            bossHp: monster.maxHp,
+            bossDefeated,
             attempt: attempts + 1,
             at: Date.now(),
           },
@@ -69,13 +88,28 @@ export default function HeroPage() {
         const update = { rpg: nextHero };
         if (reward > 0) update.cash = (s.cash || 0) + reward;
         tx.update(studentRef, update);
-        battleResult = { won, monster, chance, currentPower, reward, attempt: attempts + 1, limit: settings.limit };
+        battleResult = {
+          won, monster, chance, currentPower, reward,
+          damage: damageResult.damage, critical: damageResult.critical,
+          bossDamage: nextBossDamage, bossHp: monster.maxHp, bossDefeated,
+          attempt: attempts + 1, limit: settings.limit,
+        };
       });
+      setBattleFx(battleResult);
       setBattlePhase(battleResult.won ? 'win' : 'lose');
       setTimeout(() => setBattlePhase('idle'), 2800);
       setMsg(battleResult.won
         ? { type: 'ok', text: `🎉 ${battleResult.monster.name}을(를) 물리쳤어요! ${fmt(battleResult.reward)}${klass.currency}를 받았어요. (${battleResult.attempt}/${battleResult.limit}회)` }
         : { type: 'err', text: `💥 아쉽게 졌어요. 승리 확률은 ${Math.round(battleResult.chance * 100)}%였어요. ${battleResult.reward > 0 ? `${fmt(battleResult.reward)}${klass.currency}를 받았어요.` : '패배 보상은 0이에요.'} (${battleResult.attempt}/${battleResult.limit}회)` });
+      if (battleResult.won && battleResult.monster.boss) {
+        setMsg({
+          type: 'ok',
+          text: '💥 ' + battleResult.monster.name + '에게 ' + fmt(battleResult.damage) + ' 데미지' +
+            (battleResult.critical ? ' (크리티컬 2배!)' : '') + '! ' +
+            (battleResult.bossDefeated ? '보스를 쓰러뜨렸어요!' : '아직 보스 HP가 남았어요.') +
+            ' 보상 ' + fmt(battleResult.reward) + klass.currency + ' (' + battleResult.attempt + '/' + battleResult.limit + '회)',
+        });
+      }
     } catch (e) {
       setBattlePhase('idle');
       setMsg({ type: 'err', text: e.message });
@@ -125,23 +159,46 @@ export default function HeroPage() {
                 </div>
               );
             })}
+            <div className={['flex items-center gap-3 rounded-2xl border px-3 py-2', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50' : 'border-gray-100 bg-gray-50'].join(' ')}>
+              <span className="text-xs text-gray-400 w-12">펫</span>
+              <HeroItemVisual item={HERO_ITEM_MAP[hero.pet]} size={52} showLevel={false} />
+              <span className="text-sm text-gray-600">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
+              <span className="ml-auto text-right text-sm text-fuchsia-600">
+                {HERO_ITEM_MAP[hero.pet] ? <>보스 크리티컬 {bossCriticalChance(hero)}%</> : ''}
+                <small className="block text-[9px] text-gray-400">보스 데미지 2배</small>
+              </span>
+            </div>
           </div>
           <Link to="/student/hero/shop" className="block text-center text-sm text-indigo-500 underline mt-4">장비 바꾸러 가기 →</Link>
         </div>
       </div>
 
       {nextMonster && hero.character && (
-        <HeroBattleArena hero={hero} power={power} monster={nextMonster} phase={battlePhase} chance={battleChance(power, nextMonster.power)} />
+        <HeroBattleArena
+          hero={hero}
+          power={power}
+          monster={nextMonster}
+          phase={battlePhase}
+          chance={battleChance(power, nextMonster.power)}
+          bossDamage={bossProgress}
+          battleFx={battleFx}
+        />
       )}
 
       {nextMonster ? (
         <div className="bg-white rounded-3xl shadow p-5">
           <div className="flex items-center gap-3">
-            <div className="text-6xl">{nextMonster.emoji}</div>
+            <div className="flex h-20 w-20 items-center justify-center"><MonsterVisual monster={nextMonster} size={72} /></div>
             <div>
               <div className="text-xs text-gray-400">NEXT · {nextMonster.level}단계 {nextMonster.boss ? '보스' : '몬스터'}</div>
               <h3 className="text-xl text-gray-700">{nextMonster.name}</h3>
               <div className="text-sm text-rose-500">몬스터 전투력 {fmt(nextMonster.power)}</div>
+              {nextMonster.boss && (
+                <div className="text-xs text-fuchsia-600">
+                  보스 HP {fmt(Math.max(0, nextMonster.maxHp - bossProgress))} / {fmt(nextMonster.maxHp)}
+                  {bossCriticalChance(hero) > 0 && <> · 펫 크리티컬 {bossCriticalChance(hero)}%</>}
+                </div>
+              )}
               <div className="text-xs text-amber-600">승리 {fmt(config.winReward)} · 패배 {fmt(config.loseReward)} {klass.currency}</div>
             </div>
             <button

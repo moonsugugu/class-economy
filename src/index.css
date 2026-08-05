@@ -128,3 +128,194 @@ input, select, textarea, button {
   animation: battleSpark .8s ease-out both;
   pointer-events: none;
 }
+
+@keyframes monsterAuraPulse {
+  0%, 100% { transform: scale(.9); opacity: .35; }
+  50% { transform: scale(1.15); opacity: .75; }
+}
+
+@keyframes monsterBodyBob {
+  0%, 100% { transform: translateY(1px) rotate(-2deg); }
+  50% { transform: translateY(-5px) rotate(2deg); }
+}
+
+.monster-visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+  filter: drop-shadow(0 10px 7px rgba(88, 28, 135, .22));
+}
+
+.monster-aura {
+  position: absolute;
+  inset: 8%;
+  border-radius: 45%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--monster-body) 58%, white), transparent 68%);
+  filter: blur(10px);
+  animation: monsterAuraPulse 1.8s ease-in-out infinite;
+  z-index: -1;
+}
+
+.monster-body {
+  position: relative;
+  width: 66%;
+  height: 66%;
+  border: 4px solid color-mix(in srgb, var(--monster-accent) 72%, black);
+  border-radius: var(--monster-radius);
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255,255,255,.72), transparent 17%),
+    linear-gradient(135deg, color-mix(in srgb, var(--monster-body) 82%, white), var(--monster-body));
+  box-shadow: inset -8px -10px 0 rgba(0,0,0,.12), inset 7px 5px 0 rgba(255,255,255,.18), 0 0 0 5px color-mix(in srgb, var(--monster-accent) 25%, transparent);
+  animation: monsterBodyBob 2.2s ease-in-out infinite;
+}
+
+.monster-pattern {
+  position: absolute;
+  inset: 12%;
+  border-radius: 40%;
+  background: repeating-linear-gradient(125deg, transparent 0 10px, rgba(255,255,255,.22) 11px 14px, transparent 15px 25px);
+  opacity: .7;
+}
+
+.monster-face {
+  position: absolute;
+  inset: 35% 20% 20%;
+}
+
+.monster-eye {
+  position: absolute;
+  top: 0;
+  width: 15%;
+  height: 25%;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: inset 0 -3px 0 #1e293b;
+}
+
+.monster-eye::after {
+  content: '';
+  position: absolute;
+  left: 35%;
+  top: 28%;
+  width: 42%;
+  height: 54%;
+  border-radius: 50%;
+  background: #111827;
+}
+
+.monster-eye-left { left: 24%; }
+.monster-eye-right { right: 24%; }
+
+.monster-mouth {
+  position: absolute;
+  left: 38%;
+  top: 48%;
+  width: 24%;
+  height: 18%;
+  border-bottom: 3px solid var(--monster-accent);
+  border-radius: 50%;
+}
+
+.monster-mark {
+  position: absolute;
+  right: 10%;
+  top: 8%;
+  color: rgba(255,255,255,.82);
+  font-size: 17px;
+  text-shadow: 0 0 8px var(--monster-accent);
+}
+
+.monster-glyph {
+  position: absolute;
+  right: 8%;
+  bottom: 6%;
+  font-size: 22px;
+  filter: drop-shadow(0 3px 2px rgba(15,23,42,.2));
+}
+
+.monster-wing,
+.monster-horn {
+  position: absolute;
+  z-index: -1;
+  background: var(--monster-accent);
+  opacity: .85;
+}
+
+.monster-wing {
+  width: 30%;
+  height: 25%;
+  top: 35%;
+  border-radius: 80% 20% 70% 30%;
+}
+
+.monster-wing-left { left: 0; transform: rotate(-25deg); }
+.monster-wing-right { right: 0; transform: scaleX(-1) rotate(-25deg); }
+
+.monster-horn {
+  width: 13%;
+  height: 25%;
+  top: 15%;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.monster-horn-left { left: 27%; transform: rotate(-20deg); }
+.monster-horn-right { right: 27%; transform: rotate(20deg); }
+
+.monster-crown {
+  position: absolute;
+  top: -3%;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fbbf24;
+  font-size: 30px;
+  text-shadow: 0 0 10px #f59e0b;
+  animation: battleVictory .9s ease-in-out infinite;
+}
+
+.monster-kind-bat .monster-wing,
+.monster-kind-phoenix .monster-wing,
+.monster-kind-dragon .monster-wing {
+  width: 40%;
+  height: 34%;
+}
+
+.monster-kind-spider .monster-body,
+.monster-kind-kraken .monster-body {
+  border-radius: 50%;
+}
+
+.monster-kind-robot .monster-body {
+  box-shadow: inset 0 -8px 0 rgba(15,23,42,.22), inset 0 8px 0 rgba(255,255,255,.2), 0 0 0 5px color-mix(in srgb, var(--monster-accent) 25%, transparent);
+}
+
+.monster-boss .monster-body {
+  box-shadow: inset -8px -10px 0 rgba(0,0,0,.12), 0 0 16px var(--monster-body), 0 0 34px color-mix(in srgb, var(--monster-body) 60%, transparent);
+}
+
+@keyframes heroRarityAura {
+  0%, 100% { transform: scale(.94) rotate(0deg); opacity: .45; }
+  50% { transform: scale(1.04) rotate(3deg); opacity: .95; }
+}
+
+@keyframes heroRaritySpark {
+  0%, 100% { transform: scale(.5) rotate(0deg); opacity: .25; }
+  50% { transform: scale(1.3) rotate(90deg); opacity: 1; }
+}
+
+.hero-item-rarity-aura {
+  pointer-events: none;
+  animation: heroRarityAura 1.8s ease-in-out infinite;
+  box-shadow: 0 0 18px currentColor, inset 0 0 12px currentColor;
+}
+
+.hero-item-spark {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  pointer-events: none;
+  animation: heroRaritySpark 1.2s ease-in-out infinite;
+  box-shadow: 0 0 10px currentColor;
+}

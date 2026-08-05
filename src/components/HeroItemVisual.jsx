@@ -7,6 +7,7 @@ const SLOT_MARKS = {
   shoes: '발',
   accessory: '장신구',
   character: '용사',
+  pet: '펫',
 };
 
 const CHARACTER_THEME = {
@@ -48,6 +49,17 @@ export function HeroItemVisual({ item, size = 76, className = '', showLevel = tr
         className="absolute bottom-1 left-1/2 h-2 w-2/3 -translate-x-1/2 rounded-full opacity-25 blur-md"
         style={{ background: accent }}
       />
+      {item.rarity === 'elite' && (
+        <div className="hero-item-rarity-aura absolute inset-2 rounded-xl border border-violet-300/70" />
+      )}
+      {item.rarity === 'legendary' && (
+        <>
+          <div className="hero-item-rarity-aura absolute inset-1 rounded-xl border-2 border-amber-300/80" />
+          <span className="hero-item-spark left-3 top-3" style={{ background: accent }} />
+          <span className="hero-item-spark right-3 top-5" style={{ background: '#fff7ed' }} />
+          <span className="hero-item-spark bottom-3 right-5" style={{ background: accent }} />
+        </>
+      )}
       <span
         className="relative z-10 drop-shadow-[0_4px_4px_rgba(15,23,42,.22)]"
         style={{ fontSize: Math.max(26, size * 0.48), lineHeight: 1 }}
@@ -67,6 +79,11 @@ export function HeroItemVisual({ item, size = 76, className = '', showLevel = tr
       </span>
       {showLevel && item.rarity && (
         <span className="absolute bottom-1 right-1 text-[8px] font-bold text-slate-500/70">{item.rarityLabel}</span>
+      )}
+      {item.slot === 'pet' && (
+        <span className="absolute left-1 top-1 rounded-md bg-white/80 px-1 py-0.5 text-[8px] font-black text-fuchsia-600">
+          {item.critChance}%
+        </span>
       )}
     </div>
   );

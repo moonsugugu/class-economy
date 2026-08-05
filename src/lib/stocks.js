@@ -69,9 +69,15 @@ export const todayKey = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+export const MAX_TICK_LIMIT = 25;       // 선생님이 설정할 수 있는 하루 최대 횟수
 export const DEFAULT_TICK_LIMIT = 25;   // 하루 시세 변동 기본 횟수
 export const AUTO_TICK_MS = 119000;     // 자동 변동: 1분 59초
 export const HISTORY_LEN = 40;          // 미니 차트에 쓰는 최근 시세 개수
+
+export function normalizedTickLimit(value) {
+  const n = Number(value);
+  return Math.max(1, Math.min(MAX_TICK_LIMIT, Number.isFinite(n) ? Math.floor(n) : DEFAULT_TICK_LIMIT));
+}
 
 /** 처음 시장을 열 때 쓰는 초기 데이터 */
 export function makeInitialMarket() {
@@ -139,9 +145,19 @@ export const MARKET_LABEL = { KR: '🇰🇷', US: '🇺🇸', CUSTOM: '🏫' };
  * 반환: { prices: {종목코드: 가격}, fx: 원/달러 환율 }
  */
 export async function fetchRealQuotes() {
-  const r = await fetch('/api/quotes');
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.ok) throw new Error(j.error ? `실제 시세를 못 불러왔어요 (${j.error})` : '실제 시세를 못 불러왔어요');
+  const endpoint = import.meta.env.VITE_QUOTES_API_URL || '/api/quotes';
+  const r = await fetch(endpoint, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  });
+  const contentType = r.headers.get('content-type') || '';
+  const text = await r.text();
+  let j = null;
+  try { j = JSON.parse(text); } catch { /* HTML fallback 페이지면 아래 메시지를 보여줘요. */ }
+  if (!r.ok || !j?.ok || !j.prices) {
+    const detail = j?.error || (!contentType.includes('json') ? '시세 API가 JSON으로 배포되지 않았어요.' : '시세 응답이 비어 있어요.');
+    throw new Error(`실제 시세를 불러오지 못했어요. (${detail})`);
+  }
   return j;
 }
 

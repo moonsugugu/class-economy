@@ -1,17 +1,105 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
-import { collection, doc, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, doc, query, where, onSnapshot, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT } from '../../lib/stocks';
 import { ensureBaselines } from '../../lib/marketSync';
 import AvatarView from '../../components/AvatarView';
+import { PROFILE_ITEMS, PROFILE_SLOTS, normalizeProfileOwned } from '../../lib/profile';
+import { itemPrice } from '../../lib/pricing';
+import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
 
 export default function MyPage() {
   const { klass, student } = useOutletContext();
   const [savings, setSavings] = useState([]);
   const [stocks, setStocks] = useState([]);
   const [fx, setFx] = useState(DEFAULT_FX);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileBusy, setProfileBusy] = useState(null);
+
+  const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
+  const profileOwned = normalizeProfileOwned(student.profileOwned);
+
+  const buyProfile = async (item) => {
+    if (profileBusy) return;
+    setProfileBusy(item.id);
+    try {
+      await runTransaction(db, async (tx) => {
+        const s = (await tx.get(studentRef)).data() || {};
+        const settings = { ...klass, ...((await tx.get(doc(db, 'classes', klass.id))).data() || {}) };
+        const owned = normalizeProfileOwned(s.profileOwned);
+        if (owned.includes(item.id)) throw new Error('이미 가지고 있는 프로필 아이템이에요.');
+        const price = itemPrice(item.price, settings);
+        const tax = taxForPart(price, settings, 'item').tax;
+        const totalPrice = price + tax;
+        if ((s.cash || 0) < totalPrice) throw new Error('현금이 부족해요.');
+        const avatar = { ...(s.avatar || {}) };
+        avatar[item.slot] = item.slot === 'base' ? item.value : item.id;
+        tx.update(studentRef, {
+          cash: (s.cash || 0) - totalPrice,
+          profileOwned: [...owned, item.id],
+          avatar,
+        });
+        if (tax > 0) {
+          tx.set(doc(db, 'classes', klass.id, 'taxLedger', TAX_LEDGER_ID), {
+            pending: increment(tax),
+            item: increment(tax),
+            updatedAt: Date.now(),
+          }, { merge: true });
+        }
+      });
+    } catch (e) {
+      window.alert(e.message);
+    } finally {
+      setProfileBusy(null);
+    }
+  };
+
+  const equipProfile = async (item) => {
+    if (profileBusy) return;
+    setProfileBusy(item.id);
+    try {
+      await runTransaction(db, async (tx) => {
+        const s = (await tx.get(studentRef)).data() || {};
+        const owned = normalizeProfileOwned(s.profileOwned);
+        if (!owned.includes(item.id)) throw new Error('먼저 프로필 상점에서 구매해 주세요.');
+        const avatar = { ...(s.avatar || {}) };
+        avatar[item.slot] = item.slot === 'base' ? item.value : item.id;
+        tx.update(studentRef, { avatar });
+      });
+    } catch (e) {
+      window.alert(e.message);
+    } finally {
+      setProfileBusy(null);
+    }
+  };
+
+  const refundProfile = async (item) => {
+    if (profileBusy) return;
+    const refund = Math.floor(itemPrice(item.price, klass) * 0.5);
+    if (!window.confirm(item.name + '을(를) ' + fmt(refund) + klass.currency + '에 환불할까요?')) return;
+    setProfileBusy(item.id);
+    try {
+      await runTransaction(db, async (tx) => {
+        const s = (await tx.get(studentRef)).data() || {};
+        const owned = normalizeProfileOwned(s.profileOwned);
+        if (!owned.includes(item.id)) throw new Error('구매한 프로필 아이템이 아니에요.');
+        const avatar = { ...(s.avatar || {}) };
+        const equipped = item.slot === 'base' ? avatar.base === item.value : avatar[item.slot] === item.id;
+        if (equipped) delete avatar[item.slot];
+        tx.update(studentRef, {
+          cash: (s.cash || 0) + refund,
+          profileOwned: owned.filter((id) => id !== item.id),
+          avatar,
+        });
+      });
+    } catch (e) {
+      window.alert(e.message);
+    } finally {
+      setProfileBusy(null);
+    }
+  };
 
   useEffect(() => {
     const q = query(
@@ -79,15 +167,82 @@ export default function MyPage() {
         <span className="absolute right-4 top-3 text-2xl animate-pulse select-none">✨</span>
         <span className="absolute right-14 bottom-4 text-lg opacity-60 select-none">💫</span>
         <span className="absolute -left-4 -bottom-6 text-7xl opacity-15 select-none">💰</span>
-        <div className="bg-white/15 backdrop-blur rounded-full p-2 shadow-inner">
+        <button
+          type="button"
+          onClick={() => setProfileOpen((open) => !open)}
+          className="group rounded-full bg-white/15 p-2 text-left shadow-inner transition hover:scale-105 hover:bg-white/25"
+          title="프로필 상점 열기"
+        >
           <AvatarView avatar={student.avatar} size={72} />
-        </div>
+          <span className="absolute left-6 top-20 rounded-full bg-white px-2 py-1 text-[10px] font-bold text-indigo-600 opacity-0 shadow transition group-hover:opacity-100">
+            프로필 상점
+          </span>
+        </button>
         <div className="relative">
           <div className="text-sm text-white/70">{student.name}의 총자산 🏆</div>
           <div className="text-4xl tabular-nums drop-shadow">{fmt(total)} <span className="text-lg">{klass.currency}</span></div>
           <div className="text-[11px] text-white/60 mt-1">현금 비중 {share}% · 예금·적금·주식까지 모두 더한 금액이에요</div>
         </div>
       </div>
+
+      {profileOpen && (
+        <section className="rounded-3xl border-2 border-indigo-100 bg-white p-4 shadow-xl">
+          <div className="mb-3 flex items-center gap-3">
+            <div>
+              <h3 className="text-xl font-bold text-indigo-600">✨ 프로필 상점</h3>
+              <p className="text-xs text-gray-400">프로필을 구매하고 원하는 조합으로 꾸며 보세요. 환불은 구매가의 50%예요.</p>
+            </div>
+            <button type="button" onClick={() => setProfileOpen(false)} className="ml-auto rounded-xl bg-gray-100 px-3 py-1 text-sm text-gray-500">닫기</button>
+          </div>
+          <div className="mb-4 rounded-2xl bg-indigo-50 px-3 py-2 text-sm text-indigo-700">
+            내 현금 <b>{fmt(student.cash)} {klass.currency}</b> · 구매한 프로필 {profileOwned.length}개
+          </div>
+          <div className="space-y-5">
+            {PROFILE_SLOTS.map(([slot, label]) => (
+              <div key={slot}>
+                <h4 className="mb-2 text-sm font-bold text-gray-600">{label}</h4>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {PROFILE_ITEMS.filter((item) => item.slot === slot).map((item) => {
+                    const owned = profileOwned.includes(item.id);
+                    const equipped = slot === 'base'
+                      ? student.avatar?.base === item.value
+                      : student.avatar?.[slot] === item.id;
+                    const price = itemPrice(item.price, klass);
+                    const tax = taxForPart(price, klass, 'item').tax;
+                    const previewAvatar = {
+                      ...(student.avatar || {}),
+                      [slot]: slot === 'base' ? item.value : item.id,
+                    };
+                    return (
+                      <div key={item.id} className={['rounded-2xl border p-2 text-center transition', equipped ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100' : 'border-gray-100 bg-gray-50'].join(' ')}>
+                        <div className="mx-auto mb-1 flex h-20 items-end justify-center rounded-xl bg-white">
+                          <AvatarView avatar={previewAvatar} size={52} />
+                        </div>
+                        <div className="text-xs font-bold text-gray-600">{item.name}</div>
+                        <div className="text-[10px] text-amber-600">{fmt(price + tax)} {klass.currency}</div>
+                        {owned ? (
+                          <div className="mt-1 space-y-1">
+                            <button type="button" onClick={() => equipProfile(item)} disabled={!!profileBusy} className="w-full rounded-lg bg-indigo-100 py-1 text-[11px] text-indigo-600">
+                              {equipped ? '사용 중 ✓' : '사용하기'}
+                            </button>
+                            <button type="button" onClick={() => refundProfile(item)} disabled={!!profileBusy} className="text-[10px] text-rose-500 underline">
+                              50% 환불
+                            </button>
+                          </div>
+                        ) : (
+                          <button type="button" onClick={() => buyProfile(item)} disabled={!!profileBusy || student.cash < price + tax} className="mt-1 w-full rounded-lg bg-amber-400 py-1 text-[11px] text-white disabled:bg-gray-300">
+                            구매하기
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-3">
         <Item icon="💵" label="현금" value={student.cash} to="/student/shop" grad="from-amber-50 to-orange-100" sub="상점에서 바로 쓸 수 있어요" />

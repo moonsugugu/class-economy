@@ -12,7 +12,7 @@ import {
 } from '../../lib/stocks';
 import { applyScheduledTicks } from '../../lib/marketSync';
 import { isActiveStudent } from '../../lib/studentState';
-import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
+import { TAX_LEDGER_ID, stockTradeTax } from '../../lib/taxes';
 
 const stockTaxToClassUnits = (amount, cur, fx, kpu) => {
   const value = Math.max(0, Number(amount) || 0);
@@ -105,7 +105,8 @@ export default function StocksPage() {
         const currentKpu = Number(settings.krwPerUnit) || kpu;
         const baseAmount = price * n;
         const taxPart = side === 'buy' ? 'stockBuy' : 'stockSell';
-        const taxNative = taxForPart(baseAmount, settings, taxPart).tax;
+        const tradeTax = stockTradeTax(side, price, n, h);
+        const taxNative = tradeTax.tax;
         const taxFund = stockTaxToClassUnits(taxNative, cur, currentFx, currentKpu);
         const need = {
           KRW: '원이 부족해요! 은행 환전소에서 원(₩)으로 바꿔 오세요 💱',
@@ -115,7 +116,7 @@ export default function StocksPage() {
 
         if (side === 'buy') {
           const cost = baseAmount;
-          const debit = cost + taxNative;
+          const debit = cost;
           if (wallet < debit) throw new Error(need);
           const nq = h.qty + n;
           tx.update(studentRef, {
@@ -126,7 +127,7 @@ export default function StocksPage() {
               cur,
             },
           });
-          logged = { price, total: cost, cur, tax: taxNative, taxFund, net: -debit, profit: null };
+          logged = { price, total: cost, cur, tax: 0, taxFund: 0, net: -debit, profit: null, grossProfit: 0 };
         } else {
           if (h.qty < n) throw new Error('보유 수량이 부족해요!');
           const nq = h.qty - n;
@@ -136,7 +137,11 @@ export default function StocksPage() {
             [field]: Math.round((wallet + netGain) * 100) / 100,
             [`holdings.${sel.id}`]: nq === 0 ? { qty: 0, avg: 0, cur } : { qty: nq, avg: h.avg, cur },
           });
-          logged = { price, total: gain, cur, tax: taxNative, taxFund, net: netGain, profit: Math.round(((price - h.avg) * n - taxNative) * 100) / 100 };
+          logged = {
+            price, total: gain, cur, tax: taxNative, taxFund, net: netGain,
+            grossProfit: Math.round(tradeTax.grossProfit * 100) / 100,
+            profit: Math.round((tradeTax.grossProfit - taxNative) * 100) / 100,
+          };
         }
         if (taxFund > 0) {
           tx.set(ledgerRef, {
@@ -162,14 +167,15 @@ export default function StocksPage() {
         taxFund: logged.taxFund,
         net: logged.net,
         cur: logged.cur,
+        grossProfit: logged.grossProfit,
         profit: logged.profit,
         at: Date.now(),
         createdAt: serverTimestamp(),
       });
 
       flash('ok', side === 'buy'
-        ? `📈 ${sel.name} ${n}주 매수 완료! 세금 ${fmt(logged.tax)}${logged.cur}가 누적됐어요.`
-        : `📉 ${sel.name} ${n}주 매도 완료! 세금 ${fmt(logged.tax)}${logged.cur}가 누적됐어요.`);
+        ? `📈 ${sel.name} ${n}주 매수 완료! 매수 세금은 없어요.`
+        : `📉 ${sel.name} ${n}주 매도 완료! 이익 ${fmt(logged.grossProfit)} 중 세금 ${fmt(logged.tax)}${logged.cur}를 누적했어요.`);
       setSel(null); setQty(1);
     } catch (e) {
       flash('err', e.message);
@@ -184,6 +190,9 @@ export default function StocksPage() {
   const totalValue = holdings.reduce((a, h) => a + inUnits(h.stock.price * h.qty, h.stock), 0);
 
   const list = stocks.filter((s) => filter === 'ALL' || s.market === filter);
+  const previewQty = Math.max(1, Math.floor(Number(qty) || 1));
+  const previewHolding = sel ? (student.holdings?.[sel.id] || { qty: 0, avg: 0 }) : { qty: 0, avg: 0 };
+  const previewSellTax = sel ? stockTradeTax('sell', sel.price, previewQty, previewHolding) : { tax: 0, grossProfit: 0 };
 
   return (
     <div className="space-y-4">
@@ -334,7 +343,7 @@ export default function StocksPage() {
               {curSuffix(sel)}
             </div>
             <div className="mb-4 rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs text-emerald-700">
-              매수 세금 {fmt(taxForPart(sel.price * Math.max(1, Math.floor(Number(qty) || 1)), klass, 'stockBuy').tax)} · 매도 세금 {fmt(taxForPart(sel.price * Math.max(1, Math.floor(Number(qty) || 1)), klass, 'stockSell').tax)} {curSuffix(sel) || stockCur(sel)}
+              매수 세금 0 · 매도 이익 세금 {fmt(previewSellTax.tax)} (예상 이익 {fmt(previewSellTax.grossProfit)}) {curSuffix(sel) || stockCur(sel)}
             </div>
             <div className="flex gap-2">
               <button onClick={() => trade('buy')} className="flex-1 rounded-2xl py-3 bg-red-500 hover:bg-red-600 text-white text-lg">매수</button>

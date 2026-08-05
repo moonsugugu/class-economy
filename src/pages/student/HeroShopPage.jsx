@@ -4,7 +4,7 @@ import { doc, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import {
-  HERO_ITEMS, HERO_SLOTS, HERO_RARITIES, HERO_SHOP_REFRESH_LIMIT,
+  HERO_ITEMS, HERO_SLOTS, HERO_PETS, HERO_PET_SLOT, HERO_RARITIES, HERO_SHOP_REFRESH_LIMIT,
   normalizeHero, heroDateKey, heroShopFor,
 } from '../../lib/hero';
 import HeroPreview from '../../three/Hero3D.jsx';
@@ -62,7 +62,8 @@ export default function HeroShopPage() {
           character: item.slot === 'character' && !current.character ? item.id : current.character,
           equipment: { ...current.equipment },
         };
-        if (item.slot !== 'character' && !next.equipment[item.slot]) next.equipment[item.slot] = item.id;
+        if (item.slot === 'pet') next.pet = item.id;
+        else if (item.slot !== 'character' && !next.equipment[item.slot]) next.equipment[item.slot] = item.id;
         tx.update(studentRef, { cash: (s.cash || 0) - total, rpg: next });
         if (tax > 0) {
           tx.set(doc(db, 'classes', klass.id, 'taxLedger', TAX_LEDGER_ID), {
@@ -114,6 +115,7 @@ export default function HeroShopPage() {
         if (!current.owned.includes(item.id)) throw new Error('먼저 구매해 주세요.');
         const next = { ...current, equipment: { ...current.equipment } };
         if (item.slot === 'character') next.character = item.id;
+        else if (item.slot === 'pet') next.pet = item.id;
         else next.equipment[item.slot] = item.id;
         tx.update(studentRef, { rpg: next });
       });
@@ -140,7 +142,8 @@ export default function HeroShopPage() {
           character: current.character === item.id ? null : current.character,
           equipment: { ...current.equipment },
         };
-        if (next.equipment[item.slot] === item.id) delete next.equipment[item.slot];
+        if (item.slot === 'pet' && next.pet === item.id) next.pet = null;
+        if (item.slot !== 'pet' && next.equipment[item.slot] === item.id) delete next.equipment[item.slot];
         tx.update(studentRef, { cash: (s.cash || 0) + refundPrice, rpg: next });
       });
       flash('ok', `♻️ ${item.name} 환불 완료! 50%를 돌려받았어요.`);
@@ -158,7 +161,9 @@ export default function HeroShopPage() {
     const total = price + tax;
     const equipped = item.slot === 'character'
       ? hero.character === item.id
-      : hero.equipment[item.slot] === item.id;
+      : item.slot === 'pet'
+        ? hero.pet === item.id
+        : hero.equipment[item.slot] === item.id;
     const locked = item.slot !== 'character' && !hero.character && !owned;
     const rarity = item.rarity ? HERO_RARITIES[item.rarity] : null;
     return (
@@ -173,7 +178,9 @@ export default function HeroShopPage() {
           <HeroRarityBadge item={item} />
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-500">{item.level}단계</span>
         </div>
-        <div className="text-xs text-indigo-500">전투력 +{item.power}</div>
+        <div className="text-xs text-indigo-500">
+          {item.slot === 'pet' ? <>보스전 크리티컬 {item.critChance}% · 데미지 2배</> : <>전투력 +{item.power}</>}
+        </div>
         <div className="text-xs text-amber-600 mb-2">{fmt(total)} {klass.currency}</div>
         {tax > 0 && <div className="text-[10px] text-gray-400 mb-1">상품 {fmt(price)} + 세금 {fmt(tax)}</div>}
         {owned ? (
@@ -246,6 +253,22 @@ export default function HeroShopPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-2 flex items-center gap-2">
+          <h3 className="text-lg text-fuchsia-600">🐾 {HERO_PET_SLOT[1]} 상점</h3>
+          <span className="text-xs text-gray-400">1단계 5% · 20단계 80% 보스전 크리티컬</span>
+        </div>
+        <p className="mb-2 rounded-2xl bg-fuchsia-50 px-3 py-2 text-xs text-fuchsia-700">
+          장착한 펫은 보스전에서 일정 확률로 데미지를 2배로 만들어요. 펫은 전투력에는 더하지 않아요.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {(view === 'shop'
+            ? HERO_PETS.filter((item) => shopIds.includes(item.id))
+            : HERO_PETS
+          ).map((item) => card(item, view === 'shop' && shopIds.includes(item.id)))}
         </div>
       </section>
 

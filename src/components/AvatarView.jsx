@@ -1,8 +1,9 @@
 import { ITEM_MAP } from '../lib/items';
+import { PROFILE_ITEM_MAP } from '../lib/profile';
 
 // 이모지를 레이어로 겹쳐 그리는 아바타 뷰
 export default function AvatarView({ avatar = {}, size = 96 }) {
-  const emoji = (id) => (id && ITEM_MAP[id] ? ITEM_MAP[id].emoji : null);
+  const emoji = (id) => (id && (ITEM_MAP[id] || PROFILE_ITEM_MAP[id]) ? (ITEM_MAP[id] || PROFILE_ITEM_MAP[id]).emoji : null);
   const hat = emoji(avatar.hat);
   const face = emoji(avatar.face);
   const acc = emoji(avatar.acc);

@@ -6,7 +6,7 @@
 - **Frontend**: React 19 + Vite + Tailwind CSS 4 + React Router 7
 - **인증**: Firebase Google Authentication (선생님 로그인 전용)
 - **Backend/DB**: 홈서버 `api.moonsunezip.com` REST/WebSocket + PostgreSQL 17
-- **주식**: 한국 20개 + 미국 20개 — `/api/quotes`가 Yahoo Finance의 실제 현재가를 프록시하고, 실패 시 기존 모의 시세로 안전하게 대체
+- **주식**: 한국 20개 + 미국 20개 — `/api/quotes`가 Yahoo Finance의 실제 현재가를 프록시하고, 실패 시 기존 모의 시세로 안전하게 대체. 매수 세금은 0%, 매도 이익 세금은 5%
 
 ## 시작하기
 
@@ -48,7 +48,7 @@ npm run dev
 - **학생**: 체크박스로 선택 → 월급 일괄 지급, 금액 입력 후 지급/차감(상벌점)
 - **상점**: 실물 상품(쿠폰·간식 등) 등록 — 이모지/이미지 URL, 가격, 수량. 인라인 수정/삭제
 - **알림**: 학생 구매 실시간 알림 → "지급 완료" 처리
-- **주식**: "주식 시장 열기"로 40개 종목 생성, 실제 시세 불러오기 및 수동/자동(1분 59초) 시세 변동. 기본 하루 변동 횟수는 25회
+- **주식**: "주식 시장 열기"로 40개 종목 생성, 실제 시세 불러오기 및 수동/자동(1분 59초) 시세 변동. 하루 변동 횟수는 최대 25회
 - **버그 신고·건의함**: 담임 화면에서 개발자 이메일 작성 창을 열고, `xdaethx@naver.com` 계정은 전체 학급 수신함을 별도 확인
 - **설정**: 화폐 단위(미소·달란트 등), 월급 금액, 예금/적금 이율, 주식 횟수, 용사 전투 횟수·승패 보상, 상점·내 공간·용사 아이템 물가(단위/퍼센트), 거래별 공동기금 세율
 
@@ -56,9 +56,10 @@ npm run dev
 - **마이**: 현금 + 예금 + 적금 + 주식 평가액 = 총자산 한눈에
 - **상점**: 잔액으로 구매 → 재고 차감 + 교사에게 알림 (PostgreSQL API 트랜잭션으로 품절/잔액 검증)
 - **은행**: 예금(자유 입출금, 7일마다 이자 수령) / 적금(7·14·28일 약정, 높은 이율, 중도해지 시 원금만)
-- **주식**: 실시간 시세·미니 차트·평가손익, 매수/매도 (트랜잭션 처리)
+- **주식**: 실제 시세·미니 차트·평가손익, 매수/매도 (매수 세금 없음, 매도 이익의 5% 세금)
 - **마이룸**: 캐릭터 3D 상세 미리보기, 가구 여러 개 구매·배치, 신규 오리·사람 캐릭터와 판다·돼지 애완동물, 모든 마이룸 아이템 50% 환불
-- **용사키우기**: 소년·소녀 캐릭터와 착장 3D 미리보기, 부위별 20단계 장비(일반·희귀·엘리트·전설), 하루 3회 상점 새로고침, 전투력 비율로 100단계 몬스터에 도전
+- **용사키우기**: 소년·소녀 캐릭터와 착장 3D 미리보기, 엘리트·전설 장비 발광 효과, 부위별 20단계 장비와 펫, 100종 몬스터·10단계마다 HP 보스, 전투력 비율 전투
+- **프로필 상점**: 마이 화면의 내 프로필을 누르면 캐릭터·모자·표정·장식을 구매·장착·50% 환불
 
 ## 데이터 구조 (PostgreSQL 문서 API의 기존 경로)
 ```
@@ -67,9 +68,9 @@ classes/{classId}
   ├─ heroBattleLimit, heroWinReward, heroLoseReward — 용사 전투 설정
   ├─ priceInflationMode, priceInflationValue — 아이템 물가 상승 설정(기존 가격에 추가)
   ├─ taxRate, taxSalaryRate, taxShopRate, taxSeatRate, taxItemRate — 거래별 세율 설정
-  ├─ taxStockBuyRate, taxStockSellRate — 주식 매수·매도 세율 설정
+  ├─ taxStockBuyRate, taxStockSellRate — 호환용 필드(현재 매수 0%, 매도 이익 5% 고정)
   ├─ taxLedger/pending — 아직 공동기금에 반영하지 않은 세금 누적 원장
-  ├─ students/{studentId}   — name, cash, deposit, depositLastAt, avatar, inventory, room, holdings, rpg
+  ├─ students/{studentId}   — name, cash, deposit, depositLastAt, avatar, profileOwned, inventory, room, holdings, rpg
   ├─ products/{productId}   — name, emoji, imageUrl, price, qty, subtotal, tax
   ├─ purchases/{purchaseId} — studentName, productName, price, status(pending|done)
   ├─ accounts/{accountId}   — 적금: studentId, amount, rate, days, startAt, status
