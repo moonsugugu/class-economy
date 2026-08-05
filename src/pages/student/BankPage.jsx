@@ -48,6 +48,8 @@ export default function BankPage() {
 
   /* ----- 💱 환전소: 학급화폐 ↔ 원(₩) / 달러($) ----- */
   const kpu = Number(klass.krwPerUnit) || DEFAULT_KRW_PER_UNIT; // 학급화폐 1개 = 몇 원
+  const classUsdRate = kpu / (Number(fx) || DEFAULT_FX);
+  const fmtRate = (value) => Number(value || 0).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
   // 학급화폐 1개로 살 수 있는 양
   const rate = exCur === 'KRW' ? kpu : kpu / fx;   // 원: kpu원, 달러: kpu/fx달러
   const unitCost = (v) => (exCur === 'KRW' ? v / kpu : (v * fx) / kpu); // v를 사는 데 드는 학급화폐
@@ -221,6 +223,7 @@ export default function BankPage() {
           <h3 className="text-xl">💱 환전소</h3>
           <div className="text-sm text-emerald-600 tabular-nums text-right">
             <div>1 {klass.currency} = {fmt(kpu)} 원</div>
+            <div>1 {klass.currency} = {fmtRate(classUsdRate)} 달러</div>
             <div className="text-gray-400">1 달러 = {fmt(fx)} 원</div>
           </div>
         </div>

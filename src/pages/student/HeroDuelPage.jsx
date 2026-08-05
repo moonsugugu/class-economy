@@ -9,6 +9,7 @@ import {
 } from '../../lib/hero';
 import { isActiveStudent } from '../../lib/studentState';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
+import HeroDuelArena from '../../components/HeroDuelArena.jsx';
 
 const sortByPower = (a, b) => b.power - a.power || String(a.name || '').localeCompare(String(b.name || ''), 'ko');
 
@@ -18,6 +19,8 @@ export default function HeroDuelPage() {
   const [selectedId, setSelectedId] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [battlePhase, setBattlePhase] = useState('idle');
+  const [duelResult, setDuelResult] = useState(null);
   const today = heroDateKey();
   const myHero = normalizeHero(student.rpg);
   const myPower = heroPower(myHero);
@@ -64,10 +67,15 @@ export default function HeroDuelPage() {
       `추가 대결 1회에 ${extraCost}${klass.currency}를 지불하고 도전할까요?`
     )) return;
     setBusy(true);
+    setDuelResult(null);
+    setBattlePhase('charge');
     const roll = Math.random();
     const ownRef = doc(db, 'classes', klass.id, 'students', student.id);
     const opponentRef = doc(db, 'classes', klass.id, 'students', selected.id);
     try {
+      await new Promise((resolve) => setTimeout(resolve, 320));
+      setBattlePhase('attack');
+      await new Promise((resolve) => setTimeout(resolve, 560));
       let result = null;
       await runTransaction(db, async (tx) => {
         const ownSnap = await tx.get(ownRef);
@@ -133,8 +141,12 @@ export default function HeroDuelPage() {
           ? `🏆 ${result.opponentName}에게 승리했어요! ${result.reward}${klass.currency}를 받았어요.${result.extraCost ? ` 추가 비용 ${result.extraCost}${klass.currency}를 냈어요.` : ''} (${result.attempt}회)`
           : `💥 ${result.opponentName}에게 졌어요. 보상은 0${klass.currency}예요.${result.extraCost ? ` 추가 비용 ${result.extraCost}${klass.currency}를 냈어요.` : ''} (${result.attempt}회)`,
       );
+      setDuelResult(result);
+      setBattlePhase(result.won ? 'win' : 'lose');
+      setTimeout(() => setBattlePhase('idle'), 1800);
     } catch (e) {
       flash('err', e.message);
+      setBattlePhase('idle');
     } finally {
       setBusy(false);
     }
@@ -215,7 +227,19 @@ export default function HeroDuelPage() {
           </div>
 
           {selected && (
-            <div className="rounded-3xl bg-white p-5 shadow">
+            <>
+              <HeroDuelArena
+                hero={myHero}
+                opponent={selected.hero}
+                heroName={heroDisplayName(myHero)}
+                opponentName={heroDisplayName(selected.hero)}
+                power={myPower}
+                opponentPower={selected.power}
+                chance={chance}
+                phase={battlePhase}
+                result={duelResult}
+              />
+              <div className="rounded-3xl bg-white p-5 shadow">
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex-1">
                   <div className="text-xs text-gray-400">선택한 상대</div>
@@ -235,7 +259,8 @@ export default function HeroDuelPage() {
                 </button>
               </div>
               <p className="mt-3 text-xs text-gray-400">승률은 내 전투력 ÷ (내 전투력 + 상대 전투력)으로 계산해요.</p>
-            </div>
+              </div>
+            </>
           )}
         </>
       )}

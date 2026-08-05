@@ -145,20 +145,30 @@ export const MARKET_LABEL = { KR: '🇰🇷', US: '🇺🇸', CUSTOM: '🏫' };
  * 반환: { prices: {종목코드: 가격}, fx: 원/달러 환율 }
  */
 export async function fetchRealQuotes() {
-  const endpoint = import.meta.env.VITE_QUOTES_API_URL || '/api/quotes';
-  const r = await fetch(endpoint, {
-    headers: { Accept: 'application/json' },
-    cache: 'no-store',
-  });
-  const contentType = r.headers.get('content-type') || '';
-  const text = await r.text();
-  let j = null;
-  try { j = JSON.parse(text); } catch { /* HTML fallback 페이지면 아래 메시지를 보여줘요. */ }
-  if (!r.ok || !j?.ok || !j.prices) {
-    const detail = j?.error || (!contentType.includes('json') ? '시세 API가 JSON으로 배포되지 않았어요.' : '시세 응답이 비어 있어요.');
-    throw new Error(`실제 시세를 불러오지 못했어요. (${detail})`);
+  const configured = import.meta.env.VITE_QUOTES_API_URL;
+  const endpoints = [...new Set([configured, '/api/quotes', '/api/quotes/'].filter(Boolean))];
+  let lastDetail = '시세 응답이 비어 있어요.';
+
+  for (const endpoint of endpoints) {
+    try {
+      const r = await fetch(endpoint, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const contentType = r.headers.get('content-type') || '';
+      const text = await r.text();
+      let j = null;
+      try { j = JSON.parse(text); } catch { /* 정적 서버가 돌려준 HTML이면 다음 경로를 시도해요. */ }
+      if (r.ok && j?.ok && j.prices) return j;
+      lastDetail = j?.error || (!contentType.includes('json')
+        ? '시세 API가 JSON으로 배포되지 않았어요.'
+        : '시세 응답이 비어 있어요.');
+    } catch (error) {
+      lastDetail = error?.message || lastDetail;
+    }
   }
-  return j;
+
+  throw new Error(`실제 시세를 불러오지 못했어요. (${lastDetail})`);
 }
 
 /** 실제 시세를 종목 목록에 반영 (우리 반 종목은 그대로 두고 살짝만 움직여요) */

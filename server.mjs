@@ -74,7 +74,8 @@ async function serveStatic(req, res, pathname) {
 
 const server = createServer(async (req, res) => {
   const pathname = new URL(req.url || '/', 'http://127.0.0.1').pathname;
-  if (pathname === '/api/quotes') {
+  // 자동 배포 환경에 따라 뒤에 슬래시가 붙어도 정적 SPA 폴백보다 먼저 API를 처리합니다.
+  if (pathname.replace(/\/+$/, '') === '/api/quotes') {
     const apiRes = {
       setHeader(name, value) { res.setHeader(name, value); },
       status(code) { res.statusCode = code; return apiRes; },

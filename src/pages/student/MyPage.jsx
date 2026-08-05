@@ -34,8 +34,7 @@ export default function MyPage() {
         const tax = taxForPart(price, settings, 'item').tax;
         const totalPrice = price + tax;
         if ((s.cash || 0) < totalPrice) throw new Error('현금이 부족해요.');
-        const avatar = { ...(s.avatar || {}) };
-        avatar[item.slot] = item.slot === 'base' ? item.value : item.id;
+        const avatar = { ...(s.avatar || {}), base: item.value };
         tx.update(studentRef, {
           cash: (s.cash || 0) - totalPrice,
           profileOwned: [...owned, item.id],
@@ -64,8 +63,7 @@ export default function MyPage() {
         const s = (await tx.get(studentRef)).data() || {};
         const owned = normalizeProfileOwned(s.profileOwned);
         if (!owned.includes(item.id)) throw new Error('먼저 프로필 상점에서 구매해 주세요.');
-        const avatar = { ...(s.avatar || {}) };
-        avatar[item.slot] = item.slot === 'base' ? item.value : item.id;
+        const avatar = { ...(s.avatar || {}), base: item.value };
         tx.update(studentRef, { avatar });
       });
     } catch (e) {
@@ -86,7 +84,7 @@ export default function MyPage() {
         const owned = normalizeProfileOwned(s.profileOwned);
         if (!owned.includes(item.id)) throw new Error('구매한 프로필 아이템이 아니에요.');
         const avatar = { ...(s.avatar || {}) };
-        const equipped = item.slot === 'base' ? avatar.base === item.value : avatar[item.slot] === item.id;
+        const equipped = avatar.base === item.value;
         if (equipped) delete avatar[item.slot];
         tx.update(studentRef, {
           cash: (s.cash || 0) + refund,
@@ -190,7 +188,7 @@ export default function MyPage() {
           <div className="mb-3 flex items-center gap-3">
             <div>
               <h3 className="text-xl font-bold text-indigo-600">✨ 프로필 상점</h3>
-              <p className="text-xs text-gray-400">프로필을 구매하고 원하는 조합으로 꾸며 보세요. 환불은 구매가의 50%예요.</p>
+              <p className="text-xs text-gray-400">동물·이모티콘 프로필 사진을 하나씩 구매해 사용할 수 있어요. 환불은 구매가의 50%예요.</p>
             </div>
             <button type="button" onClick={() => setProfileOpen(false)} className="ml-auto rounded-xl bg-gray-100 px-3 py-1 text-sm text-gray-500">닫기</button>
           </div>
@@ -209,10 +207,7 @@ export default function MyPage() {
                       : student.avatar?.[slot] === item.id;
                     const price = itemPrice(item.price, klass);
                     const tax = taxForPart(price, klass, 'item').tax;
-                    const previewAvatar = {
-                      ...(student.avatar || {}),
-                      [slot]: slot === 'base' ? item.value : item.id,
-                    };
+                    const previewAvatar = { base: item.value };
                     return (
                       <div key={item.id} className={['rounded-2xl border p-2 text-center transition', equipped ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100' : 'border-gray-100 bg-gray-50'].join(' ')}>
                         <div className="mx-auto mb-1 flex h-20 items-end justify-center rounded-xl bg-white">

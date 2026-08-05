@@ -218,7 +218,7 @@ export default function TeacherDashboard() {
           {tab === 'seats' && <SeatsTab klass={klass} />}
           {tab === 'reports' && <ReportsTab klass={klass} teacherEmail={teacher.email} />}
           {tab === 'settings' && (
-            <div className="space-y-4">
+            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
               <SettingsTab klass={klass} />
               <PinManager klass={klass} />
             </div>
@@ -1214,7 +1214,7 @@ function SettingsTab({ klass }) {
   );
 
   return (
-    <form onSubmit={save} className={card + ' max-w-lg space-y-4'}>
+    <form onSubmit={save} className={card + ' w-full space-y-4'}>
       <h3 className="text-xl">⚙️ 학급 설정</h3>
       {field('학급 이름', 'name')}
       {field('화폐 단위', 'currency', 'text', '예: 미소, 달란트, 별, 포인트 — 자유롭게 정해요.')}
@@ -1307,7 +1307,7 @@ function PinManager({ klass }) {
   };
 
   return (
-    <div className={card + ' max-w-lg space-y-3'}>
+    <div className={card + ' w-full space-y-3'}>
       <div className="flex items-center gap-2">
         <h3 className="text-xl">🔒 학생 비밀번호</h3>
         <button
