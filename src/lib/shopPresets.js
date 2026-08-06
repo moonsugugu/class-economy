@@ -5,6 +5,10 @@ export const SHOP_PRESETS = [
     items: [
       { emoji: '🪑', name: '자리 바꾸기 이용권', price: 300, qty: 3 },
       { emoji: '🍚', name: '급식 먼저 먹기권', price: 150, qty: 5 },
+      { emoji: '🎲', name: '보드게임 이용권', price: 5, qty: 5 },
+      { emoji: '🥇', name: '급식 1등', price: 5, qty: 5 },
+      { emoji: '🎵', name: '선곡권', price: 5, qty: 5 },
+      { emoji: '💼', name: '직업선택권', price: 20, qty: 3 },
       { emoji: '📝', name: '숙제 1회 면제권', price: 400, qty: 2 },
       { emoji: '⏰', name: '자유시간 10분권', price: 250, qty: 3 },
       { emoji: '👫', name: '짝꿍 지정권', price: 350, qty: 2 },
@@ -19,6 +23,7 @@ export const SHOP_PRESETS = [
     cat: '🍭 간식',
     items: [
       { emoji: '🍬', name: '사탕 1개', price: 30, qty: 20 },
+      { emoji: '🍭', name: '마이쮸', price: 10, qty: 20 },
       { emoji: '🍫', name: '초콜릿', price: 60, qty: 10 },
       { emoji: '🧸', name: '젤리 한 봉지', price: 80, qty: 10 },
       { emoji: '🍪', name: '과자', price: 100, qty: 8 },
@@ -34,6 +39,7 @@ export const SHOP_PRESETS = [
       { emoji: '⭐', name: '반짝이 스티커', price: 30, qty: 20 },
       { emoji: '🖊️', name: '형광펜', price: 80, qty: 10 },
       { emoji: '📏', name: '캐릭터 자', price: 70, qty: 8 },
+      { emoji: '🏷️', name: '라벨기 사용', price: 2, qty: 10 },
     ],
   },
   {

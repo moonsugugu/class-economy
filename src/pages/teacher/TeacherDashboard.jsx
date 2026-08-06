@@ -936,6 +936,70 @@ function AlertsTab({ klass }) {
     }
   };
 
+  const completePurchase = async (purchase) => {
+    if (busyId) return;
+    const key = `purchase:${purchase.id}`;
+    setBusyId(key);
+    try {
+      const purchaseRef = doc(db, 'classes', klass.id, 'purchases', purchase.id);
+      await runTransaction(db, async (tx) => {
+        const purchaseSnap = await tx.get(purchaseRef);
+        if (!purchaseSnap.exists() || purchaseSnap.data()?.status !== 'pending') throw new Error('이미 처리된 구매 알림이에요.');
+        tx.update(purchaseRef, { status: 'done', completedAt: Date.now() });
+      });
+    } catch (error) {
+      setMsg(`구매 완료 처리 실패: ${error.message}`);
+      window.setTimeout(() => setMsg(''), 3500);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const rejectPurchase = async (purchase) => {
+    if (busyId || !confirm(`'${purchase.studentName}' 학생의 '${purchase.productName}' 구매를 반려할까요?\n결제 금액은 환불되고 상품 재고가 1개 돌아옵니다.`)) return;
+    const key = `purchase:${purchase.id}`;
+    setBusyId(key);
+    try {
+      const purchaseRef = doc(db, 'classes', klass.id, 'purchases', purchase.id);
+      const studentRef = doc(db, 'classes', klass.id, 'students', purchase.studentId);
+      const productRef = purchase.productId
+        ? doc(db, 'classes', klass.id, 'products', purchase.productId)
+        : null;
+      const ledgerRef = doc(db, 'classes', klass.id, 'taxLedger', TAX_LEDGER_ID);
+      let refund = 0;
+      await runTransaction(db, async (tx) => {
+        const purchaseSnap = await tx.get(purchaseRef);
+        const studentSnap = await tx.get(studentRef);
+        const productSnap = productRef ? await tx.get(productRef) : null;
+        const ledgerSnap = await tx.get(ledgerRef);
+        if (!purchaseSnap.exists() || purchaseSnap.data()?.status !== 'pending') throw new Error('이미 처리된 구매 알림이에요.');
+        if (!studentSnap.exists()) throw new Error('구매한 학생 계정을 찾지 못했어요.');
+        const order = purchaseSnap.data() || {};
+        const student = studentSnap.data() || {};
+        refund = Math.max(0, Math.floor(Number(order.price) || 0));
+        if (refund < 1) throw new Error('환불할 구매 금액이 올바르지 않아요.');
+        tx.update(studentRef, { cash: (Number(student.cash) || 0) + refund });
+        tx.update(purchaseRef, { status: 'rejected', rejectedAt: Date.now(), refundedAmount: refund });
+        if (productSnap?.exists()) {
+          const product = productSnap.data() || {};
+          tx.update(productRef, { qty: (Number(product.qty) || 0) + 1 });
+        }
+        const tax = Math.max(0, Math.floor(Number(order.tax) || 0));
+        const pendingTax = Math.max(0, Math.floor(Number(ledgerSnap.data()?.pending) || 0));
+        if (tax > 0 && pendingTax >= tax) {
+          tx.update(ledgerRef, { pending: increment(-tax), shop: increment(-tax), updatedAt: Date.now() });
+        }
+      });
+      setMsg(`↩️ ${purchase.studentName} 학생에게 ${fmt(refund)}${klass.currency}를 환불하고 구매를 반려했어요.`);
+      window.setTimeout(() => setMsg(''), 3500);
+    } catch (error) {
+      setMsg(`구매 반려 실패: ${error.message}`);
+      window.setTimeout(() => setMsg(''), 3500);
+    } finally {
+      setBusyId('');
+    }
+  };
+
   return (
     <div className={card}>
       <h3 className="mb-4 text-xl">🔔 알림·지급요청</h3>
@@ -961,7 +1025,11 @@ function AlertsTab({ klass }) {
           <div
             key={o.id}
             className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${
-              o.status === 'pending' ? 'bg-amber-50 border-2 border-amber-200' : 'bg-gray-50 text-gray-400'
+              o.status === 'pending'
+                ? 'bg-amber-50 border-2 border-amber-200'
+                : o.status === 'rejected'
+                  ? 'bg-rose-50 text-rose-500'
+                  : 'bg-gray-50 text-gray-400'
             }`}
           >
             <span className="text-2xl">{o.emoji || '🎁'}</span>
@@ -970,14 +1038,24 @@ function AlertsTab({ klass }) {
               <span className="text-sm text-gray-400 ml-2">{fmt(o.price)} {klass.currency}</span>
             </div>
             {o.status === 'pending' ? (
-              <button
-                onClick={() => updateDoc(doc(db, 'classes', klass.id, 'purchases', o.id), { status: 'done' })}
-                className={btn + ' bg-emerald-500 hover:bg-emerald-600 text-sm'}
-              >
-                ✅ 지급 완료
-              </button>
+              <div className="flex shrink-0 gap-1.5">
+                <button
+                  onClick={() => completePurchase(o)}
+                  disabled={Boolean(busyId)}
+                  className={btn + ' bg-emerald-500 hover:bg-emerald-600 text-sm'}
+                >
+                  ✅ 지급 완료
+                </button>
+                <button
+                  onClick={() => rejectPurchase(o)}
+                  disabled={Boolean(busyId)}
+                  className="rounded-xl border border-rose-200 px-3 py-2 text-sm text-rose-500 hover:bg-rose-500 hover:text-white disabled:opacity-40"
+                >
+                  ↩️ 구매 반려
+                </button>
+              </div>
             ) : (
-              <span className="text-sm">지급 완료</span>
+              <span className="shrink-0 text-sm">{o.status === 'rejected' ? '구매 반려 · 환불 완료' : '지급 완료'}</span>
             )}
           </div>
         ))}
