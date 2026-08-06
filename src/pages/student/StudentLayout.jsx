@@ -14,6 +14,8 @@ const NAV = [
   ['/student/bank', '🏦', '은행'],
   ['/student/stocks', '📈', '주식'],
   ['/student/missions', '🎯', '오늘 미션'],
+  ['/student/payment-request', '🧾', '지급요청'],
+  ['/student/lottery', '🎟️', '복권'],
   ['/student/class', '🏛️', '학급'],
   ['/student/seats', '🪑', '자리'],
   ['/student/room', '🛋️', '내 공간'],
@@ -138,14 +140,14 @@ export default function StudentLayout() {
       </main>
 
       <nav className="fixed bottom-3 inset-x-0 px-3 z-40">
-        <div className="max-w-3xl mx-auto flex bg-white/95 backdrop-blur rounded-3xl shadow-xl border border-purple-100 p-1.5">
+        <div className="max-w-3xl mx-auto flex overflow-x-auto bg-white/95 backdrop-blur rounded-3xl shadow-xl border border-purple-100 p-1.5">
           {NAV.map(([to, icon, label, end]) => (
             <NavLink
               key={to}
               to={to}
               end={end}
               className={({ isActive }) =>
-                `flex-1 py-1.5 text-center rounded-2xl transition ${
+                `min-w-[58px] flex-none py-1.5 text-center rounded-2xl transition ${
                   isActive ? 'bg-gradient-to-b from-indigo-500 to-purple-500 text-white shadow' : 'text-gray-400 hover:bg-purple-50'
                 }`
               }

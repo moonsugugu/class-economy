@@ -16,6 +16,8 @@ import HeroPage from './pages/student/HeroPage.jsx';
 import HeroShopPage from './pages/student/HeroShopPage.jsx';
 import HeroDuelPage from './pages/student/HeroDuelPage.jsx';
 import MissionsPage from './pages/student/MissionsPage.jsx';
+import PaymentRequestPage from './pages/student/PaymentRequestPage.jsx';
+import LotteryPage from './pages/student/LotteryPage.jsx';
 import DemoRoom from './pages/DemoRoom.jsx';
 
 function SetupGuide() {
@@ -59,6 +61,8 @@ export default function App() {
         <Route path="bank" element={<BankPage />} />
         <Route path="stocks" element={<StocksPage />} />
         <Route path="missions" element={<MissionsPage />} />
+        <Route path="payment-request" element={<PaymentRequestPage />} />
+        <Route path="lottery" element={<LotteryPage />} />
         <Route path="seats" element={<SeatsPage />} />
         <Route path="class" element={<ClassPage />} />
         <Route path="visit" element={<VisitPage />} />

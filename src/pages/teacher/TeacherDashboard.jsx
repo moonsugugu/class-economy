@@ -20,9 +20,17 @@ import { grossPay, taxOf } from '../../lib/jobs';
 import { TAX_PARTS, TAX_LEDGER_ID, taxRates } from '../../lib/taxes';
 import { isActiveStudent } from '../../lib/studentState';
 import { ITEM_MAP } from '../../lib/items';
-import { HERO_ITEM_MAP } from '../../lib/hero';
+import { HERO_ITEM_MAP, normalizeHero } from '../../lib/hero';
 import { PRICE_MODE_PERCENT, PRICE_MODE_UNIT, pricePolicyLabel } from '../../lib/pricing';
 import { loanDueAmount } from '../../lib/loans.js';
+import {
+  DEFAULT_LOTTERY_DISTRIBUTION_RATE,
+  DEFAULT_LOTTERY_PRIZE,
+  DEFAULT_LOTTERY_PRICE,
+  DEFAULT_LOTTERY_RECIPIENTS,
+  DEFAULT_LOTTERY_SUPPORT_RATE,
+  DEFAULT_LOTTERY_WIN_PROBABILITY,
+} from '../../lib/lottery.js';
 import SeatsTab from './SeatsTab.jsx';
 import ReportsTab from './ReportsTab.jsx';
 import JobsTab from './JobsTab.jsx';
@@ -31,6 +39,7 @@ import InviteQR from '../../components/InviteQR.jsx';
 import EconomyEventsPanel from './EconomyEventsPanel.jsx';
 import RecoveryTab from './RecoveryTab.jsx';
 import MissionsTab from './MissionsTab.jsx';
+import LotteryTab from './LotteryTab.jsx';
 import FeatureGuideModal from '../../components/FeatureGuideModal.jsx';
 
 const card = 'bg-white rounded-3xl shadow p-6';
@@ -73,6 +82,7 @@ export default function TeacherDashboard() {
   const [classId, setClassId] = useState(() => localStorage.getItem('ce_teacher_class') || '');
   const [tab, setTab] = useState('students');
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingPaymentCount, setPendingPaymentCount] = useState(0);
   const [newClassName, setNewClassName] = useState('');
   const [showInvite, setShowInvite] = useState(false);
 
@@ -100,6 +110,12 @@ export default function TeacherDashboard() {
     return onSnapshot(q, (snap) => setPendingCount(snap.size));
   }, [klass?.id]);
 
+  useEffect(() => {
+    if (!klass) return;
+    const q = query(collection(db, 'classes', klass.id, 'paymentRequests'), where('status', '==', 'pending'));
+    return onSnapshot(q, (snap) => setPendingPaymentCount(snap.size));
+  }, [klass?.id]);
+
   if (!authReady) return <Center>불러오는 중...</Center>;
   if (!teacher) return <Navigate to="/" replace />;
   if (classes === null) return <Center>학급 정보를 불러오는 중...</Center>;
@@ -118,6 +134,13 @@ export default function TeacherDashboard() {
       savingsRate: 5,
       loanRate: 10,
       loanLimit: 1000,
+      lotteryPrice: DEFAULT_LOTTERY_PRICE,
+      lotteryWinProbability: DEFAULT_LOTTERY_WIN_PROBABILITY,
+      lotteryPrize: DEFAULT_LOTTERY_PRIZE,
+      lotterySupportRate: DEFAULT_LOTTERY_SUPPORT_RATE,
+      lotterySupportRecipients: DEFAULT_LOTTERY_RECIPIENTS,
+      lotteryDistributionRate: DEFAULT_LOTTERY_DISTRIBUTION_RATE,
+      lotterySupportFund: 0,
       createdAt: serverTimestamp(),
     });
     setNewClassName('');
@@ -127,11 +150,12 @@ export default function TeacherDashboard() {
   const tabs = [
     ['students', '🧑‍🎓', '학생', 'from-emerald-400 to-teal-500'],
     ['shop', '🏪', '상점', 'from-amber-400 to-orange-500'],
-    ['alerts', '🔔', pendingCount ? `알림 ${pendingCount}` : '알림', 'from-rose-400 to-pink-500'],
+    ['alerts', '🔔', pendingCount + pendingPaymentCount ? `알림 ${pendingCount + pendingPaymentCount}` : '알림', 'from-rose-400 to-pink-500'],
     ['stocks', '📈', '주식', 'from-blue-400 to-indigo-500'],
     ['missions', '🎯', '오늘의 미션', 'from-indigo-400 to-cyan-500'],
     ['jobs', '🧑‍🍳', '직업', 'from-teal-400 to-emerald-500'],
     ['fund', '🏛️', '공동기금', 'from-emerald-400 to-green-500'],
+    ['lottery', '🎟️', '복권', 'from-fuchsia-400 to-indigo-500'],
     ['seats', '🪑', '자리', 'from-teal-400 to-cyan-500'],
     ['reports', '🐞', '건의함', 'from-fuchsia-400 to-rose-500'],
     ['recovery', '🧯', '파산·회생', 'from-rose-400 to-orange-500'],
@@ -225,6 +249,7 @@ export default function TeacherDashboard() {
           {tab === 'missions' && <MissionsTab klass={klass} />}
           {tab === 'jobs' && <JobsTab klass={klass} />}
           {tab === 'fund' && <FundTab klass={klass} />}
+          {tab === 'lottery' && <LotteryTab klass={klass} />}
           {tab === 'seats' && <SeatsTab klass={klass} />}
           {tab === 'reports' && <ReportsTab klass={klass} teacherEmail={teacher.email} />}
           {tab === 'recovery' && <RecoveryTab klass={klass} />}
@@ -333,6 +358,11 @@ function StudentsTab({ klass }) {
     0
   );
 
+  const heroStageOf = (student) => {
+    const hero = normalizeHero(student.rpg);
+    return hero.character ? `${hero.clearedLevel}단계` : '미시작';
+  };
+
   const assetBreakdownOf = (student) => {
     const savings = savingsByStudent.get(student.id) || 0;
     const stocks = stockValueOf(student);
@@ -408,6 +438,17 @@ function StudentsTab({ klass }) {
       return next;
     });
     flash(`📦 ${s.name} 학생 계정을 보관했어요. 기존 데이터는 보존돼요.`);
+  };
+
+  const deleteStudent = async (s) => {
+    if (!confirm(`'${s.name}' 학생을 정말 삭제할까요?\n학생 문서가 영구 삭제되며, 구매·지급요청·거래 기록은 별도로 남을 수 있습니다.`)) return;
+    await deleteDoc(doc(db, 'classes', klass.id, 'students', s.id));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(s.id);
+      return next;
+    });
+    flash(`🗑️ ${s.name} 학생을 삭제했어요.`);
   };
 
   const restoreStudent = async (s) => {
@@ -529,22 +570,23 @@ function StudentsTab({ klass }) {
             총자산은 현금·예금·적금·주식과 원화/달러 환산액에서 미상환 대출을 뺀 순자산이에요. 공간 지출비와 용사 아이템비는 보유 아이템 가격표 기준입니다.
           </span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px] text-left">
+        <div className="overflow-hidden rounded-2xl border border-gray-100">
+          <table className="w-full table-fixed text-left text-[10px] leading-tight">
             <thead>
-              <tr className="text-gray-400 text-sm border-b">
-                <th className="py-2 w-10"></th>
-                <th className="py-2"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-5 h-5" /></th>
-                <th>이름</th>
-                <th className="text-right">총자산</th>
-                <th className="text-right">현금</th>
-                <th className="text-right">예금</th>
-                <th className="text-right">적금</th>
-                <th className="text-right">주식 평가액</th>
-                <th className="text-right">대출 잔액</th>
-                <th className="text-right">공간 지출비</th>
-                <th className="text-right">용사 아이템비</th>
-                <th className="text-right w-20">관리</th>
+              <tr className="border-b bg-gray-50 text-gray-400">
+                <th className="w-[3%] px-1 py-2"></th>
+                <th className="w-[3%] px-1 py-2"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4" /></th>
+                <th className="w-[12%] px-1 py-2 text-left">이름</th>
+                <th className="w-[7%] px-1 py-2 text-center">용사 단계</th>
+                <th className="w-[8%] px-1 py-2 text-right">총자산</th>
+                <th className="w-[7%] px-1 py-2 text-right">현금</th>
+                <th className="w-[7%] px-1 py-2 text-right">예금</th>
+                <th className="w-[7%] px-1 py-2 text-right">적금</th>
+                <th className="w-[8%] px-1 py-2 text-right">주식</th>
+                <th className="w-[7%] px-1 py-2 text-right">대출</th>
+                <th className="w-[8%] px-1 py-2 text-right">공간비</th>
+                <th className="w-[8%] px-1 py-2 text-right">용사비</th>
+                <th className="w-[10%] px-1 py-2 text-right">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -560,37 +602,46 @@ function StudentsTab({ klass }) {
                     onDragEnd={() => setDraggingId(null)}
                     className={`border-b border-gray-100 hover:bg-indigo-50/40 ${draggingId === s.id ? 'opacity-50' : ''}`}
                   >
-                    <td className="py-2 text-gray-300 cursor-grab select-none" title="끌어서 순서 바꾸기">↕</td>
-                    <td className="py-2"><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="w-5 h-5" /></td>
-                    <td className="text-lg whitespace-nowrap">
+                    <td className="cursor-grab select-none px-1 py-2 text-center text-gray-300" title="끌어서 순서 바꾸기">↕</td>
+                    <td className="px-1 py-2 text-center"><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="h-4 w-4" /></td>
+                    <td className="truncate px-1 py-2 text-left text-[11px]" title={s.name}>
                       {s.avatar?.base || '🙂'} {s.name}
                       {s.jobName && (
-                        <span className="ml-2 text-xs bg-teal-50 text-teal-700 rounded-lg px-2 py-0.5 align-middle">
+                        <span className="ml-1 rounded bg-teal-50 px-1 py-0.5 text-[9px] text-teal-700 align-middle">
                           {s.jobEmoji} {s.jobName} +{wholeFmt(s.jobSalary || 0)}
                         </span>
                       )}
                     </td>
-                    <td className="text-right font-semibold whitespace-nowrap">{wholeFmt(asset.total)} {klass.currency}</td>
-                    <td className="text-right whitespace-nowrap">{wholeFmt(asset.cash)} {klass.currency}</td>
-                    <td className="text-right text-gray-500 whitespace-nowrap">{wholeFmt(asset.deposit)} {klass.currency}</td>
-                    <td className="text-right text-pink-600 whitespace-nowrap">{wholeFmt(asset.savings)} {klass.currency}</td>
-                    <td className="text-right text-sky-600 whitespace-nowrap">{wholeFmt(asset.stocks)} {klass.currency}</td>
-                    <td className="text-right text-rose-600 whitespace-nowrap">{wholeFmt(asset.loan)} {klass.currency}</td>
-                    <td className="text-right text-purple-600 whitespace-nowrap">{wholeFmt(asset.spaceSpending)} {klass.currency}</td>
-                    <td className="text-right text-violet-600 whitespace-nowrap">{wholeFmt(asset.heroItemSpending)} {klass.currency}</td>
-                    <td className="text-right">
+                    <td className={`px-1 py-2 text-center ${heroStageOf(s) === '미시작' ? 'text-gray-300' : 'font-bold text-indigo-600'}`} title="용사키우기 정복 단계">{heroStageOf(s)}</td>
+                    <td className="whitespace-nowrap px-1 py-2 text-right font-semibold">{wholeFmt(asset.total)}</td>
+                    <td className="whitespace-nowrap px-1 py-2 text-right">{wholeFmt(asset.cash)}</td>
+                    <td className="whitespace-nowrap px-1 py-2 text-right text-gray-500">{wholeFmt(asset.deposit)}</td>
+                    <td className="whitespace-nowrap px-1 py-2 text-right text-pink-600">{wholeFmt(asset.savings)}</td>
+                    <td className="whitespace-nowrap px-1 py-2 text-right text-sky-600">{wholeFmt(asset.stocks)}</td>
+                    <td className="whitespace-nowrap px-1 py-2 text-right text-rose-600">{wholeFmt(asset.loan)}</td>
+                    <td className="whitespace-nowrap px-1 py-2 text-right text-purple-600">{wholeFmt(asset.spaceSpending)}</td>
+                    <td className="whitespace-nowrap px-1 py-2 text-right text-violet-600">{wholeFmt(asset.heroItemSpending)}</td>
+                    <td className="px-1 py-2 text-right">
+                      <div className="flex justify-end gap-1">
                       <button
                         onClick={() => removeStudent(s)}
-                        className="rounded-lg px-2.5 py-1 text-sm bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition"
+                        className="rounded px-1.5 py-1 text-[9px] bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white transition"
                       >
                         보관
                       </button>
+                        <button
+                          onClick={() => deleteStudent(s)}
+                          className="rounded px-1.5 py-1 text-[9px] bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition"
+                        >
+                          삭제
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
               })}
               {!activeStudents.length && (
-                <tr><td colSpan={12} className="py-8 text-center text-gray-400">
+                <tr><td colSpan={13} className="py-8 text-center text-gray-400">
                   아직 학생이 없어요. 학생들에게 학급 코드 <b>{klass.code}</b>를 알려 주세요!
                 </td></tr>
               )}
@@ -605,13 +656,20 @@ function StudentsTab({ klass }) {
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {archivedStudents.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => restoreStudent(s)}
-                  className="rounded-xl bg-white px-3 py-2 text-sm text-amber-800 shadow-sm hover:bg-amber-100"
-                >
-                  {s.avatar?.base || '🙂'} {s.name} 복구
-                </button>
+                <span key={s.id} className="flex gap-2">
+                  <button
+                    onClick={() => restoreStudent(s)}
+                    className="rounded-xl bg-white px-3 py-2 text-sm text-amber-800 shadow-sm hover:bg-amber-100"
+                  >
+                    {s.avatar?.base || '🙂'} {s.name} 복구
+                  </button>
+                  <button
+                    onClick={() => deleteStudent(s)}
+                    className="rounded-xl bg-white px-3 py-2 text-sm text-rose-500 shadow-sm hover:bg-rose-100"
+                  >
+                    삭제
+                  </button>
+                </span>
               ))}
             </div>
           </div>
@@ -825,15 +883,79 @@ function ProductCard({ p, klass }) {
 /* ---------- 구매 알림 ---------- */
 function AlertsTab({ klass }) {
   const [purchases, setPurchases] = useState([]);
+  const [paymentRequests, setPaymentRequests] = useState([]);
+  const [busyId, setBusyId] = useState('');
+  const [msg, setMsg] = useState('');
 
   useEffect(() => {
     const q = query(collection(db, 'classes', klass.id, 'purchases'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snap) => setPurchases(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
   }, [klass.id]);
 
+  useEffect(() => {
+    const q = query(collection(db, 'classes', klass.id, 'paymentRequests'), orderBy('createdAtMs', 'desc'));
+    return onSnapshot(q, (snap) => setPaymentRequests(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  }, [klass.id]);
+
+  const approvePaymentRequest = async (request) => {
+    if (busyId) return;
+    setBusyId(request.id);
+    try {
+      const requestRef = doc(db, 'classes', klass.id, 'paymentRequests', request.id);
+      const studentRef = doc(db, 'classes', klass.id, 'students', request.studentId);
+      let paid = 0;
+      await runTransaction(db, async (tx) => {
+        const requestSnap = await tx.get(requestRef);
+        const studentSnap = await tx.get(studentRef);
+        if (!requestSnap.exists() || requestSnap.data()?.status !== 'pending') throw new Error('이미 처리된 지급요청이에요.');
+        if (!studentSnap.exists()) throw new Error('학생 계정을 찾지 못했어요.');
+        const amount = Math.floor(Number(requestSnap.data()?.amount) || 0);
+        if (amount < 1) throw new Error('지급 금액이 올바르지 않아요.');
+        const student = studentSnap.data() || {};
+        paid = amount;
+        tx.update(studentRef, { cash: (Number(student.cash) || 0) + amount });
+        tx.update(requestRef, { status: 'approved', approvedAt: Date.now(), paidAmount: amount });
+      });
+      setMsg(`✅ ${request.studentName || '학생'}에게 ${fmt(paid)}${klass.currency}를 지급했어요.`);
+      window.setTimeout(() => setMsg(''), 3500);
+    } catch (error) {
+      setMsg(`지급 실패: ${error.message}`);
+      window.setTimeout(() => setMsg(''), 3500);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const rejectPaymentRequest = async (request) => {
+    if (busyId || !confirm(`${request.studentName || '학생'} 학생의 지급요청을 반려할까요?`)) return;
+    setBusyId(request.id);
+    try {
+      await updateDoc(doc(db, 'classes', klass.id, 'paymentRequests', request.id), { status: 'rejected', rejectedAt: Date.now() });
+    } finally {
+      setBusyId('');
+    }
+  };
+
   return (
     <div className={card}>
-      <h3 className="text-xl mb-4">🔔 학생 구매 알림</h3>
+      <h3 className="mb-4 text-xl">🔔 알림·지급요청</h3>
+      {msg && <div className="mb-3 rounded-xl bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{msg}</div>}
+      <div className="mb-5 space-y-2">
+        {paymentRequests.map((request) => (
+          <div key={request.id} className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${request.status === 'pending' ? 'border-2 border-sky-200 bg-sky-50' : 'bg-gray-50 text-gray-400'}`}>
+            <span className="text-2xl">🧾</span>
+            <div className="min-w-0 flex-1"><b>{request.studentName}</b> 학생의 지급요청 <span className="ml-1 text-sm text-gray-500">{fmt(request.amount)} {klass.currency}</span><p className="truncate text-sm text-gray-500">이유: {request.reason}</p></div>
+            {request.status === 'pending' ? (
+              <div className="flex shrink-0 gap-1.5">
+                <button onClick={() => approvePaymentRequest(request)} disabled={busyId === request.id} className={btn + ' bg-emerald-500 hover:bg-emerald-600 text-sm'}>✅ 확인하고 지급</button>
+                <button onClick={() => rejectPaymentRequest(request)} disabled={busyId === request.id} className="rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-500 disabled:opacity-40">반려</button>
+              </div>
+            ) : <span className="shrink-0 text-sm">{request.status === 'approved' ? '지급 완료' : '반려됨'}</span>}
+          </div>
+        ))}
+        {!paymentRequests.length && <div className="py-2 text-center text-sm text-gray-400">지급요청이 없어요.</div>}
+      </div>
+      <h4 className="mb-3 text-lg text-gray-700">🛒 학생 구매 알림</h4>
       <div className="space-y-2">
         {purchases.map((o) => (
           <div
