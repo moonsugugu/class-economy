@@ -103,6 +103,12 @@ const POWER_BY_SLOT = {
 
 const rarityOfLevel = (level) => (level <= 5 ? 'common' : level <= 10 ? 'rare' : level <= 15 ? 'elite' : level <= 19 ? 'legendary' : 'transcendent');
 
+const rarityPriceMultiplier = (rarity) => {
+  if (rarity === 'legendary') return 1.5;
+  if (rarity === 'transcendent') return 2;
+  return 1;
+};
+
 const SPECIAL_STAT_LABELS = {
   bossCritChance: '보스전 크리티컬 확률',
   critDamage: '크리티컬 데미지',
@@ -128,25 +134,34 @@ function specialStatsFor(slot, level, rarity) {
   return [first, { key: secondKey, label: SPECIAL_STAT_LABELS[secondKey], value: valueFor(secondKey, 1) }];
 }
 
-const gearItems = HERO_SLOTS.flatMap(([slot]) => Array.from({ length: 20 }, (_, index) => {
-  const level = index + 1;
-  const legacy = (LEGACY_GEAR[slot] || {})[level];
-  const rarity = rarityOfLevel(level);
-  const power = POWER_BY_SLOT[slot][index];
-  return {
-    id: legacy?.id || `hero_${slot}_${level}`,
-    slot,
-    level,
-    rarity,
-    rarityLabel: HERO_RARITIES[rarity].label,
-    visualKey: `${slot}-${level === 20 ? 5 : Math.ceil(level / 5)}`,
-    name: legacy?.name || `${HERO_RARITIES[rarity].label} ${GEAR_NAMES[slot][index]}`,
-    emoji: legacy?.emoji || GEAR_EMOJIS[slot][index],
-    price: legacy?.price || Math.round(50 + power * 10 + level * 15),
-    power,
-    specialStats: specialStatsFor(slot, level, rarity),
-  };
-}));
+const gearItems = HERO_SLOTS.flatMap(([slot]) => {
+  let previousPrice = 0;
+  return Array.from({ length: 20 }, (_, index) => {
+    const level = index + 1;
+    const legacy = (LEGACY_GEAR[slot] || {})[level];
+    const rarity = rarityOfLevel(level);
+    const power = POWER_BY_SLOT[slot][index];
+    const basePrice = legacy?.price || Math.round(50 + power * 10 + level * 15);
+    const price = Math.max(
+      previousPrice + 1,
+      Math.round(basePrice * rarityPriceMultiplier(rarity)),
+    );
+    previousPrice = price;
+    return {
+      id: legacy?.id || `hero_${slot}_${level}`,
+      slot,
+      level,
+      rarity,
+      rarityLabel: HERO_RARITIES[rarity].label,
+      visualKey: `${slot}-${level === 20 ? 5 : Math.ceil(level / 5)}`,
+      name: legacy?.name || `${HERO_RARITIES[rarity].label} ${GEAR_NAMES[slot][index]}`,
+      emoji: legacy?.emoji || GEAR_EMOJIS[slot][index],
+      price,
+      power,
+      specialStats: specialStatsFor(slot, level, rarity),
+    };
+  });
+});
 
 const PET_NAMES = [
   '별빛 토끼', '구름 여우', '바다 물개', '초원 판다', '불꽃 고양이',
@@ -155,10 +170,17 @@ const PET_NAMES = [
   '심연의 뱀', '천공의 고래', '마력 유니콘', '고대 그리핀', '신성한 봉황',
 ];
 const PET_EMOJIS = ['🐇', '🦊', '🦭', '🐼', '🐈', '🐺', '🦌', '🦅', '🐢', '🐧', '🐒', '🐲', '🦉', '🦁', '🦅', '🐍', '🐳', '🦄', '🪽', '🔥'];
+let previousPetPrice = 0;
 const petItems = Array.from({ length: 20 }, (_, index) => {
   const level = index + 1;
   const rarity = rarityOfLevel(level);
   const critChance = Math.round(5 + (level - 1) * (75 / 19));
+  const basePrice = 180 + level * 95 + (rarity === 'transcendent' ? 500 : rarity === 'legendary' ? 220 : 0);
+  const price = Math.max(
+    previousPetPrice + 1,
+    Math.round(basePrice * rarityPriceMultiplier(rarity)),
+  );
+  previousPetPrice = price;
   return {
     id: 'hero_pet_' + level,
     slot: 'pet',
@@ -168,7 +190,7 @@ const petItems = Array.from({ length: 20 }, (_, index) => {
     visualKey: 'pet-' + level,
     name: PET_NAMES[index],
     emoji: PET_EMOJIS[index],
-    price: 180 + level * 95 + (rarity === 'transcendent' ? 500 : rarity === 'legendary' ? 220 : 0),
+    price,
     power: 0,
     critChance,
     specialStats: level === 20 ? specialStatsFor('pet', level, rarity) : [],
@@ -350,14 +372,14 @@ export function heroDuelExtraCost(attempts) {
   return Math.max(0, Number(attempts) || 0) >= HERO_DUEL_LIMIT ? HERO_DUEL_EXTRA_COST : 0;
 }
 
-// 용사 배틀은 10단계 단위로 기본 보상이 올라가고, 각 구간의 보스는 처치에 성공했을 때만 10배를 지급합니다.
-// 마지막 91~100단계 구간은 최종 도전을 위해 일반 보상 1,000, 최종 보스 10,000으로 설정합니다.
+// 용사 배틀은 10단계 단위로 기본 보상이 올라가고, 각 구간의 보스는 기존 10배에서 줄여 일반 보상의 5배를 지급합니다.
+// 마지막 91~100단계 구간은 최종 도전을 위해 일반 보상 1,000, 최종 보스 5,000으로 설정합니다.
 export function heroBattleWinReward(level, boss = false, baseReward = 10) {
   const safeLevel = clamp(Math.floor(Number(level) || 1), 1, 100);
   const tier = Math.ceil(safeLevel / 10);
   const safeBaseReward = Math.max(0, Math.floor(Number(baseReward) || 0));
   const normalReward = tier === 10 ? safeBaseReward * 100 : safeBaseReward * tier;
-  return boss ? normalReward * 10 : normalReward;
+  return boss ? normalReward * 5 : normalReward;
 }
 
 export function battleConfig(klass = {}) {
@@ -411,7 +433,7 @@ const MONSTER_DESIGNS = Array.from({ length: 100 }, (_, index) => {
     name: `${MONSTER_VARIANTS[variantIndex]} ${species.name}`,
     emoji: species.emoji,
     boss,
-    power: Math.floor(30 + level * 4.5 + Math.pow(level, 1.2) * 1.5),
+    power: Math.floor((30 + level * 4.5 + Math.pow(level, 1.2) * 1.5) * (1 + Math.floor((level - 1) / 10) * 0.1)),
     maxHp: boss ? Math.floor(250 + level * 70 + level * level * 0.8) : 1,
     visual: {
       key: `monster-${level}`,
