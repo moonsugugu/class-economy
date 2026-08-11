@@ -289,6 +289,7 @@ function StudentsTab({ klass }) {
   const [msg, setMsg] = useState('');
   const [sortMode, setSortMode] = useState('name');
   const [draggingId, setDraggingId] = useState(null);
+  const [resettingHeroId, setResettingHeroId] = useState('');
 
   useEffect(() => {
     return onSnapshot(collection(db, 'classes', klass.id, 'students'), (snap) =>
@@ -449,6 +450,36 @@ function StudentsTab({ klass }) {
       return next;
     });
     flash(`🗑️ ${s.name} 학생을 삭제했어요.`);
+  };
+
+  const resetHeroProgress = async (s) => {
+    const currentHero = normalizeHero(s.rpg);
+    if (!currentHero.character) return flash(`${s.name} 학생은 아직 용사를 구매하지 않았어요.`);
+    if (!confirm(`'${s.name}' 학생의 용사키우기 단계를 0단계로 리셋할까요?\n용사·장비·아이템과 현금은 그대로 두고, 정복 단계와 보스 진행만 초기화합니다.`)) return;
+    setResettingHeroId(s.id);
+    try {
+      const studentRef = doc(db, 'classes', klass.id, 'students', s.id);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(studentRef);
+        if (!snap.exists()) throw new Error('학생 계정을 찾지 못했어요.');
+        const hero = normalizeHero(snap.data()?.rpg);
+        tx.update(studentRef, {
+          rpg: {
+            ...hero,
+            clearedLevel: 0,
+            bossProgress: {},
+            battleDate: '',
+            battleCount: 0,
+            lastBattle: null,
+          },
+        });
+      });
+      flash(`⚔️ ${s.name} 학생의 용사키우기 단계를 0단계로 리셋했어요.`);
+    } catch (error) {
+      flash(`용사 단계 리셋 실패: ${error.message}`);
+    } finally {
+      setResettingHeroId('');
+    }
   };
 
   const restoreStudent = async (s) => {
@@ -622,10 +653,10 @@ function StudentsTab({ klass }) {
                     <td className="whitespace-nowrap px-1 py-2 text-right text-purple-600">{wholeFmt(asset.spaceSpending)}</td>
                     <td className="whitespace-nowrap px-1 py-2 text-right text-violet-600">{wholeFmt(asset.heroItemSpending)}</td>
                     <td className="px-1 py-2 text-right">
-                      <div className="flex justify-end gap-1">
-                      <button
-                        onClick={() => removeStudent(s)}
-                        className="rounded px-1.5 py-1 text-[9px] bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white transition"
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <button
+                          onClick={() => removeStudent(s)}
+                          className="rounded px-1.5 py-1 text-[9px] bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white transition"
                       >
                         보관
                       </button>
@@ -634,6 +665,14 @@ function StudentsTab({ klass }) {
                           className="rounded px-1.5 py-1 text-[9px] bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition"
                         >
                           삭제
+                        </button>
+                        <button
+                          onClick={() => resetHeroProgress(s)}
+                          disabled={resettingHeroId === s.id}
+                          title="용사키우기 단계 0으로 리셋"
+                          className="rounded px-1.5 py-1 text-[9px] bg-indigo-50 text-indigo-600 hover:bg-indigo-500 hover:text-white transition disabled:opacity-40"
+                        >
+                          {resettingHeroId === s.id ? '...' : '용사 리셋'}
                         </button>
                       </div>
                     </td>

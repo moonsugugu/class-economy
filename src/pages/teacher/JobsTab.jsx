@@ -19,6 +19,7 @@ export default function JobsTab({ klass }) {
   const [msg, setMsg] = useState('');
   const [presetOpen, setPresetOpen] = useState(false);
   const [picked, setPicked] = useState(new Set());
+  const [addingPresets, setAddingPresets] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, 'classes', klass.id, 'jobs'), orderBy('createdAt'));
@@ -49,16 +50,38 @@ export default function JobsTab({ klass }) {
   };
 
   const addPresets = async () => {
-    const batch = writeBatch(db);
-    JOB_PRESETS.forEach((p, i) => {
-      if (!picked.has(i)) return;
-      batch.set(doc(collection(db, 'classes', klass.id, 'jobs')), {
-        ...p, holders: [], applicants: [], createdAt: serverTimestamp(),
+    if (addingPresets || !picked.size) return;
+    setAddingPresets(true);
+    try {
+      // 같은 이름이라도 월급·정원·역할이 다른 예시는 별도 프리셋으로 추가합니다.
+      const missing = JOB_PRESETS.filter((preset, index) => picked.has(index) && !jobs.some((job) => (
+        job.name === preset.name
+        && Number(job.salary) === Number(preset.salary)
+        && Number(job.slots) === Number(preset.slots)
+        && (job.desc || '') === (preset.desc || '')
+      )));
+      if (!missing.length) {
+        setPresetOpen(false);
+        flash('선택한 직업 예시는 이미 모두 들어가 있어요.');
+        return;
+      }
+      const batch = writeBatch(db);
+      missing.forEach((preset) => {
+        batch.set(doc(collection(db, 'classes', klass.id, 'jobs')), {
+          ...preset,
+          holders: [],
+          applicants: [],
+          createdAt: Date.now(),
+        });
       });
-    });
-    await batch.commit();
-    setPresetOpen(false);
-    flash(`✅ 직업 ${picked.size}개를 만들었어요!`);
+      await batch.commit();
+      setPresetOpen(false);
+      flash(`✅ 직업 예시 ${missing.length}개를 추가했어요!`);
+    } catch (error) {
+      flash(`직업 예시를 추가하지 못했어요: ${error.message}`);
+    } finally {
+      setAddingPresets(false);
+    }
   };
 
   const hire = async (job, sid) => {
@@ -241,8 +264,8 @@ export default function JobsTab({ klass }) {
                 </label>
               ))}
             </div>
-            <button onClick={addPresets} disabled={!picked.size} className={btn + ' bg-teal-500 hover:bg-teal-600 w-full text-lg'}>
-              선택한 {picked.size}개 직업 만들기
+            <button onClick={addPresets} disabled={addingPresets || !picked.size} className={btn + ' bg-teal-500 hover:bg-teal-600 w-full text-lg'}>
+              {addingPresets ? '추가 중...' : `선택한 ${picked.size}개 직업 만들기`}
             </button>
           </div>
         </div>

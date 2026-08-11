@@ -114,14 +114,17 @@ export default function HeroPage() {
         const damageResult = won
           ? battleDamage(currentPower, monster, current)
           : { damage: 0, critical: false, criticalChance: bossCriticalChance(current), criticalDamage: criticalDamageBonus(current) };
-        const reward = won
-          ? heroBattleWinReward(monster.level, monster.boss, settings.winReward)
-          : settings.loseReward;
         const previousBossDamage = current.bossProgress[monster.level] || 0;
         const nextBossDamage = monster.boss
           ? Math.min(monster.maxHp, previousBossDamage + damageResult.damage)
           : previousBossDamage;
         const bossDefeated = !monster.boss || nextBossDamage >= monster.maxHp;
+        // 보스는 데미지를 넣을 때마다 상금을 주지 않고, 마지막 처치 시도에만 승리 상금을 줍니다.
+        const reward = won && bossDefeated
+          ? heroBattleWinReward(monster.level, monster.boss, settings.winReward)
+          : won
+            ? 0
+            : settings.loseReward;
         const nextHero = {
           ...current,
           clearedLevel: won && bossDefeated ? level : current.clearedLevel,
@@ -301,7 +304,10 @@ export default function HeroPage() {
                   {bossCriticalChance(hero) > 0 && <> · 펫 크리티컬 {bossCriticalChance(hero)}%</>}
                 </div>
               )}
-              <div className="text-xs text-amber-600">승리 {fmt(nextWinReward)} · 패배 {fmt(config.loseReward)} {klass.currency}</div>
+              <div className="text-xs text-amber-600">
+                {nextMonster.boss ? `보스 처치 ${fmt(nextWinReward)}` : `승리 ${fmt(nextWinReward)}`} · 패배 {fmt(config.loseReward)} {klass.currency}
+                {nextMonster.boss && <span className="ml-1 text-fuchsia-500">(데미지 보상 없음)</span>}
+              </div>
             </div>
             <button
               onClick={battle}

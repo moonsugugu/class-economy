@@ -350,7 +350,7 @@ export function heroDuelExtraCost(attempts) {
   return Math.max(0, Number(attempts) || 0) >= HERO_DUEL_LIMIT ? HERO_DUEL_EXTRA_COST : 0;
 }
 
-// 용사 배틀은 10단계 단위로 기본 보상이 올라가고, 각 구간의 보스는 10배를 지급합니다.
+// 용사 배틀은 10단계 단위로 기본 보상이 올라가고, 각 구간의 보스는 처치에 성공했을 때만 10배를 지급합니다.
 // 마지막 91~100단계 구간은 최종 도전을 위해 일반 보상 1,000, 최종 보스 10,000으로 설정합니다.
 export function heroBattleWinReward(level, boss = false, baseReward = 10) {
   const safeLevel = clamp(Math.floor(Number(level) || 1), 1, 100);
