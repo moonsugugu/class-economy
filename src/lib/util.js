@@ -62,7 +62,11 @@ export function netAssets(student = {}, stocks = [], fx, krwPerUnit = 1, savings
     .reduce((total, loan) => {
       const principal = Math.max(0, Number(loan.principal) || 0);
       const rate = Math.max(0, Number(loan.rate) || 0);
-      return total + principal + Math.floor(principal * rate / 100);
+      const dueAt = Number(loan.dueAt) || 0;
+      const overdueDays = dueAt && Date.now() > dueAt
+        ? Math.max(1, Math.ceil((Date.now() - dueAt) / DAY_MS))
+        : 0;
+      return total + principal + Math.floor(principal * (rate + overdueDays) / 100);
     }, 0);
   return Math.round(rankAssets(student, stocks, fx, krwPerUnit) + savingsValue - loanLiability);
 }

@@ -20,7 +20,7 @@ import { grossPay, taxOf } from '../../lib/jobs';
 import { TAX_PARTS, TAX_LEDGER_ID, taxRates } from '../../lib/taxes';
 import { isActiveStudent } from '../../lib/studentState';
 import { ITEM_MAP } from '../../lib/items';
-import { HERO_ITEM_MAP, normalizeHero } from '../../lib/hero';
+import { HERO_ITEM_MAP, normalizeHero, heroItemValue } from '../../lib/hero';
 import { PRICE_MODE_PERCENT, PRICE_MODE_UNIT, pricePolicyLabel } from '../../lib/pricing';
 import { loanDueAmount } from '../../lib/loans.js';
 import {
@@ -355,7 +355,7 @@ function StudentsTab({ klass }) {
   );
 
   const heroItemSpendingOf = (student) => (student.rpg?.owned || []).reduce(
-    (total, itemId) => total + (Number(HERO_ITEM_MAP[itemId]?.price) || 0),
+    (total, itemId) => total + heroItemValue(HERO_ITEM_MAP[itemId], student.rpg),
     0
   );
 

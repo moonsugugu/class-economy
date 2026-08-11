@@ -3,10 +3,13 @@ import { Link, useOutletContext } from 'react-router-dom';
 import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
+import { itemPrice } from '../../lib/pricing';
 import {
   HERO_ITEM_MAP, HERO_SLOTS, normalizeHero, heroPower,
   monsterForLevel, battleChance, battleConfig, heroDateKey, battleDamage, bossCriticalChance, heroBattleWinReward,
   criticalDamageBonus, bossCriticalMultiplier, formatHeroSpecialStats, heroExtraBattleCost, heroDisplayName,
+  HERO_ENHANCEMENT_MAX_LEVEL, heroEnhancementCost, heroEnhancementSuccessRate, heroEnhancementFor,
+  heroEnhancementStats, heroItemPower,
 } from '../../lib/hero';
 import HeroPreview from '../../three/Hero3D.jsx';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
@@ -21,6 +24,8 @@ export default function HeroPage() {
   const [battlePhase, setBattlePhase] = useState('idle');
   const [battleFx, setBattleFx] = useState(null);
   const [fireworks, setFireworks] = useState(false);
+  const [enhancementItemId, setEnhancementItemId] = useState(null);
+  const [enhancementBusy, setEnhancementBusy] = useState(false);
   const hero = normalizeHero(student.rpg);
   const power = heroPower(hero);
   const today = heroDateKey();
@@ -34,6 +39,19 @@ export default function HeroPage() {
   const bossProgress = nextMonster?.boss ? Math.min(nextMonster.maxHp, hero.bossProgress[nextMonster.level] || 0) : 0;
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
   const classRef = doc(db, 'classes', klass.id);
+  const enhancementItem = enhancementItemId ? HERO_ITEM_MAP[enhancementItemId] : null;
+  const enhancement = enhancementItem ? heroEnhancementFor(hero, enhancementItem.id) : null;
+  const enhancementTarget = enhancement ? enhancement.level + 1 : 0;
+  const enhancementCost = enhancementTarget <= HERO_ENHANCEMENT_MAX_LEVEL
+    ? heroEnhancementCost(enhancementTarget)
+    : 0;
+  const enhancementChance = enhancementTarget <= HERO_ENHANCEMENT_MAX_LEVEL
+    ? heroEnhancementSuccessRate(enhancementTarget)
+    : 0;
+
+  const isEquipped = (itemId, current = hero) => (
+    current.character === itemId || current.pet === itemId || Object.values(current.equipment || {}).includes(itemId)
+  );
 
   const renameHero = async () => {
     if (busy || !hero.character) return;
@@ -70,6 +88,69 @@ export default function HeroPage() {
       setMsg({ type: 'err', text: e.message });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const enhanceItem = async () => {
+    if (!enhancementItem || enhancementBusy || !enhancement) return;
+    if (enhancementTarget > HERO_ENHANCEMENT_MAX_LEVEL) return;
+    if (!window.confirm(
+      `${enhancementItem.name} +${enhancementTarget}강에 도전할까요?\n` +
+      `비용 ${fmt(enhancementCost)}${klass.currency} · 성공 확률 ${enhancementChance}%\n` +
+      `실패해도 사용한 비용은 아이템 가치에 누적됩니다.`
+    )) return;
+    const roll = Math.random();
+    setEnhancementBusy(true);
+    try {
+      let result;
+      await runTransaction(db, async (tx) => {
+        const s = (await tx.get(studentRef)).data() || {};
+        const current = normalizeHero(s.rpg);
+        const item = HERO_ITEM_MAP[enhancementItem.id];
+        const currentEnhancement = heroEnhancementFor(current, item.id);
+        const targetLevel = currentEnhancement.level + 1;
+        const cost = heroEnhancementCost(targetLevel);
+        const successRate = heroEnhancementSuccessRate(targetLevel);
+        if (!current.owned.includes(item.id) || !isEquipped(item.id, current)) {
+          throw new Error('장착 중인 아이템만 강화할 수 있어요.');
+        }
+        if (targetLevel > HERO_ENHANCEMENT_MAX_LEVEL) throw new Error('이미 +10강이에요.');
+        if ((Number(s.cash) || 0) < cost) throw new Error(`${fmt(cost)}${klass.currency}가 필요해요.`);
+        const success = roll < successRate / 100;
+        const nextLevel = success ? targetLevel : currentEnhancement.level;
+        const specialAbility = nextLevel >= HERO_ENHANCEMENT_MAX_LEVEL
+          ? currentEnhancement.specialAbility || {
+            key: 'enhancementPower',
+            label: '강화 특수능력',
+            value: 10,
+          }
+          : currentEnhancement.specialAbility;
+        const nextEnhancement = {
+          ...currentEnhancement,
+          level: nextLevel,
+          invested: currentEnhancement.invested + cost,
+          attempts: currentEnhancement.attempts + 1,
+          specialAbility,
+        };
+        tx.update(studentRef, {
+          cash: (Number(s.cash) || 0) - cost,
+          rpg: {
+            ...current,
+            enhancements: { ...current.enhancements, [item.id]: nextEnhancement },
+          },
+        });
+        result = { success, targetLevel, cost, successRate, nextLevel, invested: nextEnhancement.invested };
+      });
+      setMsg({
+        type: result.success ? 'ok' : 'err',
+        text: result.success
+          ? `✨ ${enhancementItem.name} +${result.targetLevel}강 성공! 현재 +${result.nextLevel}강 · 누적 가치 ${fmt(result.invested)}${klass.currency}`
+          : `💥 +${result.targetLevel}강 실패했어요. 사용한 ${fmt(result.cost)}${klass.currency}는 아이템 가치에 누적됐어요.`,
+      });
+    } catch (e) {
+      setMsg({ type: 'err', text: e.message });
+    } finally {
+      setEnhancementBusy(false);
     }
   };
 
@@ -217,7 +298,11 @@ export default function HeroPage() {
 
       <div className="grid gap-4 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="hero-profile-panel text-white rounded-3xl shadow-lg p-5 text-center">
-          <div className="flex w-full justify-center">
+          <div
+            className={`flex w-full justify-center ${hero.character ? 'cursor-pointer' : ''}`}
+            onClick={() => hero.character && setEnhancementItemId(hero.character)}
+            title={hero.character ? '캐릭터를 눌러 강화' : undefined}
+          >
             {hero.character ? <HeroPreview hero={hero} size={210} /> : <div className="h-[210px] w-[210px] rounded-2xl bg-white/15 flex items-center justify-center text-7xl">❔</div>}
           </div>
           {hero.character ? (
@@ -244,37 +329,63 @@ export default function HeroPage() {
           <div className="space-y-2">
             {HERO_SLOTS.map(([slot, label]) => {
               const item = HERO_ITEM_MAP[hero.equipment[slot]];
+              const itemEnhancement = item ? heroEnhancementFor(hero, item.id) : null;
+              const enhancementStats = item ? heroEnhancementStats(hero, item.id) : [];
               const specialStats = formatHeroSpecialStats(item).map((stat) => stat
                 .replace('보스전 크리티컬 확률', '치명타 확률')
                 .replace('크리티컬 데미지', '치명타 피해'));
               return (
-                <div key={slot} className={`flex min-w-0 items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5 ${item ? 'border-indigo-100 bg-indigo-50/40' : 'border-gray-100 bg-gray-50'}`}>
+                <button
+                  key={slot}
+                  type="button"
+                  onClick={() => item && setEnhancementItemId(item.id)}
+                  disabled={!item}
+                  className={`flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5 text-left ${item ? 'border-indigo-100 bg-indigo-50/40 hover:border-indigo-300' : 'border-gray-100 bg-gray-50'}`}
+                >
                   <span className="w-12 shrink-0 whitespace-nowrap text-[9px] text-gray-400">{label}</span>
                   <HeroItemVisual item={item} size={44} showLevel={false} />
                   <span className="min-w-0 flex-1 overflow-hidden text-gray-600">
                     <span className="block truncate text-[10px] leading-tight">{item?.name || '미장착'}</span>
-                    {item && <span className="block text-[8px] font-semibold leading-tight text-indigo-500">{item.level}단계 장비</span>}
+                    {item && <span className="block text-[8px] font-semibold leading-tight text-indigo-500">{item.level}단계 장비 · +{itemEnhancement.level}강</span>}
                     {specialStats.map((stat) => <span key={stat} title={stat} className="block break-words text-[8px] leading-tight tracking-[-0.04em] text-fuchsia-500">✨ {stat}</span>)}
+                    {enhancementStats.map((stat) => <span key={stat.key} className="block break-words text-[8px] leading-tight text-amber-600">✨ {stat.label} +{stat.value}</span>)}
                   </span>
-                  <span className="w-11 shrink-0 text-right text-[9px] text-indigo-500">{item ? `+${item.power}` : ''}<small className="block text-[7px] leading-tight text-gray-400">전투력</small></span>
-                </div>
+                  <span className="w-11 shrink-0 text-right text-[9px] text-indigo-500">{item ? `+${heroItemPower(item, itemEnhancement)}` : ''}<small className="block text-[7px] leading-tight text-gray-400">전투력</small></span>
+                </button>
               );
             })}
-            <div className={['grid min-w-0 grid-cols-[2.25rem_2.75rem_minmax(0,1fr)_6.5rem] items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50' : 'border-gray-100 bg-gray-50'].join(' ')}>
+            <button
+              type="button"
+              onClick={() => hero.pet && setEnhancementItemId(hero.pet)}
+              disabled={!hero.pet}
+              className={['grid w-full min-w-0 grid-cols-[2.25rem_2.75rem_minmax(0,1fr)_6.5rem] items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5 text-left', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50 hover:border-fuchsia-300' : 'border-gray-100 bg-gray-50'].join(' ')}
+            >
+              {(() => {
+                const pet = HERO_ITEM_MAP[hero.pet];
+                const petEnhancement = pet ? heroEnhancementFor(hero, pet.id) : null;
+                const petEnhancementStats = pet ? heroEnhancementStats(hero, pet.id) : [];
+                return (
+                  <>
               <span className="whitespace-nowrap text-[9px] text-gray-400">펫</span>
-              <HeroItemVisual item={HERO_ITEM_MAP[hero.pet]} size={44} showLevel={false} />
+              <HeroItemVisual item={pet} size={44} showLevel={false} />
               <span className="min-w-0 overflow-hidden text-gray-600">
-                <span className="block truncate break-keep text-[10px] leading-tight">{HERO_ITEM_MAP[hero.pet]?.name || '미장착'}</span>
-                {HERO_ITEM_MAP[hero.pet] && <span className="block text-[8px] font-semibold leading-tight text-fuchsia-500">{HERO_ITEM_MAP[hero.pet].level}단계 펫</span>}
+                <span className="block truncate break-keep text-[10px] leading-tight">{pet?.name || '미장착'}</span>
+                {pet && <span className="block text-[8px] font-semibold leading-tight text-fuchsia-500">{pet.level}단계 펫 · +{petEnhancement.level}강</span>}
+                {petEnhancementStats.map((stat) => <span key={stat.key} className="block break-words text-[8px] leading-tight text-amber-600">✨ {stat.label} +{stat.value}</span>)}
               </span>
               <span className="min-w-0 text-right text-[8px] leading-tight text-fuchsia-600 [word-break:keep-all]">
                 {bossCriticalChance(hero) > 0 && <span className="block">치명타 확률 {bossCriticalChance(hero)}%</span>}
                 <small className="block text-[8px] text-gray-400">치명타 시 보스 피해 ×2</small>
                 {criticalDamageBonus(hero) > 0 && <small className="block text-[8px] text-fuchsia-400">치명타 피해 +{criticalDamageBonus(hero)}%</small>}
+                {pet && <small className="block text-[8px] text-indigo-500">전투력 +{heroItemPower(pet, petEnhancement)}</small>}
               </span>
-            </div>
+                  </>
+                );
+              })()}
+            </button>
           </div>
-          <Link to="/student/hero/shop" className="block text-center text-sm text-indigo-500 underline mt-4">장비 바꾸러 가기 →</Link>
+          <p className="mt-3 text-center text-[11px] text-gray-400">장착 아이템을 누르면 강화 창이 열려요.</p>
+          <Link to="/student/hero/shop" className="block text-center text-sm text-indigo-500 underline mt-1">장비 바꾸러 가기 →</Link>
         </div>
       </div>
 
@@ -332,6 +443,43 @@ export default function HeroPage() {
       {hero.lastBattle && (
         <div className="text-center text-xs text-gray-400">
           마지막 전투: {hero.lastBattle.level}단계 · {hero.lastBattle.won ? '승리' : '패배'} · 보상 {fmt(hero.lastBattle.reward || 0)} {klass.currency} · {new Date(hero.lastBattle.at).toLocaleString('ko-KR')}
+        </div>
+      )}
+
+      {enhancementItem && enhancement && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={() => !enhancementBusy && setEnhancementItemId(null)}>
+          <div className="w-full max-w-sm space-y-4 rounded-3xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <HeroItemVisual item={enhancementItem} size={72} />
+              <div>
+                <h3 className="text-xl font-bold text-indigo-700">{enhancementItem.name} 강화</h3>
+                <p className="text-sm text-gray-500">현재 +{enhancement.level}강 · 누적 투자 {fmt(enhancement.invested)}{klass.currency}</p>
+              </div>
+            </div>
+            <div className="rounded-2xl bg-indigo-50 p-3 text-sm text-indigo-700">
+              <div>아이템 가치: <b>{fmt(itemPrice(enhancementItem.price, klass) + enhancement.invested)}{klass.currency}</b></div>
+              <div>환불 예상액: <b>{fmt(Math.floor((itemPrice(enhancementItem.price, klass) + enhancement.invested) * 0.5))}{klass.currency}</b></div>
+            </div>
+            {enhancementTarget <= HERO_ENHANCEMENT_MAX_LEVEL ? (
+              <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <div className="flex items-center justify-between"><b>+{enhancementTarget}강 도전</b><b>{fmt(enhancementCost)}{klass.currency}</b></div>
+                <div>성공 확률 {enhancementChance}% · 실패해도 비용은 아이템 가치에 누적</div>
+                {enhancementTarget === HERO_ENHANCEMENT_MAX_LEVEL && <div className="font-semibold text-fuchsia-600">성공하면 특수능력: 강화 전투력 +10</div>}
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-fuchsia-50 p-4 text-sm text-fuchsia-700">
+                +10강 달성! 특수능력 강화 전투력 +10이 적용되어 있어요.
+              </div>
+            )}
+            <div className="flex gap-2">
+              {enhancementTarget <= HERO_ENHANCEMENT_MAX_LEVEL && (
+                <button onClick={enhanceItem} disabled={enhancementBusy} className="flex-1 rounded-xl bg-amber-500 py-2 font-bold text-white disabled:bg-gray-300">
+                  {enhancementBusy ? '강화 중...' : `+${enhancementTarget}강 도전`}
+                </button>
+              )}
+              <button onClick={() => setEnhancementItemId(null)} disabled={enhancementBusy} className="flex-1 rounded-xl bg-gray-100 py-2 text-gray-500 disabled:opacity-50">닫기</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

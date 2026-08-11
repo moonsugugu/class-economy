@@ -204,6 +204,60 @@ export const HERO_GEAR_BY_SLOT = Object.fromEntries(HERO_SLOTS.map(([slot]) => [
   slot, gearItems.filter((item) => item.slot === slot),
 ]));
 
+export const HERO_ENHANCEMENT_MAX_LEVEL = 10;
+export const HERO_ENHANCEMENT_POWER_PER_LEVEL = 2;
+
+export function heroEnhancementCost(targetLevel) {
+  const level = clamp(Math.floor(Number(targetLevel) || 1), 1, HERO_ENHANCEMENT_MAX_LEVEL);
+  return level * 10;
+}
+
+export function heroEnhancementSuccessRate(targetLevel) {
+  const level = clamp(Math.floor(Number(targetLevel) || 1), 1, HERO_ENHANCEMENT_MAX_LEVEL);
+  return level === HERO_ENHANCEMENT_MAX_LEVEL ? 5 : 100 - level * 10;
+}
+
+export function heroEnhancementFor(raw = {}, itemId) {
+  const source = raw.enhancements?.[itemId] || {};
+  const level = clamp(Number(source.level) || 0, 0, HERO_ENHANCEMENT_MAX_LEVEL);
+  return {
+    level,
+    invested: Math.max(0, Math.floor(Number(source.invested) || 0)),
+    attempts: Math.max(0, Math.floor(Number(source.attempts) || 0)),
+    specialAbility: source.specialAbility && typeof source.specialAbility === 'object'
+      ? { ...source.specialAbility }
+      : null,
+  };
+}
+
+export function heroEnhancementSpecialFor(item, level) {
+  if (!item || Number(level) < HERO_ENHANCEMENT_MAX_LEVEL) return null;
+  return {
+    key: 'enhancementPower',
+    label: '강화 특수능력',
+    value: 10,
+  };
+}
+
+export function heroEnhancementStats(raw = {}, itemId) {
+  const item = HERO_ITEM_MAP[itemId];
+  const enhancement = heroEnhancementFor(raw, itemId);
+  const special = enhancement.specialAbility || heroEnhancementSpecialFor(item, enhancement.level);
+  return special ? [special] : [];
+}
+
+export function heroItemPower(item, enhancement = {}) {
+  if (!item) return 0;
+  const level = clamp(Number(enhancement.level) || 0, 0, HERO_ENHANCEMENT_MAX_LEVEL);
+  const specialPower = level >= HERO_ENHANCEMENT_MAX_LEVEL ? 10 : 0;
+  return Math.max(0, Number(item.power) || 0) + level * HERO_ENHANCEMENT_POWER_PER_LEVEL + specialPower;
+}
+
+export function heroItemValue(item, raw = {}) {
+  if (!item) return 0;
+  return Math.max(0, Number(item.price) || 0) + heroEnhancementFor(raw, item.id).invested;
+}
+
 export function heroDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -234,6 +288,18 @@ export function normalizeHero(raw = {}) {
     ? Object.fromEntries(Object.entries(raw.bossProgress)
       .map(([level, damage]) => [level, Math.max(0, Number(damage) || 0)]))
     : {};
+  const enhancements = raw.enhancements && typeof raw.enhancements === 'object'
+    ? Object.fromEntries(Object.entries(raw.enhancements)
+      .filter(([itemId]) => HERO_ITEM_MAP[itemId])
+      .map(([itemId, value]) => [itemId, {
+        level: clamp(Number(value?.level) || 0, 0, HERO_ENHANCEMENT_MAX_LEVEL),
+        invested: Math.max(0, Math.floor(Number(value?.invested) || 0)),
+        attempts: Math.max(0, Math.floor(Number(value?.attempts) || 0)),
+        specialAbility: value?.specialAbility && typeof value.specialAbility === 'object'
+          ? { ...value.specialAbility }
+          : null,
+      }]))
+    : {};
   const shop = raw.shop && typeof raw.shop === 'object' ? { ...raw.shop } : {};
   return {
     character,
@@ -242,6 +308,7 @@ export function normalizeHero(raw = {}) {
     nameChangeCount: Math.max(0, Number(raw.nameChangeCount) || 0),
     owned,
     equipment,
+    enhancements,
     bossProgress,
     clearedLevel: clamp(Number(raw.clearedLevel) || 0, 0, 100),
     battleDate: raw.battleDate || '',
@@ -261,12 +328,16 @@ export function heroDisplayName(raw) {
 
 export function heroPower(raw) {
   const hero = normalizeHero(raw);
-  const characterPower = HERO_ITEM_MAP[hero.character]?.power || 0;
+  const character = HERO_ITEM_MAP[hero.character];
+  const characterPower = heroItemPower(character, heroEnhancementFor(hero, hero.character));
   const gearPower = HERO_SLOTS.reduce((total, [slot]) => {
     const id = hero.equipment[slot];
-    return total + (HERO_ITEM_MAP[id]?.slot === slot ? HERO_ITEM_MAP[id].power : 0);
+    const item = HERO_ITEM_MAP[id];
+    return total + (item?.slot === slot ? heroItemPower(item, heroEnhancementFor(hero, id)) : 0);
   }, 0);
-  return characterPower + gearPower;
+  const pet = HERO_ITEM_MAP[hero.pet];
+  const petPower = pet?.slot === 'pet' ? heroItemPower(pet, heroEnhancementFor(hero, hero.pet)) : 0;
+  return characterPower + gearPower + petPower;
 }
 
 export function formatHeroSpecialStat(stat) {
@@ -372,14 +443,15 @@ export function heroDuelExtraCost(attempts) {
   return Math.max(0, Number(attempts) || 0) >= HERO_DUEL_LIMIT ? HERO_DUEL_EXTRA_COST : 0;
 }
 
-// 용사 배틀은 10단계 단위로 기본 보상이 올라가고, 각 구간의 보스는 기존 10배에서 줄여 일반 보상의 5배를 지급합니다.
-// 마지막 91~100단계 구간은 최종 도전을 위해 일반 보상 1,000, 최종 보스 5,000으로 설정합니다.
+// 용사 배틀은 10단계 단위로 기본 보상이 올라가고, 일반 보스는 기존 10배에서 줄여 일반 보상의 5배를 지급합니다.
+// 최종 보스만 최종 도전 보상으로 기존과 같은 10배를 지급합니다.
 export function heroBattleWinReward(level, boss = false, baseReward = 10) {
   const safeLevel = clamp(Math.floor(Number(level) || 1), 1, 100);
   const tier = Math.ceil(safeLevel / 10);
   const safeBaseReward = Math.max(0, Math.floor(Number(baseReward) || 0));
   const normalReward = tier === 10 ? safeBaseReward * 100 : safeBaseReward * tier;
-  return boss ? normalReward * 5 : normalReward;
+  if (!boss) return normalReward;
+  return safeLevel === 100 ? normalReward * 10 : normalReward * 5;
 }
 
 export function battleConfig(klass = {}) {

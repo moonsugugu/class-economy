@@ -1,4 +1,4 @@
-import { WEEK_MS } from './util.js';
+import { DAY_MS, WEEK_MS } from './util.js';
 import { loanLimitMultiplierFor, loanRateAdjustmentFor } from './economyEvents.js';
 
 export const LOAN_TERM_MS = WEEK_MS;
@@ -20,9 +20,20 @@ export function loanLimitFor(klass = {}) {
   return Math.floor(base * configured * loanLimitMultiplierFor(klass));
 }
 
-export function loanDueAmount(loan = {}) {
-  const principal = Math.max(0, Number(loan.principal) || 0);
+export function loanOverdueDays(loan = {}, now = Date.now()) {
+  const dueAt = Number(loan.dueAt) || 0;
+  if (!dueAt || now <= dueAt) return 0;
+  return Math.max(1, Math.ceil((now - dueAt) / DAY_MS));
+}
+
+export function loanInterestRate(loan = {}, now = Date.now()) {
   const rate = Math.max(0, Number(loan.rate) || 0);
+  return rate + loanOverdueDays(loan, now);
+}
+
+export function loanDueAmount(loan = {}, now = Date.now()) {
+  const principal = Math.max(0, Number(loan.principal) || 0);
+  const rate = loanInterestRate(loan, now);
   return principal + Math.floor(principal * rate / 100);
 }
 

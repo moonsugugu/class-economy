@@ -13,7 +13,7 @@ import {
   depositRateFor, withdrawalFeeFor, savingsSignupBonusFor,
 } from '../../lib/economyEvents.js';
 import {
-  BANKRUPTCY_GRANT, DEFAULT_LOAN_LIMIT, loanDueAmount, loanIsDue,
+  BANKRUPTCY_GRANT, DEFAULT_LOAN_LIMIT, loanDueAmount, loanInterestRate, loanIsDue,
   loanLimitFor, loanRateFor, LOAN_TERM_MS,
 } from '../../lib/loans.js';
 
@@ -250,15 +250,14 @@ export default function BankPage() {
         tx.update(studentRef, { cash: (Number(s.cash) || 0) + amt });
       });
       setLoanAmount('');
-      flash('ok', `대출 ${fmt(amt)}${klass.currency}이 실행됐어요. 7일 뒤 ${fmt(amt + Math.floor(amt * loanRateFor(klass) / 100))}${klass.currency}을 갚아야 해요.`);
+      flash('ok', `대출 ${fmt(amt)}${klass.currency}이 실행됐어요. 지금 갚아도 기본 이자율은 그대로 적용돼요.`);
     } catch (e) {
       flash('err', e.message);
     }
   };
 
   const repayLoan = async (loan) => {
-    if (!loanIsDue(loan)) return flash('err', '대출은 빌린 뒤 7일이 지나야 상환할 수 있어요.');
-    const due = loanDueAmount(loan);
+    const due = loanDueAmount(loan, clock);
     if (!window.confirm(`${fmt(due)}${klass.currency}을 상환할까요?`)) return;
     try {
       await runTransaction(db, async (tx) => {
@@ -266,7 +265,7 @@ export default function BankPage() {
         const latestLoan = (await tx.get(loanRef)).data() || {};
         const s = (await tx.get(studentRef)).data() || {};
         if (!['active', 'overdue'].includes(latestLoan.status)) throw new Error('이미 처리된 대출이에요.');
-        const latestDue = loanDueAmount(latestLoan);
+        const latestDue = loanDueAmount(latestLoan, Date.now());
         if ((Number(s.cash) || 0) < latestDue) throw new Error('현금이 부족해요.');
         tx.update(loanRef, { status: 'paid', paidAt: Date.now(), interest: latestDue - (Number(latestLoan.principal) || 0) });
         tx.update(studentRef, { cash: (Number(s.cash) || 0) - latestDue });
@@ -324,7 +323,7 @@ export default function BankPage() {
           <h3 className="text-xl text-indigo-700">💳 대출</h3>
           <span className="text-sm text-gray-500">주 이자 {fmt(loanRateFor(klass))}% · 한도 {fmt(loanLimit)} {klass.currency}</span>
         </div>
-        <p className="text-xs text-gray-400">대출일로부터 7일이 지나면 원금에 이자가 붙은 금액을 한 번에 상환해야 해요. 현재 가능 금액: <b className="text-indigo-600">{fmt(availableLoan)} {klass.currency}</b></p>
+        <p className="text-xs text-gray-400">언제든 상환할 수 있고 기본 이자율은 그대로 적용돼요. 만기 후에는 연체 일수마다 이자율이 1%p씩 올라가요. 현재 가능 금액: <b className="text-indigo-600">{fmt(availableLoan)} {klass.currency}</b></p>
         <div className="flex gap-2 flex-wrap">
           <input
             type="number"
@@ -339,16 +338,17 @@ export default function BankPage() {
         {currentLoans.length > 0 && (
           <div className="space-y-2 pt-1">
             {currentLoans.map((loan) => {
-              const due = loanDueAmount(loan);
+              const due = loanDueAmount(loan, clock);
               const dueNow = loanIsDue(loan, clock);
+              const currentRate = loanInterestRate(loan, clock);
               return (
                 <div key={loan.id} className={`rounded-2xl border-2 p-3 ${dueNow ? 'border-rose-200 bg-rose-50' : 'border-indigo-100 bg-indigo-50/50'}`}>
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex-1 text-sm">
                       <b>{fmt(loan.principal)} {klass.currency}</b> 대출 · 상환액 <b>{fmt(due)} {klass.currency}</b>
-                      <div className="text-xs text-gray-500 mt-1">{dueNow ? '상환 가능' : `${new Date(loan.dueAt).toLocaleDateString('ko-KR')}부터 상환 가능`}</div>
+                      <div className="text-xs text-gray-500 mt-1">{dueNow ? `연체 이자율 ${fmt(currentRate)}%` : `미리 상환 가능 · ${new Date(loan.dueAt).toLocaleDateString('ko-KR')} 만기 · 이자율 ${fmt(currentRate)}%`}</div>
                     </div>
-                    <button onClick={() => repayLoan(loan)} disabled={!dueNow} className="rounded-xl px-3 py-2 text-sm bg-rose-500 text-white disabled:bg-gray-300">상환하기</button>
+                    <button onClick={() => repayLoan(loan)} className="rounded-xl px-3 py-2 text-sm bg-rose-500 text-white">상환하기</button>
                   </div>
                 </div>
               );

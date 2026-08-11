@@ -5,7 +5,7 @@ import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import {
   HERO_ITEMS, HERO_SLOTS, HERO_PETS, HERO_PET_SLOT, HERO_RARITIES, HERO_SHOP_REFRESH_LIMIT,
-  normalizeHero, formatHeroSpecialStats, heroDateKey, heroShopFor,
+  normalizeHero, formatHeroSpecialStats, heroDateKey, heroShopFor, heroEnhancementFor,
 } from '../../lib/hero';
 import HeroPreview from '../../three/Hero3D.jsx';
 import { HeroItemVisual, HeroRarityBadge } from '../../components/HeroItemVisual.jsx';
@@ -128,13 +128,19 @@ export default function HeroShopPage() {
   };
 
   const refund = async (item) => {
-    const refundPrice = Math.floor(costOf(item) * 0.5);
+    const enhancement = heroEnhancementFor(hero, item.id);
+    const refundPrice = Math.floor((costOf(item) + enhancement.invested) * 0.5);
     if (!confirm(`'${item.name}'을(를) ${refundPrice}${klass.currency}에 환불할까요?`)) return;
     setBusyId(item.id);
     try {
+      let refundResult = refundPrice;
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
         const current = normalizeHero(s.rpg);
+        const settings = { ...klass, ...((await tx.get(doc(db, 'classes', klass.id))).data() || {}) };
+        const currentPrice = itemPrice(item.price, settings);
+        const currentEnhancement = heroEnhancementFor(current, item.id);
+        refundResult = Math.floor((currentPrice + currentEnhancement.invested) * 0.5);
         if (!current.owned.includes(item.id)) throw new Error('환불할 아이템을 찾지 못했어요.');
         const next = {
           ...current,
@@ -144,7 +150,8 @@ export default function HeroShopPage() {
         };
         if (item.slot === 'pet' && next.pet === item.id) next.pet = null;
         if (item.slot !== 'pet' && next.equipment[item.slot] === item.id) delete next.equipment[item.slot];
-        tx.update(studentRef, { cash: (s.cash || 0) + refundPrice, rpg: next });
+        delete next.enhancements[item.id];
+        tx.update(studentRef, { cash: (s.cash || 0) + refundResult, rpg: next });
       });
       flash('ok', `♻️ ${item.name} 환불 완료! 50%를 돌려받았어요.`);
     } catch (e) {
@@ -156,6 +163,7 @@ export default function HeroShopPage() {
 
   const card = (item, available = true) => {
     const owned = hero.owned.includes(item.id);
+    const enhancement = heroEnhancementFor(hero, item.id);
     const price = costOf(item);
     const tax = taxForPart(price, klass, 'item').tax;
     const total = price + tax;
@@ -196,7 +204,7 @@ export default function HeroShopPage() {
               {equipped ? '장착 중 ✓' : '장착하기'}
             </button>
             <button onClick={() => refund(item)} disabled={busyId === item.id} className="text-xs text-rose-500 underline">
-              50% 환불 ({fmt(Math.floor(price * 0.5))})
+              50% 환불 ({fmt(Math.floor((price + enhancement.invested) * 0.5))})
             </button>
           </div>
         ) : (

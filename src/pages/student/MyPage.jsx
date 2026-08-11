@@ -10,7 +10,7 @@ import { PROFILE_ITEMS, PROFILE_SLOTS, normalizeProfileOwned } from '../../lib/p
 import { itemPrice } from '../../lib/pricing';
 import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
 import { ITEM_MAP } from '../../lib/items';
-import { HERO_ITEM_MAP } from '../../lib/hero';
+import { HERO_ITEM_MAP, heroItemValue } from '../../lib/hero';
 import { loanDueAmount } from '../../lib/loans.js';
 
 export default function MyPage() {
@@ -150,7 +150,7 @@ export default function MyPage() {
     0
   );
   const heroItemSpending = (student.rpg?.owned || []).reduce(
-    (sum, itemId) => sum + (Number(HERO_ITEM_MAP[itemId]?.price) || 0),
+    (sum, itemId) => sum + heroItemValue(HERO_ITEM_MAP[itemId], student.rpg),
     0
   );
 
