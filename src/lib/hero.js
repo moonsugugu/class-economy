@@ -329,7 +329,7 @@ export const HERO_EXTRA_BATTLE_COST = 15;
 export function heroExtraBattleCost(attempts, limit = 10) {
   const used = Math.max(0, Math.floor(Number(attempts) || 0));
   const baseLimit = Math.max(1, Math.floor(Number(limit) || 10));
-  return HERO_EXTRA_BATTLE_COST + Math.max(0, used - baseLimit);
+  return HERO_EXTRA_BATTLE_COST + Math.max(0, used - baseLimit) * 3;
 }
 
 export const HERO_DUEL_LIMIT = 10;
