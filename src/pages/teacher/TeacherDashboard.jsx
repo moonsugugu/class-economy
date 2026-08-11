@@ -53,7 +53,7 @@ const firstNumber = (value) => {
   return found ? Number(found[0]) : null;
 };
 
-const sortStudents = (students, mode) => {
+const sortStudents = (students, mode, metrics = new Map(), direction = 'asc') => {
   const list = [...students];
   if (mode === 'custom') {
     return list.sort((a, b) => {
@@ -63,16 +63,37 @@ const sortStudents = (students, mode) => {
     });
   }
   if (mode === 'number') {
+    const factor = direction === 'desc' ? -1 : 1;
     return list.sort((a, b) => {
       const an = firstNumber(a.name);
       const bn = firstNumber(b.name);
-      if (an !== null && bn !== null && an !== bn) return an - bn;
-      if (an !== null && bn === null) return -1;
-      if (an === null && bn !== null) return 1;
+      if (an !== null && bn !== null && an !== bn) return (an - bn) * factor;
+      if (an !== null && bn === null) return -1 * factor;
+      if (an === null && bn !== null) return 1 * factor;
       return naturalCollator.compare(a.name || '', b.name || '');
     });
   }
-  return list.sort((a, b) => koCollator.compare(a.name || '', b.name || ''));
+  const metricKey = {
+    stage: 'stage',
+    total: 'total',
+    cash: 'cash',
+    deposit: 'deposit',
+    savings: 'savings',
+    stocks: 'stocks',
+    loan: 'loan',
+    space: 'spaceSpending',
+    hero: 'heroItemSpending',
+  }[mode];
+  if (metricKey) {
+    const factor = direction === 'desc' ? -1 : 1;
+    return list.sort((a, b) => {
+      const av = Number(metrics.get(a.id)?.[metricKey]) || 0;
+      const bv = Number(metrics.get(b.id)?.[metricKey]) || 0;
+      return (av - bv) * factor || naturalCollator.compare(a.name || '', b.name || '');
+    });
+  }
+  const factor = direction === 'desc' ? -1 : 1;
+  return list.sort((a, b) => koCollator.compare(a.name || '', b.name || '') * factor);
 };
 
 export default function TeacherDashboard() {
@@ -288,6 +309,7 @@ function StudentsTab({ klass }) {
   const [reason, setReason] = useState('');
   const [msg, setMsg] = useState('');
   const [sortMode, setSortMode] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
   const [draggingId, setDraggingId] = useState(null);
   const [resettingHeroId, setResettingHeroId] = useState('');
 
@@ -318,7 +340,6 @@ function StudentsTab({ klass }) {
 
   const activeStudents = useMemo(() => students.filter(isActiveStudent), [students]);
   const archivedStudents = useMemo(() => students.filter((s) => !isActiveStudent(s)), [students]);
-  const sortedStudents = useMemo(() => sortStudents(activeStudents, sortMode), [activeStudents, sortMode]);
   const savingsByStudent = useMemo(() => {
     const totals = new Map();
     accounts.forEach((account) => {
@@ -365,11 +386,13 @@ function StudentsTab({ klass }) {
   };
 
   const assetBreakdownOf = (student) => {
+    const hero = normalizeHero(student.rpg);
     const savings = savingsByStudent.get(student.id) || 0;
     const stocks = stockValueOf(student);
     const studentAccounts = accounts.filter((account) => account.studentId === student.id);
     const studentLoans = loans.filter((loan) => loan.studentId === student.id);
     return {
+      stage: hero.character ? hero.clearedLevel : -1,
       total: netAssets(student, marketStocks, fx, kpu, studentAccounts, studentLoans),
       cash: Number(student.cash) || 0,
       deposit: Number(student.deposit) || 0,
@@ -380,6 +403,15 @@ function StudentsTab({ klass }) {
       loan: loansByStudent.get(student.id) || 0,
     };
   };
+
+  const assetByStudent = useMemo(
+    () => new Map(activeStudents.map((student) => [student.id, assetBreakdownOf(student)])),
+    [activeStudents, accounts, loans, market, klass.krwPerUnit, savingsByStudent, loansByStudent]
+  );
+  const sortedStudents = useMemo(
+    () => sortStudents(activeStudents, sortMode, assetByStudent, sortDirection),
+    [activeStudents, sortMode, assetByStudent, sortDirection]
+  );
 
   const toggle = (id) => setSelected((s) => {
     const n = new Set(s);
@@ -505,6 +537,7 @@ function StudentsTab({ klass }) {
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
     setSortMode('custom');
+    setSortDirection('asc');
     setStudents((prev) => prev.map((s) => {
       const found = next.find((n) => n.id === s.id);
       return found ? { ...s, sortOrder: next.findIndex((n) => n.id === s.id) + 1 } : s;
@@ -512,6 +545,27 @@ function StudentsTab({ klass }) {
     await saveCustomOrder(next);
     flash('↕️ 학생 순서를 저장했어요.');
   };
+
+  const selectSort = (mode) => {
+    if (sortMode === mode && mode !== 'custom') {
+      setSortDirection((current) => current === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    setSortMode(mode);
+    setSortDirection('asc');
+  };
+
+  const sortHeader = (label, mode, align = 'text-right') => (
+    <button
+      type="button"
+      onClick={() => selectSort(mode)}
+      className={`w-full ${align} font-semibold hover:text-indigo-500 transition`}
+      title={`${label} 기준으로 정렬`}
+    >
+      {label}
+      {sortMode === mode && <span className="ml-0.5 text-indigo-500">{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+    </button>
+  );
 
   // ⚡ 빠른 지급: 버튼 한 번으로 선택 학생에게 즉시 지급
   const quickGive = async (amt) => {
@@ -586,7 +640,7 @@ function StudentsTab({ klass }) {
           ].map(([mode, label]) => (
             <button
               key={mode}
-              onClick={() => setSortMode(mode)}
+              onClick={() => selectSort(mode)}
               className={`rounded-xl px-3 py-1.5 text-sm transition ${
                 sortMode === mode ? 'bg-indigo-500 text-white shadow' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
               }`}
@@ -600,6 +654,9 @@ function StudentsTab({ klass }) {
           <span className="basis-full text-xs text-gray-400">
             총자산은 현금·예금·적금·주식과 원화/달러 환산액에서 미상환 대출을 뺀 순자산이에요. 공간 지출비와 용사 아이템비는 보유 아이템 가격표 기준입니다.
           </span>
+          <span className="basis-full text-xs text-gray-400">
+            표의 열 제목을 누르면 해당 기준으로 정렬되고, 같은 열을 다시 누르면 반대 순서로 바뀝니다.
+          </span>
         </div>
         <div className="overflow-hidden rounded-2xl border border-gray-100">
           <table className="w-full table-fixed text-left text-[10px] leading-tight">
@@ -607,22 +664,22 @@ function StudentsTab({ klass }) {
               <tr className="border-b bg-gray-50 text-gray-400">
                 <th className="w-[3%] px-1 py-2"></th>
                 <th className="w-[3%] px-1 py-2"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4" /></th>
-                <th className="w-[12%] px-1 py-2 text-left">이름</th>
-                <th className="w-[7%] px-1 py-2 text-center">용사 단계</th>
-                <th className="w-[8%] px-1 py-2 text-right">총자산</th>
-                <th className="w-[7%] px-1 py-2 text-right">현금</th>
-                <th className="w-[7%] px-1 py-2 text-right">예금</th>
-                <th className="w-[7%] px-1 py-2 text-right">적금</th>
-                <th className="w-[8%] px-1 py-2 text-right">주식</th>
-                <th className="w-[7%] px-1 py-2 text-right">대출</th>
-                <th className="w-[8%] px-1 py-2 text-right">공간비</th>
-                <th className="w-[8%] px-1 py-2 text-right">용사비</th>
+                <th className="w-[12%] px-1 py-2 text-left">{sortHeader('이름', 'name', 'text-left')}</th>
+                <th className="w-[7%] px-1 py-2 text-center">{sortHeader('용사 단계', 'stage', 'text-center')}</th>
+                <th className="w-[8%] px-1 py-2 text-right">{sortHeader('총자산', 'total')}</th>
+                <th className="w-[7%] px-1 py-2 text-right">{sortHeader('현금', 'cash')}</th>
+                <th className="w-[7%] px-1 py-2 text-right">{sortHeader('예금', 'deposit')}</th>
+                <th className="w-[7%] px-1 py-2 text-right">{sortHeader('적금', 'savings')}</th>
+                <th className="w-[8%] px-1 py-2 text-right">{sortHeader('주식', 'stocks')}</th>
+                <th className="w-[7%] px-1 py-2 text-right">{sortHeader('대출', 'loan')}</th>
+                <th className="w-[8%] px-1 py-2 text-right">{sortHeader('공간비', 'space')}</th>
+                <th className="w-[8%] px-1 py-2 text-right">{sortHeader('용사비', 'hero')}</th>
                 <th className="w-[10%] px-1 py-2 text-right">관리</th>
               </tr>
             </thead>
             <tbody>
               {sortedStudents.map((s) => {
-                const asset = assetBreakdownOf(s);
+                const asset = assetByStudent.get(s.id) || assetBreakdownOf(s);
                 return (
                   <tr
                     key={s.id}
