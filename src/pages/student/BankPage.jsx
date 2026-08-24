@@ -17,6 +17,16 @@ import {
   loanLimitFor, loanRateFor, LOAN_TERM_MS,
 } from '../../lib/loans.js';
 
+const numberOf = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+};
+
+const millisOf = (value) => {
+  if (value && typeof value.toMillis === 'function') return value.toMillis();
+  return numberOf(value);
+};
+
 export default function BankPage() {
   const { klass, student } = useOutletContext();
   const [fx, setFx] = useState(DEFAULT_FX);
@@ -133,19 +143,21 @@ export default function BankPage() {
     if (!amt) return flash('err', '금액을 입력해 주세요.');
     try {
       await runTransaction(db, async (tx) => {
-        const s = (await tx.get(studentRef)).data();
+        const s = (await tx.get(studentRef)).data() || {};
+        const cash = numberOf(s.cash);
+        const deposit = numberOf(s.deposit);
         if (dir > 0) {
-          if (s.cash < amt) throw new Error('현금이 부족해요.');
+          if (cash < amt) throw new Error('현금이 부족해요.');
           tx.update(studentRef, {
-            cash: s.cash - amt,
-            deposit: s.deposit + amt,
+            cash: cash - amt,
+            deposit: deposit + amt,
             // 첫 입금이면 이자 시계를 지금부터 시작
-            ...(s.deposit === 0 ? { depositLastAt: Date.now() } : {}),
+            ...(deposit <= 0 ? { depositLastAt: Date.now() } : {}),
           });
         } else {
-          if (s.deposit < amt) throw new Error('예금이 부족해요.');
+          if (deposit < amt) throw new Error('예금이 부족해요.');
           if (withdrawalFee > amt) throw new Error(`출금 수수료 ${fmt(withdrawalFee)}보다 적은 금액은 출금할 수 없어요.`);
-          tx.update(studentRef, { cash: s.cash + amt - withdrawalFee, deposit: s.deposit - amt });
+          tx.update(studentRef, { cash: cash + amt - withdrawalFee, deposit: deposit - amt });
         }
       });
       setAmount('');
@@ -155,21 +167,26 @@ export default function BankPage() {
     }
   };
 
-  const weeks = student.deposit > 0
-    ? Math.floor((Date.now() - (student.depositLastAt || Date.now())) / WEEK_MS)
+  const depositBalance = numberOf(student.deposit);
+  const depositStartedAt = millisOf(student.depositLastAt) || clock;
+  const weeks = depositBalance > 0
+    ? Math.floor(Math.max(0, clock - depositStartedAt) / WEEK_MS)
     : 0;
-  const pendingInterest = Math.floor(student.deposit * (depositRate / 100) * weeks);
+  const pendingInterest = Math.floor(depositBalance * (depositRate / 100) * weeks);
 
   const claimInterest = async () => {
     try {
       await runTransaction(db, async (tx) => {
-        const s = (await tx.get(studentRef)).data();
-        const w = Math.floor((Date.now() - (s.depositLastAt || Date.now())) / WEEK_MS);
-        const interest = Math.floor(s.deposit * (depositRate / 100) * w);
+        const s = (await tx.get(studentRef)).data() || {};
+        const deposit = numberOf(s.deposit);
+        const now = Date.now();
+        const startedAt = millisOf(s.depositLastAt) || now;
+        const w = Math.floor(Math.max(0, now - startedAt) / WEEK_MS);
+        const interest = Math.floor(deposit * (depositRate / 100) * w);
         if (w < 1 || interest < 1) throw new Error('아직 이자가 쌓이지 않았어요. 7일마다 이자가 생겨요!');
         tx.update(studentRef, {
-          deposit: s.deposit + interest,
-          depositLastAt: (s.depositLastAt || Date.now()) + w * WEEK_MS,
+          deposit: deposit + interest,
+          depositLastAt: startedAt + w * WEEK_MS,
         });
       });
       flash('ok', '💸 이자를 받았어요!');

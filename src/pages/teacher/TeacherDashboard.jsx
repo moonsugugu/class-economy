@@ -9,7 +9,7 @@ import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 import { fmt, makeClassCode, netAssets } from '../../lib/util';
 import {
-  changePct, advance, usedTicks, makeInitialMarket, makeCustomStock, mergeSeedStocks,
+  changePct, advance, usedTicks, makeInitialMarket, makeCustomStock, mergeSeedStocks, normalizeStocks,
   MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, MAX_TICK_LIMIT, normalizedTickLimit, AUTO_TICK_MS, DEFAULT_FX, todayKey,
   pendingSchedule, SCHEDULE_LABEL, fetchRealQuotes, applyRealPrices,
   DEFAULT_KRW_PER_UNIT,
@@ -982,15 +982,31 @@ function AlertsTab({ klass }) {
   const [paymentRequests, setPaymentRequests] = useState([]);
   const [busyId, setBusyId] = useState('');
   const [msg, setMsg] = useState('');
+  const [purchasesOpen, setPurchasesOpen] = useState(true);
+
+  const createdAtOf = (record) => {
+    const explicit = Number(record.createdAtMs);
+    if (Number.isFinite(explicit) && explicit > 0) return explicit;
+    if (record.createdAt && typeof record.createdAt.toMillis === 'function') return record.createdAt.toMillis();
+    return Number(record.createdAt) || 0;
+  };
 
   useEffect(() => {
-    const q = query(collection(db, 'classes', klass.id, 'purchases'), orderBy('createdAt', 'desc'));
-    return onSnapshot(q, (snap) => setPurchases(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const q = query(collection(db, 'classes', klass.id, 'purchases'));
+    return onSnapshot(q, (snap) => setPurchases(
+      snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => createdAtOf(b) - createdAtOf(a))
+    ));
   }, [klass.id]);
 
   useEffect(() => {
-    const q = query(collection(db, 'classes', klass.id, 'paymentRequests'), orderBy('createdAtMs', 'desc'));
-    return onSnapshot(q, (snap) => setPaymentRequests(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const q = query(collection(db, 'classes', klass.id, 'paymentRequests'));
+    return onSnapshot(q, (snap) => setPaymentRequests(
+      snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => createdAtOf(b) - createdAtOf(a))
+    ));
   }, [klass.id]);
 
   const approvePaymentRequest = async (request) => {
@@ -1096,6 +1112,24 @@ function AlertsTab({ klass }) {
     }
   };
 
+  const deletePurchaseNotice = async (purchase) => {
+    if (busyId) return;
+    const detail = purchase.status === 'pending'
+      ? '\n아직 처리하지 않은 구매라서 알림만 삭제되고 구매 상태·재고는 그대로 남아요.'
+      : '';
+    if (!confirm(`'${purchase.studentName || '학생'}' 학생의 '${purchase.productName || '상품'}' 구매 알림을 삭제할까요?${detail}`)) return;
+    const key = `delete-purchase:${purchase.id}`;
+    setBusyId(key);
+    try {
+      await deleteDoc(doc(db, 'classes', klass.id, 'purchases', purchase.id));
+    } catch (error) {
+      setMsg(`구매 알림 삭제 실패: ${error.message}`);
+      window.setTimeout(() => setMsg(''), 3500);
+    } finally {
+      setBusyId('');
+    }
+  };
+
   return (
     <div className={card}>
       <h3 className="mb-4 text-xl">🔔 알림·지급요청</h3>
@@ -1115,8 +1149,17 @@ function AlertsTab({ klass }) {
         ))}
         {!paymentRequests.length && <div className="py-2 text-center text-sm text-gray-400">지급요청이 없어요.</div>}
       </div>
-      <h4 className="mb-3 text-lg text-gray-700">🛒 학생 구매 알림</h4>
-      <div className="space-y-2">
+      <div className="mb-3 flex items-center gap-2">
+        <h4 className="text-lg text-gray-700">🛒 학생 구매 알림 <span className="text-sm font-normal text-gray-400">({purchases.length})</span></h4>
+        <button
+          type="button"
+          onClick={() => setPurchasesOpen((open) => !open)}
+          className="ml-auto rounded-xl bg-gray-100 px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-200"
+        >
+          {purchasesOpen ? '접기' : '펼치기'}
+        </button>
+      </div>
+      {purchasesOpen && <div className="space-y-2">
         {purchases.map((o) => (
           <div
             key={o.id}
@@ -1153,10 +1196,19 @@ function AlertsTab({ klass }) {
             ) : (
               <span className="shrink-0 text-sm">{o.status === 'rejected' ? '구매 반려 · 환불 완료' : '지급 완료'}</span>
             )}
+            <button
+              type="button"
+              onClick={() => deletePurchaseNotice(o)}
+              disabled={Boolean(busyId)}
+              title="구매 알림 삭제"
+              className="shrink-0 rounded-lg px-2 py-1 text-gray-300 hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40"
+            >
+              🗑️
+            </button>
           </div>
         ))}
         {!purchases.length && <div className="text-gray-400 text-center py-8">아직 구매 내역이 없어요.</div>}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -1214,11 +1266,20 @@ function StocksTab({ klass }) {
   useEffect(() => {
     if (!market?.stocks) return;
     const stocks = mergeSeedStocks(market.stocks);
-    if (stocks.length === market.stocks.length) return;
+    const needsRepair = stocks.length !== market.stocks.length
+      || stocks.some((stock, index) => (
+        stock.symbol !== market.stocks[index]?.symbol
+        || stock.name !== market.stocks[index]?.name
+      ));
+    if (!needsRepair) return;
     updateDoc(mref, { stocks, updatedAt: Date.now() })
-      .then(() => flash(`📈 새 한국·미국 종목 ${stocks.length - market.stocks.length}개를 추가했어요!`))
+      .then(() => flash(
+        stocks.length > market.stocks.length
+          ? `📈 새 한국·미국 종목 ${stocks.length - market.stocks.length}개를 추가하고 종목명을 정리했어요!`
+          : '📈 잘못 표시되던 주식 이름을 정리했어요!'
+      ))
       .catch((e) => flash('⚠️ 새 종목을 추가하지 못했어요: ' + e.message));
-  }, [market?.stocks?.length, klass.id]);
+  }, [market?.stocks, klass.id]);
 
   // 예약 시세 변동(아침 8:30 · 오후 3:00)이 밀려 있으면 적용
   useEffect(() => {
@@ -1378,8 +1439,9 @@ function StocksTab({ klass }) {
     );
   }
 
-  const list = (market.stocks || []).filter((s) => filter === 'ALL' || s.market === filter);
-  const customCount = (market.stocks || []).filter((s) => s.market === 'CUSTOM').length;
+  const displayStocks = normalizeStocks(market.stocks || []);
+  const list = displayStocks.filter((s) => filter === 'ALL' || s.market === filter);
+  const customCount = displayStocks.filter((s) => s.market === 'CUSTOM').length;
   const stockPriceLabels = (stock) => {
     const price = Math.max(0, Number(stock.price) || 0);
     const fx = Number(market.fx) || DEFAULT_FX;

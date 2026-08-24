@@ -47,6 +47,33 @@ export const STOCK_SEED = [
   { symbol: 'INTC', name: '인텔', market: 'US', base: 25 },
 ];
 
+const STOCK_SEED_BY_SYMBOL = new Map(STOCK_SEED.map((stock) => [stock.symbol, stock]));
+
+const isBrokenStockName = (value) => {
+  const name = String(value || '').trim();
+  return !name || /^[?？\s]+$/.test(name);
+};
+
+/** 예전 시장 문서에 이름이 비어 있거나 ???로 저장된 종목을 표시 가능한 이름으로 복구합니다. */
+export function stockNameFor(stock = {}) {
+  const symbol = stock.symbol || stock.id;
+  if (!isBrokenStockName(stock.name)) return String(stock.name).trim();
+  return STOCK_SEED_BY_SYMBOL.get(symbol)?.name || `우리 반 종목 (${symbol || '이름 없음'})`;
+}
+
+export function normalizeStock(stock = {}) {
+  const symbol = stock.symbol || stock.id;
+  return {
+    ...stock,
+    ...(symbol ? { symbol } : {}),
+    name: stockNameFor({ ...stock, symbol }),
+  };
+}
+
+export function normalizeStocks(stocks = []) {
+  return (Array.isArray(stocks) ? stocks : []).map(normalizeStock);
+}
+
 // 랜덤워크: 한 틱에 최대 ±3% 변동
 export function nextPrice(price) {
   const change = (Math.random() - 0.5) * 0.06;
@@ -98,14 +125,15 @@ export function makeInitialMarket() {
 
 /** 기존 시장 문서를 보존하면서 새 기본 종목만 뒤에 추가합니다. */
 export function mergeSeedStocks(stocks = []) {
-  const existing = new Set(stocks.map((s) => s.symbol));
+  const normalized = normalizeStocks(stocks);
+  const existing = new Set(normalized.map((s) => s.symbol));
   const additions = STOCK_SEED
     .filter((s) => !existing.has(s.symbol))
     .map((s) => ({
       symbol: s.symbol, name: s.name, market: s.market,
       price: s.base, prevClose: s.base, history: [s.base],
     }));
-  return [...stocks, ...additions];
+  return [...normalized, ...additions];
 }
 
 /** 선생님이 직접 만드는 우리 반 종목 */

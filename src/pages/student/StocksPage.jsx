@@ -9,6 +9,7 @@ import { fmt, periodKeys, rankAssets } from '../../lib/util';
 import {
   changePct, MARKET_PATH, MARKET_LABEL, DEFAULT_FX, DEFAULT_KRW_PER_UNIT,
   pendingSchedule, SCHEDULE_LABEL, stockCur, WALLET_FIELD,
+  normalizeStocks,
 } from '../../lib/stocks';
 import { applyScheduledTicks } from '../../lib/marketSync';
 import { isActiveStudent } from '../../lib/studentState';
@@ -42,7 +43,7 @@ export default function StocksPage() {
   const [msg, setMsg] = useState(null);
   const [filter, setFilter] = useState('ALL');
 
-  const stocks = (market?.stocks || []).map((s) => ({ id: s.symbol, ...s }));
+  const stocks = normalizeStocks(market?.stocks || []).map((s) => ({ id: s.symbol, ...s }));
   const fx = market?.fx || DEFAULT_FX;
 
   // 시장 전체가 문서 1개 — 읽기 비용이 예전의 1/20이에요

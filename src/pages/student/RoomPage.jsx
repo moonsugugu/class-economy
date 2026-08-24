@@ -54,6 +54,7 @@ function RoomInner({ klass, student }) {
   const [msg, setMsg] = useState(null);
   const [previewItem, setPreviewItem] = useState(null);
   const [spaceBusy, setSpaceBusy] = useState(null);
+  const [refundBusy, setRefundBusy] = useState(null);
   const glRef = useRef(null);
 
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
@@ -286,17 +287,27 @@ function RoomInner({ klass, student }) {
     updateDoc(studentRef, { [`roomSkin.${item.slot}`]: skin[item.slot] === item.id ? null : item.id });
 
   const refundItem = async (item) => {
-    const refundPrice = Math.floor(costOf(item) * 0.5);
-    if (!confirm(`'${item.name}'을(를) 구매가의 50%인 ${fmt(refundPrice)}${klass.currency}에 환불할까요?`)) return;
+    if (refundBusy) return;
+    const previewRefund = Math.floor(costOf(item) * 0.5);
+    if (!confirm(`'${item.name}'을(를) 구매가의 50%인 ${fmt(previewRefund)}${klass.currency}에 환불할까요?`)) return;
+    setRefundBusy(`${item.id}:${item.inventoryIndex}`);
     try {
+      let refundPrice = previewRefund;
       await runTransaction(db, async (tx) => {
-        const s = (await tx.get(studentRef)).data();
+        const studentSnap = await tx.get(studentRef);
+        const classSnap = await tx.get(classRef);
+        const s = studentSnap.data() || {};
+        const settings = { ...klass, ...(classSnap.data() || {}) };
+        const catalogItem = ITEM_MAP[item.id] || item;
+        refundPrice = Math.floor(itemPrice(catalogItem.price, settings) * 0.5);
         const inv = [...(s.inventory || [])];
-        const inventoryIndex = inv.indexOf(item.id);
+        const inventoryIndex = Number.isInteger(item.inventoryIndex) && inv[item.inventoryIndex] === item.id
+          ? item.inventoryIndex
+          : inv.indexOf(item.id);
         if (inventoryIndex < 0) throw new Error('환불할 아이템을 찾지 못했어요.');
         inv.splice(inventoryIndex, 1);
         const upd = {
-          cash: (s.cash || 0) + refundPrice,
+          cash: (Number(s.cash) || 0) + refundPrice,
           inventory: inv,
         };
 
@@ -304,7 +315,9 @@ function RoomInner({ klass, student }) {
           const map = normalizeRoom(s[sp]);
           const placedKey = Object.keys(map).find((key) => map[key].id === item.id);
           if (placedKey) {
-            upd[`${sp}.${placedKey}`] = deleteField();
+            const nextMap = { ...map };
+            delete nextMap[placedKey];
+            upd[sp] = nextMap;
             break;
           }
         }
@@ -314,9 +327,23 @@ function RoomInner({ klass, student }) {
           if (walkingIndex >= 0) nextWalking.splice(walkingIndex, 1);
           upd.walking = nextWalking;
         }
-        if (item.slot === 'char' && s.avatar?.base === item.base) upd['avatar.base'] = deleteField();
-        if (s.avatar?.[item.slot] === item.id) upd[`avatar.${item.slot}`] = deleteField();
-        if (s.roomSkin?.[item.slot] === item.id) upd[`roomSkin.${item.slot}`] = deleteField();
+        const nextAvatar = { ...(s.avatar || {}) };
+        let avatarChanged = false;
+        if (item.slot === 'char' && nextAvatar.base === item.base) {
+          delete nextAvatar.base;
+          avatarChanged = true;
+        }
+        if (nextAvatar[item.slot] === item.id) {
+          delete nextAvatar[item.slot];
+          avatarChanged = true;
+        }
+        if (avatarChanged) upd.avatar = nextAvatar;
+
+        const nextSkin = { ...(s.roomSkin || {}) };
+        if (nextSkin[item.slot] === item.id) {
+          delete nextSkin[item.slot];
+          upd.roomSkin = nextSkin;
+        }
         tx.update(studentRef, upd);
       });
       setSelected(null);
@@ -324,6 +351,8 @@ function RoomInner({ klass, student }) {
       flash('ok', `♻️ '${item.name}' 환불 완료! 구매가의 50%를 돌려받았어요.`);
     } catch (e) {
       flash('err', e.message);
+    } finally {
+      setRefundBusy(null);
     }
   };
 
@@ -560,7 +589,9 @@ function RoomInner({ klass, student }) {
                     <div className="min-w-0 flex-1">
                       <div className="text-[11px] truncate">{item.name}</div>
                       <div className="text-[10px] text-emerald-600">+{fmt(Math.floor(costOf(item) * 0.5))} {klass.currency}</div>
-                      <button onClick={() => refundItem(item)} className="text-[10px] text-rose-500 underline">환불하기</button>
+                      <button onClick={() => refundItem(item)} disabled={Boolean(refundBusy)} className="text-[10px] text-rose-500 underline disabled:opacity-40">
+                        {refundBusy === `${item.id}:${item.inventoryIndex}` ? '처리 중...' : '환불하기'}
+                      </button>
                     </div>
                   </div>
                 ))}
