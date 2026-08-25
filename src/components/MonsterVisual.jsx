@@ -29,8 +29,8 @@ export default function MonsterVisual({ monster, size = 132 }) {
         </div>
         <span className="monster-mark">{MARKS[visual.mark || 0]}</span>
       </div>
-      <span className="monster-glyph">{visual.emoji || monster?.emoji || '👾'}</span>
-      {monster?.boss && <span className="monster-crown">♛</span>}
+      <span className="monster-glyph">{MARKS[visual.mark || 0]}</span>
+      {monster?.boss && <span className="monster-crown">BOSS</span>}
     </div>
   );
 }

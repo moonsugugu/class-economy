@@ -7,7 +7,7 @@ import {
   HERO_ITEMS, HERO_SLOTS, HERO_PETS, HERO_PET_SLOT, HERO_RARITIES, HERO_SHOP_REFRESH_LIMIT,
   normalizeHero, formatHeroSpecialStats, heroDateKey, heroShopFor, heroEnhancementFor,
 } from '../../lib/hero';
-import HeroPreview from '../../three/Hero3D.jsx';
+import HeroCardVisual from '../../components/HeroCardVisual.jsx';
 import { HeroItemVisual, HeroRarityBadge } from '../../components/HeroItemVisual.jsx';
 import { itemPrice, pricePolicyLabel } from '../../lib/pricing';
 import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
@@ -177,23 +177,23 @@ export default function HeroShopPage() {
     return (
       <div
         key={item.id}
-        className={`relative overflow-hidden rounded-3xl border-2 bg-gradient-to-br p-4 text-center shadow-lg transition hover:-translate-y-0.5 ${item.rarity === 'transcendent' ? 'hero-card-transcendent' : (rarity?.surface || 'from-indigo-50 via-white to-pink-100')} ${rarity?.border || 'border-indigo-200'} ${owned ? 'ring-2 ring-emerald-300 ring-offset-2' : ''} ${!available ? 'opacity-70' : ''}`}
+        className={`hero-shop-card relative overflow-hidden rounded-3xl border-2 p-4 text-center shadow-lg transition hover:-translate-y-0.5 ${rarity ? `hero-shop-rarity-${item.rarity}` : 'hero-shop-character'} ${owned ? 'ring-2 ring-emerald-300 ring-offset-2' : ''} ${!available ? 'opacity-70' : ''}`}
       >
         {rarity && <div className="absolute right-3 top-3 h-2 w-2 rounded-full" style={{ background: rarity.accent, boxShadow: `0 0 12px ${rarity.accent}` }} />}
         <HeroItemVisual item={item} size={96} className="mx-auto mb-2" />
-        <div className="text-sm text-gray-700 whitespace-normal break-words leading-tight">{item.name}</div>
-        <div className="flex justify-center gap-1 my-1">
+        <div className="hero-shop-item-name text-sm text-gray-700 whitespace-normal break-words leading-tight">{item.name}</div>
+        <div className="hero-shop-item-meta flex justify-center gap-1 my-1">
           <HeroRarityBadge item={item} />
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-500">{item.level}단계</span>
         </div>
-        <div className="text-xs text-indigo-500">
+        <div className="hero-shop-item-power text-xs text-indigo-500">
           {item.slot === 'pet' ? <>보스전 크리티컬 {item.critChance}% · 치명타 시 2배</> : <>전투력 +{item.power}</>}
         </div>
         {formatHeroSpecialStats(item).map((stat) => (
-          <div key={stat} className="text-[10px] leading-tight text-fuchsia-500 whitespace-normal break-words">✨ {stat}</div>
+          <div key={stat} className="hero-shop-item-effect text-[10px] leading-tight text-fuchsia-500 whitespace-normal break-words">✦ {stat}</div>
         ))}
-        <div className="text-xs text-amber-600 mb-2">{fmt(total)} {klass.currency}</div>
-        {tax > 0 && <div className="text-[10px] text-gray-400 mb-1">상품 {fmt(price)} + 세금 {fmt(tax)}</div>}
+        <div className="hero-shop-item-price text-xs text-amber-600 mb-2">{fmt(total)} {klass.currency}</div>
+        {tax > 0 && <div className="hero-shop-item-tax text-[10px] text-gray-400 mb-1">상품 {fmt(price)} + 세금 {fmt(tax)}</div>}
         {owned ? (
           <div className="space-y-1">
             <button
@@ -225,7 +225,7 @@ export default function HeroShopPage() {
       <div className="flex items-center gap-3">
         <div>
           <h2 className="text-2xl text-amber-600">🛒 용사키우기 상점</h2>
-          <p className="text-sm text-gray-400">모든 캐릭터와 장비는 현금으로 구매하고, 언제든 50% 환불할 수 있어요.</p>
+      <p className="text-sm text-gray-400">모든 아이템은 카드 실루엣으로 성장하고, 장착한 장비의 패시브 효과가 전투에 반영돼요.</p>
         </div>
         <Link to="/student/hero" className="ml-auto text-sm text-indigo-500 underline">← 용사 화면</Link>
       </div>
@@ -234,7 +234,7 @@ export default function HeroShopPage() {
         <button onClick={() => setView('catalog')} className={`rounded-xl px-3 py-1.5 text-sm ${view === 'catalog' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-500'}`}>전체 20단계 도감</button>
       </div>
       <div className="rounded-2xl bg-amber-50 text-amber-700 px-4 py-3 text-sm flex items-center gap-2 flex-wrap">
-        <span>내 현금: <b>{fmt(student.cash)} {klass.currency}</b> · {pricePolicyLabel(klass, klass.currency)} · 아이템마다 전투력이 올라가요.</span>
+        <span>내 현금: <b>{fmt(student.cash)} {klass.currency}</b> · {pricePolicyLabel(klass, klass.currency)} · 구매 후 장착해야 패시브가 적용돼요.</span>
         <button onClick={refreshShop} disabled={!!busyId || refreshes >= HERO_SHOP_REFRESH_LIMIT} className="ml-auto rounded-xl px-3 py-1.5 bg-amber-500 text-white disabled:bg-gray-300">
           🔄 상점 새로고침 ({refreshes}/{HERO_SHOP_REFRESH_LIMIT})
         </button>
@@ -247,12 +247,12 @@ export default function HeroShopPage() {
           {characters.map((item) => {
             const previewHero = { ...hero, character: item.id };
             return (
-              <div key={item.id} className="relative overflow-hidden rounded-3xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-pink-100 p-4 text-center shadow-lg">
-                <HeroPreview hero={previewHero} size={150} />
+              <div key={item.id} className="hero-shop-card hero-shop-character relative overflow-hidden rounded-3xl border-2 p-4 text-center shadow-lg">
+                <HeroCardVisual hero={previewHero} size={150} />
                 <HeroItemVisual item={item} size={58} className="mx-auto -mt-7 border-white" />
-                <div className="text-sm text-gray-700 mt-2 whitespace-normal break-words leading-tight">{item.name}</div>
-                <div className="text-xs text-indigo-500">전투력 +{item.power}</div>
-                <div className="text-xs text-amber-600 mb-2">총 {fmt(costOf(item) + taxForPart(costOf(item), klass, 'item').tax)} {klass.currency}</div>
+                <div className="hero-shop-item-name text-sm text-gray-700 mt-2 whitespace-normal break-words leading-tight">{item.name}</div>
+                <div className="hero-shop-item-power text-xs text-indigo-500">전투력 +{item.power}</div>
+                <div className="hero-shop-item-price text-xs text-amber-600 mb-2">총 {fmt(costOf(item) + taxForPart(costOf(item), klass, 'item').tax)} {klass.currency}</div>
                 {hero.owned.includes(item.id) ? (
                   <div className="space-y-1">
                     <button onClick={() => equip(item)} disabled={busyId === item.id} className="w-full rounded-xl py-1.5 text-sm bg-indigo-100 text-indigo-600">{hero.character === item.id ? '장착 중 ✓' : '장착하기'}</button>
@@ -267,13 +267,22 @@ export default function HeroShopPage() {
         </div>
       </section>
 
+      <div className="hero-shop-guide rounded-3xl px-4 py-3">
+        <div className="hero-shop-guide-title">CARD RPG LOADOUT</div>
+        <div className="hero-shop-guide-grid">
+          <span><b>6단계 이상</b><small>장비 패시브 개방</small></span>
+          <span><b>장착 중인 장비</b><small>전투력·승률·보스 피해에 반영</small></span>
+          <span><b>강화 +10</b><small>누적 투자액이 환불 가치에 반영</small></span>
+        </div>
+      </div>
+
       <section>
         <div className="mb-2 flex items-center gap-2">
           <h3 className="text-lg text-fuchsia-600">🐾 {HERO_PET_SLOT[1]} 상점</h3>
           <span className="text-xs text-gray-400">1단계 5% · 20단계 80% 보스전 크리티컬</span>
         </div>
         <p className="mb-2 rounded-2xl bg-fuchsia-50 px-3 py-2 text-xs text-fuchsia-700">
-          장착한 펫은 보스전에서 일정 확률로 치명타를 발생시켜요. 치명타가 터진 순간에만 기본 2배 피해를 주고, 치명타 피해 +5%가 붙으면 2.05배가 됩니다. 일반 몬스터 공격과 일반 피해에는 2배가 적용되지 않아요. 펫은 전투력에는 더하지 않아요.
+          장착한 펫은 보스전에서 일정 확률로 치명타를 발생시켜요. 치명타가 터진 순간에만 기본 2배 피해를 주고, 치명타 피해 +5%가 붙으면 2.05배가 됩니다. 일반 몬스터 공격과 일반 피해에는 2배가 적용되지 않아요. 펫의 기본 전투력은 0이지만 강화로 얻은 전투력과 패시브는 반영돼요.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {(view === 'shop'

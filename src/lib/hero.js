@@ -37,27 +37,55 @@ export const HERO_RARITIES = {
 export const HERO_SHOP_REFRESH_LIMIT = 3;
 
 const HERO_CHARACTERS = [
-  { id: 'hero_male', slot: 'character', name: '소년 용사', emoji: '🧒', price: 100, power: 12 },
-  { id: 'hero_female', slot: 'character', name: '소녀 용사', emoji: '👧', price: 100, power: 14 },
+  {
+    id: 'hero_male', slot: 'character', name: '네온 수호자', emoji: '🛡️', price: 100, power: 12,
+    visual: { main: '#4f46e5', accent: '#fb7185', glow: '#fbbf24', hair: '#171b55', role: 'guardian' },
+  },
+  {
+    id: 'hero_female', slot: 'character', name: '루미나 가디언', emoji: '⚔️', price: 100, power: 14,
+    visual: { main: '#7c3aed', accent: '#22d3ee', glow: '#f9a8d4', hair: '#26124f', role: 'guardian' },
+  },
 ];
 
 const GEAR_NAMES = {
-  helmet: ['천 모자', '가죽 모자', '나무 헬멧', '청동 헬멧', '철제 헬멧', '강철 헬멧', '은빛 투구', '금빛 투구', '마법 투구', '수정 투구', '기사 헬멧', '빛의 헬멧', '왕국 투구', '성기사 투구', '고대 투구', '용의 투구', '화염 투구', '폭풍 투구', '별빛 투구', '천공의 투구'],
-  weapon: ['나무 막대기', '돌칼', '청동검', '철검', '강철검', '은빛 검', '금빛 검', '독검', '번개 창', '얼음 도끼', '불꽃 검', '빛의 검', '왕국 검', '성기사 검', '고대 검', '용의 검', '화염 대검', '폭풍 창', '별빛 활', '천공의 검'],
-  armor: ['천 갑옷', '가죽 조끼', '나무 갑옷', '청동 갑옷', '사슬 갑옷', '강철 갑옷', '은빛 갑옷', '금빛 갑옷', '마법 갑옷', '수정 갑옷', '기사 갑옷', '빛의 갑옷', '왕국 갑옷', '성기사 갑옷', '고대 갑옷', '용의 갑옷', '화염 갑옷', '폭풍 갑옷', '별빛 갑옷', '천공의 갑옷'],
-  gloves: ['천 장갑', '가죽 장갑', '나무 건틀릿', '청동 건틀릿', '철제 건틀릿', '강철 건틀릿', '은빛 건틀릿', '금빛 건틀릿', '마법 장갑', '수정 건틀릿', '기사 건틀릿', '빛의 건틀릿', '왕국 건틀릿', '성기사 건틀릿', '고대 건틀릿', '용의 건틀릿', '화염 건틀릿', '폭풍 건틀릿', '별빛 건틀릿', '천공의 건틀릿'],
-  shoes: ['가죽 샌들', '천 신발', '나무 신발', '청동 장화', '전투화', '강철 장화', '은빛 장화', '금빛 장화', '바람 장화', '얼음 장화', '날개 신발', '빛의 장화', '왕국 장화', '성기사 장화', '고대 장화', '용의 발톱', '화염 장화', '폭풍 장화', '별빛 장화', '천공의 장화'],
-  accessory: ['행운의 부적', '나무 구슬', '청동 반지', '철 팔찌', '마법 목걸이', '불꽃 루비', '은빛 반지', '금빛 반지', '바람 보석', '얼음 보석', '기사의 문장', '빛의 목걸이', '왕국 인장', '성기사 메달', '고대 유물', '왕의 보석', '화염 보석', '폭풍 보석', '별빛 보석', '천공의 보석'],
+  helmet: ['루키 헤드밴드', '코발트 바이저', '홍련 바이저', '황동 크레스트', '나이트 헬름', '심연의 투구', '문장 투구', '별무늬 투구', '룬 아치 헬름', '수정 크라운', '기사단 크라운', '성운 바이저', '왕국의 관', '성휘 헬름', '고대 룬헬름', '용맥 투구', '홍염 크라운', '폭풍왕 헬름', '별자리 크라운', '천공의 왕관'],
+  weapon: ['수련용 블레이드', '룬 단검', '황동 세이버', '코발트 소드', '나이트 브레이커', '심연의 펄스', '문장 엣지', '별무늬 커터', '룬폴 스피어', '수정 엑스', '기사단 브레이커', '성운 블레이드', '왕국의 검', '성휘 그레이트소드', '고대 룬엣지', '용맥 클리버', '홍염 버스터', '폭풍왕 랜스', '별자리 보우', '천공의 아크'],
+  armor: ['루키 전투복', '코발트 베스트', '홍련 메일', '황동 플레이트', '나이트 아머', '심연의 셸', '문장 하네스', '별무늬 코트', '룬 아머', '수정 플레이트', '기사단 아머', '성운 메일', '왕국의 갑주', '성휘 아머', '고대 룬아머', '용맥 플레이트', '홍염 브레이서', '폭풍왕 아머', '별자리 코트', '천공의 갑주'],
+  gloves: ['루키 핸드랩', '코발트 글러브', '홍련 너클', '황동 건틀릿', '나이트 그립', '심연의 피스트', '문장 건틀릿', '별무늬 너클', '룬 브레이서', '수정 건틀릿', '기사단 피스트', '성운 글러브', '왕국의 건틀릿', '성휘 너클', '고대 룬핸드', '용맥 건틀릿', '홍염 피스트', '폭풍왕 그립', '별자리 브레이서', '천공의 건틀릿'],
+  shoes: ['루키 스텝', '코발트 부츠', '홍련 러너', '황동 그리브', '나이트 워커', '심연의 스텝', '문장 부츠', '별무늬 러너', '룬 워커', '수정 그리브', '기사단 부츠', '성운 스텝', '왕국의 그리브', '성휘 러너', '고대 룬부츠', '용맥 클리버', '홍염 워커', '폭풍왕 스텝', '별자리 부츠', '천공의 그리브'],
+  accessory: ['첫 번째 엠블럼', '코발트 칩', '홍련 코어', '황동 링', '나이트 시길', '심연의 펜던트', '문장 메달', '별무늬 브로치', '룬 크리스털', '수정 하트', '기사단 엠블럼', '성운 펜던트', '왕국의 인장', '성휘 메달', '고대 룬코어', '용맥 보석', '홍염 코어링', '폭풍왕 시길', '별자리 펜던트', '천공의 크라운젬'],
 };
 
 const GEAR_EMOJIS = {
-  helmet: ['🧢', '🧢', '⛑️', '⛑️', '🪖', '🪖', '🛡️', '👑', '🔮', '💎', '🪖', '✨', '👑', '🛡️', '🏺', '🐲', '🔥', '🌪️', '🌟', '☄️'],
-  weapon: ['🪵', '🪨', '🗡️', '⚔️', '⚔️', '🗡️', '⚔️', '🦂', '🔱', '🪓', '🔥', '✨', '⚔️', '🗡️', '🏺', '🗡️', '🔥', '🌪️', '🏹', '⚔️'],
-  armor: ['🥋', '🥋', '🪵', '🛡️', '⛓️', '🛡️', '🛡️', '👑', '🔮', '💎', '🛡️', '✨', '👑', '🛡️', '🏺', '🐉', '🔥', '🌪️', '🌟', '☄️'],
-  gloves: ['🧤', '🧤', '🥊', '🥊', '🛡️', '🛡️', '⚙️', '✨', '🔮', '💎', '🥊', '🌟', '👑', '🛡️', '🏺', '🐉', '🔥', '🌪️', '🌟', '☄️'],
-  shoes: ['👡', '👞', '👞', '🥾', '🥾', '🥾', '👢', '👢', '💨', '❄️', '🪽', '✨', '👢', '🥾', '🏺', '🐾', '🔥', '🌪️', '🌟', '☄️'],
-  accessory: ['🍀', '🟤', '🟠', '⚙️', '🔮', '♦️', '⚪', '🟡', '💨', '❄️', '🏅', '✨', '🔱', '🏵️', '🏺', '👑', '🔥', '🌪️', '🌟', '☄️'],
+  helmet: ['⬡', '◇', '✦', '⬢', '♜', '◈', '✥', '✧', '⌬', '✹', '♛', '✺', '♜', '✦', '⌘', '♢', '✹', '✧', '✦', '✺'],
+  weapon: ['╱', '◈', '✦', '⚔', '✦', '◒', '✧', '✹', '⚡', '✥', '⚔', '✺', '⚔', '✦', '⌘', '◈', '✹', '⚡', '➶', '✦'],
+  armor: ['▣', '◇', '✦', '⬢', '⛓', '▣', '✥', '✧', '⌬', '✹', '♜', '✺', '♜', '✦', '⌘', '◇', '✹', '✧', '✦', '✺'],
+  gloves: ['≋', '◇', '✦', '✥', '✧', '◈', '⚙', '✺', '⌬', '✹', '✦', '✧', '♜', '✦', '⌘', '◇', '✹', '⚡', '✦', '✺'],
+  shoes: ['⌁', '◇', '✦', '⬢', '✧', '◈', '✥', '✺', '⌁', '✹', '✦', '✧', '♜', '✦', '⌘', '◇', '✹', '⚡', '✦', '✺'],
+  accessory: ['◇', '◆', '✦', '◉', '✧', '◈', '✥', '✺', '⌬', '✹', '♜', '✦', '♜', '✧', '⌘', '◆', '✹', '⚡', '✦', '✺'],
 };
+
+const PET_MARKS = ['●', '◆', '◉', '✿', '✦', '☾', '❧', 'ϟ', '◇', '❄', '✧', '◈', '☽', '☀', '⚡', '◒', '◌', '✦', '♜', '✹'];
+
+const HERO_ITEM_PALETTES = [
+  { main: '#5964d8', accent: '#22d3ee', glow: '#a5f3fc', dark: '#151a4e' },
+  { main: '#e05288', accent: '#fbbf24', glow: '#fde68a', dark: '#541b52' },
+  { main: '#7c3aed', accent: '#fb7185', glow: '#fbcfe8', dark: '#2e1065' },
+  { main: '#0f9f9a', accent: '#f59e0b', glow: '#fde68a', dark: '#123c4a' },
+  { main: '#c47b22', accent: '#fef3c7', glow: '#fff7ed', dark: '#4a2412' },
+  { main: '#334c9b', accent: '#f472b6', glow: '#fce7f3', dark: '#172554' },
+];
+
+function visualForItem(slot, level, rarity, index = 0) {
+  const palette = HERO_ITEM_PALETTES[(level + index * 2) % HERO_ITEM_PALETTES.length];
+  return {
+    ...palette,
+    tier: Math.max(1, Math.ceil(level / 4)),
+    shape: slot,
+    finish: rarity === 'transcendent' ? 'prismatic' : rarity === 'legendary' ? 'gold' : 'ink',
+    mark: slot === 'pet' ? PET_MARKS[index] : GEAR_EMOJIS[slot]?.[index] || '✦',
+  };
+}
 
 // 기존에 구매한 장비 ID와 능력치는 유지하고, 그 사이에 새 단계를 채워요.
 const LEGACY_GEAR = {
@@ -112,26 +140,66 @@ const rarityPriceMultiplier = (rarity) => {
 const SPECIAL_STAT_LABELS = {
   bossCritChance: '보스전 크리티컬 확률',
   critDamage: '크리티컬 데미지',
+  battlePower: '전투력 보너스',
+  battleChance: '전투 승률 보너스',
+  bossDamage: '보스 피해 보너스',
 };
-const SPECIAL_STAT_SLOTS = new Set(['weapon', 'accessory', 'gloves']);
 
-// 장비 ID가 같으면 어느 기기에서 보더라도 같은 추가 능력치가 보이도록
-// 단계·부위에서 안정적으로 값을 만들어요. 기존 장비 ID와 기본 전투력은 그대로예요.
+// 장비 ID와 기본 전투력은 유지하면서, 단계가 올라갈수록 카드 RPG다운 패시브가 붙어요.
+// 수치는 기존 rpg 문서에 저장하지 않고 아이템 ID·단계에서 계산하므로 기존 사용자도 즉시 적용됩니다.
 function specialStatsFor(slot, level, rarity) {
-  const transcendent = level === 20 || rarity === 'transcendent';
-  if (!transcendent && !SPECIAL_STAT_SLOTS.has(slot)) return [];
-  if (!transcendent && rarity === 'common') return [];
-  const seed = [...slot].reduce((sum, char) => sum + char.charCodeAt(0), level * 17);
-  const firstKey = seed % 2 ? 'bossCritChance' : 'critDamage';
-  const valueFor = (key, offset = 0) => key === 'bossCritChance'
-    ? 1 + ((seed + offset * 11) % 5)
-    : 1 + ((seed + offset * 17) % 10);
-  const first = { key: firstKey, label: SPECIAL_STAT_LABELS[firstKey], value: valueFor(firstKey) };
-  // 초월 등급은 부위와 상관없이 추가 능력치 하나만 붙어요.
-  if (transcendent) return [first];
-  if (rarity !== 'legendary') return [first];
-  const secondKey = firstKey === 'bossCritChance' ? 'critDamage' : 'bossCritChance';
-  return [first, { key: secondKey, label: SPECIAL_STAT_LABELS[secondKey], value: valueFor(secondKey, 1) }];
+  if (slot === 'pet') {
+    const stats = [];
+    if (level >= 6) {
+      stats.push({
+        key: 'bossCritChance',
+        label: SPECIAL_STAT_LABELS.bossCritChance,
+        value: 1 + Math.floor(level / 5),
+      });
+    }
+    if (level >= 16) {
+      stats.push({
+        key: 'critDamage',
+        label: SPECIAL_STAT_LABELS.critDamage,
+        value: 4 + Math.floor(level / 3),
+      });
+    }
+    if (rarity === 'transcendent' && level === 20) {
+      stats.push({
+        key: 'bossDamage',
+        label: SPECIAL_STAT_LABELS.bossDamage,
+        value: 8,
+      });
+    }
+    return stats;
+  }
+  if (level < 6) return [];
+  const profile = {
+    helmet: ['battleChance', 1 + Math.floor(level / 6)],
+    weapon: ['bossDamage', 2 + Math.floor(level / 4)],
+    armor: ['battlePower', 1 + Math.floor(level / 7)],
+    gloves: ['battlePower', 1 + Math.floor(level / 6)],
+    shoes: ['battleChance', 1 + Math.floor(level / 7)],
+    accessory: ['bossCritChance', 1 + Math.floor(level / 5)],
+  }[slot];
+  if (!profile) return [];
+  const [firstKey, firstValue] = profile;
+  const stats = [{ key: firstKey, label: SPECIAL_STAT_LABELS[firstKey], value: firstValue }];
+  if (level >= 16) {
+    const second = {
+      helmet: ['bossCritChance', 2 + Math.floor(level / 8)],
+      weapon: ['critDamage', 3 + Math.floor(level / 2)],
+      armor: ['battleChance', 1 + Math.floor(level / 8)],
+      gloves: ['bossDamage', 2 + Math.floor(level / 5)],
+      shoes: ['battlePower', 1 + Math.floor(level / 8)],
+      accessory: ['critDamage', 3 + Math.floor(level / 2)],
+    }[slot];
+    if (second) stats.push({ key: second[0], label: SPECIAL_STAT_LABELS[second[0]], value: second[1] });
+  }
+  if (rarity === 'transcendent' && level === 20) {
+    stats[0] = { ...stats[0], value: stats[0].value + 2 };
+  }
+  return stats;
 }
 
 const gearItems = HERO_SLOTS.flatMap(([slot]) => {
@@ -154,8 +222,9 @@ const gearItems = HERO_SLOTS.flatMap(([slot]) => {
       rarity,
       rarityLabel: HERO_RARITIES[rarity].label,
       visualKey: `${slot}-${level === 20 ? 5 : Math.ceil(level / 5)}`,
-      name: legacy?.name || `${HERO_RARITIES[rarity].label} ${GEAR_NAMES[slot][index]}`,
-      emoji: legacy?.emoji || GEAR_EMOJIS[slot][index],
+      name: `${HERO_RARITIES[rarity].label} ${GEAR_NAMES[slot][index]}`,
+      emoji: GEAR_EMOJIS[slot][index],
+      visual: visualForItem(slot, level, rarity, index),
       price,
       power,
       specialStats: specialStatsFor(slot, level, rarity),
@@ -164,12 +233,12 @@ const gearItems = HERO_SLOTS.flatMap(([slot]) => {
 });
 
 const PET_NAMES = [
-  '별빛 토끼', '구름 여우', '바다 물개', '초원 판다', '불꽃 고양이',
-  '달빛 늑대', '숲의 사슴', '번개 매', '보석 거북', '얼음 펭귄',
-  '황금 원숭이', '유성 드래곤', '밤의 부엉이', '태양 사자', '폭풍 독수리',
-  '심연의 뱀', '천공의 고래', '마력 유니콘', '고대 그리핀', '신성한 봉황',
+  '루미 슬라임', '네온 폭스', '코랄 바다표범', '모스 판다', '블레이즈 캣',
+  '문쉐이드 울프', '브램블 디어', '볼트 호크', '젬 터틀', '프로스트 펭귄',
+  '골드 몽키', '메테오 드레이크', '나이트 올빼미', '솔라 라이언', '템페스트 이글',
+  '보이드 바이퍼', '스카이 웨일', '아케인 유니콘', '에인션트 그리핀', '세라핌 피닉스',
 ];
-const PET_EMOJIS = ['🐇', '🦊', '🦭', '🐼', '🐈', '🐺', '🦌', '🦅', '🐢', '🐧', '🐒', '🐲', '🦉', '🦁', '🦅', '🐍', '🐳', '🦄', '🪽', '🔥'];
+const PET_EMOJIS = ['●', '◆', '◉', '✿', '✦', '☾', '❧', 'ϟ', '◇', '❄', '✧', '◈', '☽', '☀', '⚡', '◒', '◌', '✦', '♜', '✹'];
 let previousPetPrice = 0;
 const petItems = Array.from({ length: 20 }, (_, index) => {
   const level = index + 1;
@@ -190,10 +259,11 @@ const petItems = Array.from({ length: 20 }, (_, index) => {
     visualKey: 'pet-' + level,
     name: PET_NAMES[index],
     emoji: PET_EMOJIS[index],
+    visual: visualForItem('pet', level, rarity, index),
     price,
     power: 0,
     critChance,
-    specialStats: level === 20 ? specialStatsFor('pet', level, rarity) : [],
+    specialStats: specialStatsFor('pet', level, rarity),
   };
 });
 
@@ -274,24 +344,28 @@ export function heroTitleFor(clearedLevel) {
 }
 
 export function normalizeHero(raw = {}) {
-  const owned = Array.isArray(raw.owned)
-    ? [...new Set(raw.owned.filter((id) => HERO_ITEM_MAP[id]))]
+  // 화면이 이해하지 못하는 미래/구버전 필드도 먼저 보존합니다.
+  // 정규화는 계산용 값만 보정하고, 학생 문서에 있던 데이터 자체를 삭제하지 않아요.
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const owned = Array.isArray(source.owned)
+    ? [...new Set(source.owned.filter((id) => typeof id === 'string' && id.trim()))]
     : [];
-  const equipment = raw.equipment && typeof raw.equipment === 'object' ? { ...raw.equipment } : {};
-  const character = owned.includes(raw.character) && HERO_ITEM_MAP[raw.character]?.slot === 'character'
-    ? raw.character
+  const equipment = source.equipment && typeof source.equipment === 'object' ? { ...source.equipment } : {};
+  const character = owned.includes(source.character) && HERO_ITEM_MAP[source.character]?.slot === 'character'
+    ? source.character
     : null;
-  const pet = owned.includes(raw.pet) && HERO_ITEM_MAP[raw.pet]?.slot === 'pet'
-    ? raw.pet
+  const pet = owned.includes(source.pet) && HERO_ITEM_MAP[source.pet]?.slot === 'pet'
+    ? source.pet
     : null;
-  const bossProgress = raw.bossProgress && typeof raw.bossProgress === 'object'
-    ? Object.fromEntries(Object.entries(raw.bossProgress)
+  const bossProgress = source.bossProgress && typeof source.bossProgress === 'object'
+    ? Object.fromEntries(Object.entries(source.bossProgress)
       .map(([level, damage]) => [level, Math.max(0, Number(damage) || 0)]))
     : {};
-  const enhancements = raw.enhancements && typeof raw.enhancements === 'object'
-    ? Object.fromEntries(Object.entries(raw.enhancements)
-      .filter(([itemId]) => HERO_ITEM_MAP[itemId])
+  const enhancements = source.enhancements && typeof source.enhancements === 'object'
+    ? Object.fromEntries(Object.entries(source.enhancements)
+      .filter(([itemId]) => typeof itemId === 'string' && itemId.trim())
       .map(([itemId, value]) => [itemId, {
+        ...(value && typeof value === 'object' ? value : {}),
         level: clamp(Number(value?.level) || 0, 0, HERO_ENHANCEMENT_MAX_LEVEL),
         invested: Math.max(0, Math.floor(Number(value?.invested) || 0)),
         attempts: Math.max(0, Math.floor(Number(value?.attempts) || 0)),
@@ -300,24 +374,26 @@ export function normalizeHero(raw = {}) {
           : null,
       }]))
     : {};
-  const shop = raw.shop && typeof raw.shop === 'object' ? { ...raw.shop } : {};
+  const shop = source.shop && typeof source.shop === 'object' ? { ...source.shop } : {};
   return {
+    ...source,
     character,
     pet,
-    name: typeof raw.name === 'string' ? raw.name.trim().slice(0, 20) : '',
-    nameChangeCount: Math.max(0, Number(raw.nameChangeCount) || 0),
+    name: typeof source.name === 'string' ? source.name.trim().slice(0, 20) : '',
+    nameChangeCount: Math.max(0, Number(source.nameChangeCount) || 0),
     owned,
     equipment,
     enhancements,
     bossProgress,
-    clearedLevel: clamp(Number(raw.clearedLevel) || 0, 0, 100),
-    battleDate: raw.battleDate || '',
-    battleCount: Math.max(0, Number(raw.battleCount) || 0),
+    clearedLevel: clamp(Number(source.clearedLevel) || 0, 0, 100),
+    battleDate: source.battleDate || '',
+    battleCount: Math.max(0, Number(source.battleCount) || 0),
     shop: {
+      ...shop,
       date: shop.date || '',
       refreshes: Math.max(0, Number(shop.refreshes) || 0),
     },
-    lastBattle: raw.lastBattle || null,
+    lastBattle: source.lastBattle || null,
   };
 }
 
@@ -338,6 +414,14 @@ export function heroPower(raw) {
   const pet = HERO_ITEM_MAP[hero.pet];
   const petPower = pet?.slot === 'pet' ? heroItemPower(pet, heroEnhancementFor(hero, hero.pet)) : 0;
   return characterPower + gearPower + petPower;
+}
+
+/** 장비 패시브까지 반영한 실제 전투용 전투력입니다. 기본 전투력·자산 계산은 그대로 둡니다. */
+export function heroBattlePower(raw) {
+  const hero = normalizeHero(raw);
+  const base = heroPower(hero);
+  const bonus = Math.max(0, heroSpecialValue(hero, 'battlePower'));
+  return Math.floor(base * (1 + bonus / 100));
 }
 
 export function formatHeroSpecialStat(stat) {
@@ -400,13 +484,16 @@ export function battleDamage(power, monster, raw, criticalRoll = Math.random()) 
   const criticalDamage = Math.max(0, Math.round(criticalDamageBonus(raw)));
   const criticalMultiplierPercent = Math.round(bossCriticalMultiplier(raw) * 100);
   const criticalMultiplier = criticalMultiplierPercent / 100;
+  const bossDamage = monster?.boss ? Math.max(0, Math.round(heroSpecialValue(raw, 'bossDamage'))) : 0;
+  const boostedBase = Math.max(1, Math.floor((base * (100 + bossDamage)) / 100));
   return {
     // 부동소수점 오차를 피하기 위해 2.05배를 205% 정수로 계산해요.
-    damage: critical ? Math.floor((base * criticalMultiplierPercent) / 100) : base,
+    damage: critical ? Math.floor((boostedBase * criticalMultiplierPercent) / 100) : boostedBase,
     critical,
     criticalChance,
     criticalDamage,
     criticalMultiplier,
+    bossDamage,
   };
 }
 
@@ -415,6 +502,31 @@ export function battleChance(power, monsterPower) {
   if (monsterPower <= 0) return 1;
   // 전투력 80 대 몬스터 20이면 80/(80+20)=80%예요.
   return clamp(power / (power + monsterPower), 0, 1);
+}
+
+/** 장비의 승률 패시브를 반영합니다. 친구 대결에도 같은 규칙을 적용합니다. */
+export function heroBattleChance(power, monsterPower, raw) {
+  const bonus = Math.max(0, heroSpecialValue(raw, 'battleChance'));
+  return clamp(battleChance(power, monsterPower) + bonus / 100, 0, 1);
+}
+
+/** 현재 장착 조합이 전투에 주는 효과를 한 번에 보여주기 위한 읽기 전용 프로필입니다. */
+export function heroBattleProfile(raw) {
+  const hero = normalizeHero(raw);
+  const powerBonus = Math.max(0, heroSpecialValue(hero, 'battlePower'));
+  const chanceBonus = Math.max(0, heroSpecialValue(hero, 'battleChance'));
+  const bossDamageBonus = Math.max(0, heroSpecialValue(hero, 'bossDamage'));
+  const criticalChance = bossCriticalChance(hero);
+  const criticalDamage = criticalDamageBonus(hero);
+  return {
+    power: heroBattlePower(hero),
+    powerBonus,
+    chanceBonus,
+    bossDamageBonus,
+    criticalChance,
+    criticalDamage,
+    criticalMultiplier: bossCriticalMultiplier(hero),
+  };
 }
 
 export const HERO_EXTRA_BATTLE_COST = 15;

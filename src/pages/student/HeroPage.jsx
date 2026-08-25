@@ -5,13 +5,13 @@ import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import { itemPrice } from '../../lib/pricing';
 import {
-  HERO_ITEM_MAP, HERO_SLOTS, normalizeHero, heroPower,
-  monsterForLevel, battleChance, battleConfig, heroDateKey, battleDamage, bossCriticalChance, heroBattleWinReward,
+  HERO_ITEM_MAP, HERO_SLOTS, normalizeHero, heroBattlePower, heroBattleProfile,
+  monsterForLevel, heroBattleChance, battleConfig, heroDateKey, battleDamage, bossCriticalChance, heroBattleWinReward,
   criticalDamageBonus, bossCriticalMultiplier, formatHeroSpecialStats, heroExtraBattleCost, heroDisplayName,
   HERO_ENHANCEMENT_MAX_LEVEL, heroEnhancementCost, heroEnhancementSuccessRate, heroEnhancementFor,
   heroEnhancementStats, heroItemPower,
 } from '../../lib/hero';
-import HeroPreview from '../../three/Hero3D.jsx';
+import HeroCardVisual from '../../components/HeroCardVisual.jsx';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
 import HeroBattleArena from '../../components/HeroBattleArena.jsx';
 import MonsterVisual from '../../components/MonsterVisual.jsx';
@@ -27,7 +27,8 @@ export default function HeroPage() {
   const [enhancementItemId, setEnhancementItemId] = useState(null);
   const [enhancementBusy, setEnhancementBusy] = useState(false);
   const hero = normalizeHero(student.rpg);
-  const power = heroPower(hero);
+  const battleProfile = heroBattleProfile(hero);
+  const power = battleProfile.power;
   const today = heroDateKey();
   const config = battleConfig(klass);
   const usedToday = hero.battleDate === today ? hero.battleCount : 0;
@@ -189,12 +190,12 @@ export default function HeroPage() {
           throw new Error(`추가 도전에는 ${extraCost}${klass.currency}가 필요해요.`);
         }
         const monster = monsterForLevel(level);
-        const currentPower = heroPower(current);
-        const chance = battleChance(currentPower, monster.power);
+        const currentPower = heroBattlePower(current);
+        const chance = heroBattleChance(currentPower, monster.power, current);
         const won = roll < chance;
         const damageResult = won
           ? battleDamage(currentPower, monster, current)
-          : { damage: 0, critical: false, criticalChance: bossCriticalChance(current), criticalDamage: criticalDamageBonus(current) };
+          : { damage: 0, critical: false, criticalChance: bossCriticalChance(current), criticalDamage: criticalDamageBonus(current), bossDamage: 0 };
         const previousBossDamage = current.bossProgress[monster.level] || 0;
         const nextBossDamage = monster.boss
           ? Math.min(monster.maxHp, previousBossDamage + damageResult.damage)
@@ -224,6 +225,7 @@ export default function HeroPage() {
             critical: damageResult.critical,
             criticalDamage: damageResult.criticalDamage,
             criticalMultiplier: damageResult.criticalMultiplier,
+            bossDamageBonus: damageResult.bossDamage || 0,
             bossDamage: nextBossDamage,
             bossHp: monster.maxHp,
             bossDefeated,
@@ -241,6 +243,7 @@ export default function HeroPage() {
           damage: damageResult.damage, critical: damageResult.critical,
           criticalDamage: damageResult.criticalDamage,
           criticalMultiplier: damageResult.criticalMultiplier,
+          bossDamageBonus: damageResult.bossDamage || 0,
           bossDamage: nextBossDamage, bossHp: monster.maxHp, bossDefeated,
           attempt: attempts + 1, limit: settings.limit, extraCost,
         };
@@ -303,7 +306,7 @@ export default function HeroPage() {
             onClick={() => hero.character && setEnhancementItemId(hero.character)}
             title={hero.character ? '캐릭터를 눌러 강화' : undefined}
           >
-            {hero.character ? <HeroPreview hero={hero} size={210} /> : <div className="h-[210px] w-[210px] rounded-2xl bg-white/15 flex items-center justify-center text-7xl">❔</div>}
+            {hero.character ? <HeroCardVisual hero={hero} size={210} /> : <div className="h-[210px] w-[210px] rounded-2xl bg-white/15 flex items-center justify-center text-7xl">❔</div>}
           </div>
           {hero.character ? (
             <>
@@ -318,14 +321,26 @@ export default function HeroPage() {
               <div className="text-xs text-white/60">{HERO_ITEM_MAP[hero.character]?.name} · 이름 변경 1회 무료, 이후 {fmt(1000)}{klass.currency}</div>
             </>
           ) : <div className="text-xl">아직 용사가 없어요</div>}
-          <div className="text-white/70 text-sm mt-1">현재 전투력</div>
+          <div className="text-white/70 text-sm mt-1">카드 전투력</div>
           <div className="text-5xl font-bold tabular-nums">{fmt(power)}</div>
+          <div className="hero-profile-effects mt-3" aria-label="장착 장비 효과">
+            <div className="hero-profile-effect-title">EQUIPMENT SYNERGY</div>
+            <div className="hero-profile-effect-grid">
+              <span><small>공명 전투력</small><b>+{battleProfile.powerBonus}%</b></span>
+              <span><small>승률 보너스</small><b>+{battleProfile.chanceBonus}%</b></span>
+              <span><small>보스 피해</small><b>+{battleProfile.bossDamageBonus}%</b></span>
+              <span><small>보스 크리</small><b>{battleProfile.criticalChance}%</b></span>
+            </div>
+          </div>
           <div className="mt-3 text-sm bg-white/15 rounded-xl px-3 py-2">정복 단계 {hero.clearedLevel} / 100</div>
           <div className="mt-1 text-xs text-amber-100/90">최종 보스 처치 시 보상 {fmt(finalBossReward)}{klass.currency}</div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow p-5">
-          <h3 className="text-lg text-gray-600 mb-3">🧰 장착 장비</h3>
+        <div className="hero-loadout-panel bg-white rounded-3xl shadow p-5">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-lg text-gray-600">🧰 장착 장비</h3>
+            <span className="hero-loadout-count">{HERO_SLOTS.filter(([slot]) => hero.equipment[slot]).length}/6 슬롯</span>
+          </div>
           <div className="space-y-2">
             {HERO_SLOTS.map(([slot, label]) => {
               const item = HERO_ITEM_MAP[hero.equipment[slot]];
@@ -340,7 +355,7 @@ export default function HeroPage() {
                   type="button"
                   onClick={() => item && setEnhancementItemId(item.id)}
                   disabled={!item}
-                  className={`flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5 text-left ${item ? 'border-indigo-100 bg-indigo-50/40 hover:border-indigo-300' : 'border-gray-100 bg-gray-50'}`}
+                  className={`hero-loadout-row flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5 text-left ${item ? 'border-indigo-100 bg-indigo-50/40 hover:border-indigo-300' : 'border-gray-100 bg-gray-50'}`}
                 >
                   <span className="w-12 shrink-0 whitespace-nowrap text-[9px] text-gray-400">{label}</span>
                   <HeroItemVisual item={item} size={44} showLevel={false} />
@@ -358,7 +373,7 @@ export default function HeroPage() {
               type="button"
               onClick={() => hero.pet && setEnhancementItemId(hero.pet)}
               disabled={!hero.pet}
-              className={['grid w-full min-w-0 grid-cols-[2.25rem_2.75rem_minmax(0,1fr)_6.5rem] items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5 text-left', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50 hover:border-fuchsia-300' : 'border-gray-100 bg-gray-50'].join(' ')}
+              className={['hero-loadout-row hero-loadout-pet grid w-full min-w-0 grid-cols-[2.25rem_2.75rem_minmax(0,1fr)_6.5rem] items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5 text-left', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50 hover:border-fuchsia-300' : 'border-gray-100 bg-gray-50'].join(' ')}
             >
               {(() => {
                 const pet = HERO_ITEM_MAP[hero.pet];
@@ -395,14 +410,14 @@ export default function HeroPage() {
           power={power}
           monster={nextMonster}
           phase={battlePhase}
-          chance={battleChance(power, nextMonster.power)}
+          chance={heroBattleChance(power, nextMonster.power, hero)}
           bossDamage={bossProgress}
           battleFx={battleFx}
         />
       )}
 
       {nextMonster ? (
-        <div className="bg-white rounded-3xl shadow p-5">
+        <div className="hero-next-stage-card bg-white rounded-3xl shadow p-5">
           <div className="flex items-center gap-3">
             <div className="flex h-20 w-20 items-center justify-center"><MonsterVisual monster={nextMonster} size={72} /></div>
             <div>
@@ -432,7 +447,7 @@ export default function HeroPage() {
           <div className="text-xs text-gray-400 mt-3">
             오늘 기본 도전 {Math.min(usedToday, config.limit)} / {config.limit}회
             {extraAttempts > 0 && <> · 추가 도전 {extraAttempts}회</>}
-            {' · '}전투력 비율 승률 {Math.round(battleChance(power, nextMonster.power) * 100)}%
+            {' · '}장비 효과 포함 승률 {Math.round(heroBattleChance(power, nextMonster.power, hero) * 100)}%
             {usedToday >= config.limit && <> · 다음 추가 도전 {extraCostPreview}{klass.currency}</>}
           </div>
         </div>

@@ -483,3 +483,526 @@ input, select, textarea, button {
     radial-gradient(circle at 80% 75%, rgba(244, 114, 182, .5), transparent 32%),
     linear-gradient(145deg, #172554 0%, #312e81 52%, #701a75 100%);
 }
+
+/* =====================================================================
+   용사키우기 카드 RPG 리디자인
+   데이터의 아이템 ID·강화값은 그대로 두고, 화면은 2D 카드 일러스트처럼 보여요.
+   ===================================================================== */
+@keyframes heroCardFloat {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-4px) rotate(1deg); }
+}
+
+@keyframes heroCardPulse {
+  0%, 100% { opacity: .35; transform: scale(.92); }
+  50% { opacity: .85; transform: scale(1.08); }
+}
+
+@keyframes heroCardAttack {
+  0%, 100% { transform: translateX(0) rotate(-1deg); }
+  45% { transform: translateX(8%) rotate(4deg) scale(1.04); }
+  75% { transform: translateX(-3%) rotate(-2deg); }
+}
+
+@keyframes heroCardCharge {
+  0%, 100% { transform: translateY(0) scale(1); filter: saturate(1); }
+  50% { transform: translateY(-2%) scale(1.05); filter: saturate(1.35) brightness(1.12); }
+}
+
+@keyframes heroCardHit {
+  0%, 100% { transform: translateX(0) rotate(0); filter: saturate(1); }
+  25%, 60% { transform: translateX(7%) rotate(5deg); filter: saturate(.45) brightness(1.35); }
+  42% { transform: translateX(-6%) rotate(-4deg); }
+}
+
+@keyframes heroCardWin {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  45% { transform: translateY(-8%) rotate(2deg) scale(1.04); }
+  70% { transform: translateY(-3%) rotate(-2deg); }
+}
+
+.hero-card-visual {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  overflow: hidden;
+  isolation: isolate;
+  border: 2px solid rgba(129, 140, 248, .64);
+  border-radius: 1.35rem;
+  background-color: #111936;
+  background-position: center;
+  background-size: cover;
+  box-shadow: 0 18px 35px -18px rgba(15, 23, 42, .85), inset 0 1px 0 rgba(255,255,255,.22);
+}
+
+.hero-battle-card {
+  background-color: #0b1230;
+  background-image: linear-gradient(180deg, rgba(11,18,48,.18), rgba(11,18,48,.68)), url('./assets/hero-card-arena.png');
+  background-position: center;
+  background-size: cover;
+  color: #eef2ff;
+}
+
+.hero-battle-card::after { border-color: rgba(165, 180, 252, .2); }
+.hero-battle-card .text-slate-700 { color: #fff; }
+.hero-battle-card .text-slate-500 { color: rgba(224, 231, 255, .76); }
+.hero-battle-card .bg-white\/75 { background-color: rgba(15, 23, 42, .46); color: #e0e7ff; }
+
+.hero-card-visual::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(11, 18, 48, .18), rgba(11, 18, 48, .18) 48%, rgba(5, 8, 28, .72));
+}
+
+.hero-card-visual::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  z-index: 5;
+  border: 1px solid rgba(165, 180, 252, .25);
+  border-radius: 1rem;
+  pointer-events: none;
+}
+
+.hero-card-grid {
+  position: absolute;
+  inset: 0;
+  opacity: .32;
+  background: linear-gradient(135deg, transparent 0 46%, rgba(129, 140, 248, .3) 46.5% 47%, transparent 47.5% 100%), linear-gradient(45deg, transparent 0 56%, rgba(244, 114, 182, .18) 56.5% 57%, transparent 57.5% 100%);
+  mix-blend-mode: screen;
+}
+
+.hero-card-header,
+.hero-card-footer {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: rgba(224, 231, 255, .78);
+  font-size: clamp(6px, 4.3%, 10px);
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.hero-card-header { top: 8%; }
+.hero-card-footer { bottom: 7%; color: #fff; letter-spacing: .03em; text-transform: none; }
+.hero-card-footer span { max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-card-footer b { color: var(--hero-glow); font-size: .8em; letter-spacing: .12em; }
+
+.hero-card-sigil {
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  z-index: 0;
+  color: var(--hero-accent);
+  font-size: 12%;
+  opacity: .7;
+  transform: translateX(-50%);
+  text-shadow: 0 0 14px var(--hero-accent);
+}
+
+.hero-card-sparks { position: absolute; inset: 0; pointer-events: none; }
+.hero-card-sparks i {
+  position: absolute;
+  left: calc(12% + var(--spark-index) * 12%);
+  top: calc(22% + (var(--spark-index) % 3) * 12%);
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--hero-glow);
+  box-shadow: 0 0 8px var(--hero-accent);
+  animation: heroCardPulse 2.8s ease-in-out infinite;
+  animation-delay: calc(var(--spark-index) * -180ms);
+}
+
+.hero-card-ground {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 12%;
+  height: 14%;
+  border: 1px solid color-mix(in srgb, var(--hero-accent) 64%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--hero-accent) 28%, transparent), transparent 68%);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--hero-accent) 40%, transparent);
+}
+
+.hero-card-figure {
+  position: absolute;
+  left: 24%;
+  bottom: 16%;
+  z-index: 3;
+  width: 51%;
+  height: 66%;
+  transform-origin: 50% 100%;
+}
+
+.hero-card-animated .hero-card-figure { animation: heroCardFloat 2.8s ease-in-out infinite; }
+.hero-card-action-attack .hero-card-figure { animation: heroCardAttack .72s ease-in-out infinite; }
+.hero-card-action-charge .hero-card-figure { animation: heroCardCharge .82s ease-in-out infinite; }
+.hero-card-action-win .hero-card-figure { animation: heroCardWin .9s ease-in-out infinite; }
+.hero-card-action-lose .hero-card-figure { animation: heroCardHit .58s ease-in-out infinite; }
+
+.hero-card-cape {
+  position: absolute;
+  left: 12%;
+  top: 30%;
+  width: 76%;
+  height: 60%;
+  border: 2px solid color-mix(in srgb, var(--hero-accent) 58%, var(--hero-dark));
+  border-radius: 48% 48% 18% 18%;
+  background: linear-gradient(135deg, var(--hero-dark), color-mix(in srgb, var(--hero-main) 72%, var(--hero-dark)) 54%, var(--hero-accent));
+  clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
+  opacity: .96;
+  box-shadow: inset -8px -8px 0 rgba(7, 10, 34, .2);
+}
+
+.hero-card-legs { position: absolute; left: 26%; bottom: 0; width: 48%; height: 31%; }
+.hero-card-leg { position: absolute; bottom: 8%; width: 30%; height: 88%; border: 2px solid var(--hero-armor-dark); border-radius: 45% 45% 20% 20%; background: linear-gradient(90deg, var(--hero-armor-dark), var(--hero-armor), var(--hero-armor-accent)); }
+.hero-card-leg-left { left: 12%; transform: rotate(6deg); }
+.hero-card-leg-right { right: 12%; transform: rotate(-6deg); }
+.hero-card-shoe { position: absolute; left: -30%; bottom: -4%; width: 155%; height: 29%; border: 2px solid var(--hero-shoe-accent); border-radius: 40% 65% 22% 22%; background: linear-gradient(135deg, var(--hero-shoe), var(--hero-shoe-accent)); box-shadow: 0 4px 0 rgba(9, 13, 42, .36); }
+
+.hero-card-torso { position: absolute; left: 24%; top: 29%; width: 52%; height: 42%; border: 2px solid var(--hero-armor-dark); border-radius: 30% 30% 24% 24%; background: linear-gradient(135deg, var(--hero-armor-dark), var(--hero-armor) 48%, var(--hero-armor-accent)); box-shadow: inset -5px -7px 0 rgba(12, 16, 50, .2); }
+.hero-card-armor-panel { position: absolute; left: 25%; top: 18%; width: 50%; height: 52%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--hero-armor-glow); border-radius: 38% 38% 28% 28%; color: var(--hero-armor-glow); font-size: 28%; background: radial-gradient(circle, color-mix(in srgb, var(--hero-armor-accent) 72%, transparent), transparent 68%); box-shadow: 0 0 10px color-mix(in srgb, var(--hero-armor-glow) 55%, transparent); }
+.hero-card-belt { position: absolute; left: -3%; right: -3%; bottom: 11%; height: 10%; border-radius: 999px; background: var(--hero-armor-dark); box-shadow: 0 0 0 2px var(--hero-armor-accent); }
+
+.hero-card-arm { position: absolute; top: 34%; width: 22%; height: 34%; border: 2px solid var(--hero-armor-dark); border-radius: 50%; background: linear-gradient(135deg, var(--hero-armor-accent), var(--hero-armor)); }
+.hero-card-arm-left { left: 4%; transform: rotate(18deg); }
+.hero-card-arm-right { right: 4%; transform: rotate(-18deg); }
+.hero-card-glove { position: absolute; left: 22%; bottom: -5%; width: 56%; height: 30%; border: 2px solid var(--hero-glove-accent); border-radius: 42%; background: var(--hero-glove); box-shadow: inset -3px -3px 0 rgba(7, 10, 34, .24); }
+
+.hero-card-head { position: absolute; left: 29%; top: 3%; z-index: 5; width: 42%; height: 31%; }
+.hero-card-face { position: absolute; left: 10%; top: 18%; width: 80%; height: 70%; border: 2px solid color-mix(in srgb, var(--hero-skin) 72%, #7c2d12); border-radius: 44% 44% 48% 48%; background: linear-gradient(135deg, #ffe1d2, var(--hero-skin)); box-shadow: inset -4px -3px 0 rgba(124, 45, 18, .08); }
+.hero-card-eye { position: absolute; top: 46%; width: 9%; height: 12%; border-radius: 50%; background: #182044; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+.hero-card-eye-left { left: 25%; }
+.hero-card-eye-right { right: 25%; }
+.hero-card-mouth { position: absolute; left: 43%; bottom: 20%; width: 14%; height: 8%; border-bottom: 2px solid #9f3d5a; border-radius: 50%; }
+.hero-card-hair { position: absolute; left: 0; top: 0; width: 100%; height: 43%; border-radius: 52% 52% 38% 32%; background: var(--hero-hair); clip-path: polygon(0 24%, 16% 0, 32% 13%, 48% 0, 64% 15%, 82% 2%, 100% 28%, 90% 70%, 70% 54%, 56% 78%, 44% 55%, 28% 72%, 12% 54%); }
+.hero-card-helmet { position: absolute; left: -4%; top: -4%; width: 108%; height: 38%; border: 2px solid var(--hero-helmet-accent); border-radius: 55% 55% 22% 22%; background: linear-gradient(135deg, var(--hero-helmet), var(--hero-helmet-accent)); clip-path: polygon(8% 26%, 30% 0, 70% 0, 92% 26%, 100% 100%, 0 100%); color: var(--hero-helmet-glow); font-size: 27%; text-align: center; padding-top: 8%; box-shadow: inset -4px -4px 0 rgba(9, 13, 42, .24); }
+.hero-card-helmet span { display: inline-block; text-shadow: 0 0 8px var(--hero-helmet-glow); }
+
+.hero-card-shield { position: absolute; left: -16%; top: 38%; z-index: 6; width: 34%; height: 36%; display: flex; align-items: center; justify-content: center; border: 3px solid var(--hero-armor-glow); border-radius: 18% 18% 46% 46%; color: var(--hero-armor-glow); font-size: 38%; background: linear-gradient(135deg, var(--hero-armor-dark), var(--hero-armor)); clip-path: polygon(8% 4%, 92% 4%, 86% 74%, 50% 100%, 14% 74%); box-shadow: 0 0 12px color-mix(in srgb, var(--hero-armor-glow) 40%, transparent); }
+.hero-card-sword { position: absolute; right: -16%; top: 20%; z-index: 7; width: 22%; height: 64%; transform: rotate(27deg); transform-origin: 50% 90%; }
+.hero-card-blade { position: absolute; left: 35%; top: 0; width: 30%; height: 74%; border: 2px solid var(--hero-weapon-accent); background: linear-gradient(90deg, var(--hero-weapon-dark, var(--hero-weapon)), var(--hero-weapon-glow), var(--hero-weapon)); clip-path: polygon(50% 0, 100% 18%, 68% 100%, 50% 86%, 32% 100%, 0 18%); box-shadow: 0 0 10px color-mix(in srgb, var(--hero-weapon-glow) 55%, transparent); }
+.hero-card-hilt { position: absolute; left: 5%; top: 69%; width: 90%; height: 8%; border-radius: 999px; background: var(--hero-weapon-accent); box-shadow: 0 0 0 2px var(--hero-weapon-dark); }
+.hero-card-necklace { position: absolute; left: 43%; top: 36%; z-index: 8; color: var(--hero-accessory-glow); font-size: 20%; text-shadow: 0 0 8px var(--hero-accessory-glow); }
+
+.hero-card-pet { position: absolute; right: 10%; bottom: 23%; z-index: 8; width: 23%; height: 21%; filter: drop-shadow(0 5px 4px rgba(8, 8, 35, .4)); animation: heroCardFloat 2.2s ease-in-out infinite; }
+.hero-card-pet-aura { position: absolute; inset: -18%; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--hero-pet-glow) 50%, transparent), transparent 68%); animation: heroCardPulse 1.8s ease-in-out infinite; }
+.hero-card-pet-body { position: absolute; left: 12%; top: 18%; width: 76%; height: 72%; border: 2px solid var(--hero-pet-accent); border-radius: 46% 46% 40% 40%; background: linear-gradient(135deg, var(--hero-pet), var(--hero-pet-accent)); }
+.hero-card-pet-body i { position: absolute; top: 43%; width: 10%; height: 14%; border-radius: 50%; background: #111936; }
+.hero-card-pet-body i:first-child { left: 27%; }
+.hero-card-pet-body i:nth-child(2) { right: 27%; }
+.hero-card-pet-body b { position: absolute; right: 10%; bottom: 7%; color: var(--hero-pet-glow); font-size: 25%; }
+.hero-card-pet-ear { position: absolute; top: 2%; width: 33%; height: 42%; border: 2px solid var(--hero-pet-accent); background: var(--hero-pet); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.hero-card-pet-ear-left { left: 13%; transform: rotate(-16deg); }
+.hero-card-pet-ear-right { right: 13%; transform: rotate(16deg); }
+
+/* 카드 아이템: 이모지 대신 슬롯별 실루엣을 그립니다. */
+.hero-item-card-v2 { position: relative; display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; overflow: hidden; isolation: isolate; border: 2px solid color-mix(in srgb, var(--item-accent) 72%, white); border-radius: 1rem; background: linear-gradient(145deg, var(--item-dark), color-mix(in srgb, var(--item-main) 58%, #080c28)); box-shadow: 0 12px 22px -14px var(--item-accent), inset 0 1px 0 rgba(255,255,255,.26); }
+.hero-item-card-v2::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 28% 15%, color-mix(in srgb, var(--item-glow) 35%, transparent), transparent 35%), linear-gradient(145deg, transparent 48%, rgba(255,255,255,.08)); z-index: -1; }
+.hero-item-card-grid { position: absolute; inset: 8%; border: 1px solid color-mix(in srgb, var(--item-accent) 38%, transparent); border-radius: .72rem; background: linear-gradient(135deg, transparent 47%, rgba(255,255,255,.12) 48%, transparent 49%); }
+.hero-item-card-topline, .hero-item-card-bottomline { position: absolute; left: 10%; right: 10%; z-index: 5; display: flex; align-items: center; justify-content: space-between; color: rgba(224,231,255,.76); font-size: clamp(5px, 11%, 9px); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.hero-item-card-topline { top: 9%; }
+.hero-item-card-bottomline { bottom: 8%; color: #fff; letter-spacing: .02em; text-transform: none; }
+.hero-item-card-bottomline b { color: var(--item-glow); font-size: .76em; }
+.hero-item-card-corner { position: absolute; z-index: 4; width: 18%; height: 18%; border-color: var(--item-accent); opacity: .8; }
+.hero-item-card-corner-left { left: 8%; bottom: 18%; border-left: 1px solid; border-bottom: 1px solid; }
+.hero-item-card-corner-right { right: 8%; top: 18%; border-right: 1px solid; border-top: 1px solid; }
+.hero-item-card-glyph { position: absolute; left: 17%; top: 23%; width: 66%; height: 55%; display: flex; align-items: center; justify-content: center; }
+.hero-item-card-pet-rate { position: absolute; top: 21%; right: 9%; z-index: 6; border-radius: 4px; padding: 1px 3px; color: #fff; background: #d946ef; font-size: 8px; font-weight: 900; }
+.hero-item-empty { border-style: dashed; border-color: #cbd5e1; background: #f8fafc; color: #94a3b8; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
+
+.hero-item-card-elite { box-shadow: 0 0 16px -7px #a78bfa, inset 0 1px 0 rgba(255,255,255,.3); }
+.hero-item-card-legendary { box-shadow: 0 0 20px -6px #f59e0b, inset 0 1px 0 rgba(255,255,255,.3); }
+.hero-item-card-prismatic { border-color: transparent; background: linear-gradient(145deg, #25135d, #37115c) padding-box, conic-gradient(from 20deg, #fb7185, #fbbf24, #4ade80, #22d3ee, #a78bfa, #fb7185) border-box; box-shadow: 0 0 24px -5px #e879f9, inset 0 1px 0 rgba(255,255,255,.45); }
+.hero-rarity-badge-v2 { display: inline-flex; border-radius: 999px; padding: .16rem .48rem; color: #fff; font-size: 10px; font-weight: 900; }
+.hero-rarity-common { background: #64748b; }
+.hero-rarity-rare { background: #0284c7; }
+.hero-rarity-elite { background: #7c3aed; }
+.hero-rarity-legendary { background: #d97706; }
+.hero-rarity-transcendent { background: linear-gradient(90deg, #e11d48, #d97706, #059669, #2563eb, #9333ea); }
+
+.hero-item-glyph { position: relative; display: block; width: 100%; height: 100%; color: var(--glyph-glow); filter: drop-shadow(0 4px 3px rgba(0,0,0,.35)); }
+.hero-item-glyph > i, .hero-item-glyph > b { position: absolute; display: block; }
+.hero-item-glyph > b { z-index: 6; right: 4%; bottom: 3%; color: var(--glyph-glow); font-size: 18%; text-shadow: 0 0 8px var(--glyph-accent); }
+.hero-item-glyph-character .glyph-cape { left: 8%; top: 24%; width: 84%; height: 72%; background: linear-gradient(135deg, var(--glyph-dark), var(--glyph-main), var(--glyph-accent)); clip-path: polygon(18% 0, 82% 0, 100% 100%, 0 100%); }
+.hero-item-glyph-character .glyph-body { left: 27%; top: 38%; width: 46%; height: 46%; border: 2px solid var(--glyph-accent); border-radius: 35%; background: var(--glyph-main); }
+.hero-item-glyph-character .glyph-head { left: 29%; top: 8%; width: 42%; height: 39%; border: 2px solid var(--glyph-accent); border-radius: 50%; background: #f4c7b3; }
+.hero-item-glyph-character .glyph-hair { left: 24%; top: 4%; width: 52%; height: 25%; border-radius: 50% 50% 25% 25%; background: var(--glyph-dark); }
+.hero-item-glyph-helmet .glyph-helmet-dome { left: 11%; top: 17%; width: 78%; height: 58%; border: 2px solid var(--glyph-accent); border-radius: 55% 55% 20% 20%; background: linear-gradient(135deg, var(--glyph-main), var(--glyph-accent)); clip-path: polygon(8% 22%, 30% 0, 70% 0, 92% 22%, 100% 100%, 0 100%); }
+.hero-item-glyph-helmet .glyph-helmet-visor { left: 17%; top: 55%; width: 66%; height: 13%; border-radius: 999px; background: var(--glyph-dark); box-shadow: 0 0 0 2px var(--glyph-glow); }
+.hero-item-glyph-helmet .glyph-helmet-crest { left: 42%; top: 1%; width: 16%; height: 28%; background: var(--glyph-accent); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.hero-item-glyph-weapon .glyph-weapon-blade { left: 42%; top: 1%; width: 17%; height: 76%; border: 2px solid var(--glyph-accent); background: linear-gradient(90deg, var(--glyph-dark), var(--glyph-glow), #fff, var(--glyph-main)); clip-path: polygon(50% 0, 100% 18%, 68% 100%, 50% 85%, 32% 100%, 0 18%); transform: rotate(18deg); }
+.hero-item-glyph-weapon .glyph-weapon-hilt { left: 24%; top: 75%; width: 54%; height: 9%; border-radius: 999px; background: var(--glyph-accent); box-shadow: 0 0 0 2px var(--glyph-dark); transform: rotate(18deg); }
+.hero-item-glyph-weapon .glyph-weapon-core { left: 43%; top: 76%; width: 14%; height: 16%; border-radius: 50%; background: var(--glyph-glow); box-shadow: 0 0 8px var(--glyph-accent); }
+.hero-item-glyph-armor .glyph-armor-plate { left: 20%; top: 14%; width: 60%; height: 70%; border: 2px solid var(--glyph-accent); border-radius: 30% 30% 20% 20%; background: linear-gradient(135deg, var(--glyph-dark), var(--glyph-main), var(--glyph-accent)); clip-path: polygon(10% 0, 90% 0, 100% 80%, 50% 100%, 0 80%); }
+.hero-item-glyph-armor .glyph-armor-shoulder { top: 27%; width: 28%; height: 30%; border: 2px solid var(--glyph-accent); border-radius: 45%; background: var(--glyph-main); }
+.hero-item-glyph-armor .glyph-armor-shoulder-left { left: 2%; transform: rotate(18deg); }
+.hero-item-glyph-armor .glyph-armor-shoulder-right { right: 2%; transform: rotate(-18deg); }
+.hero-item-glyph-armor .glyph-armor-core { left: 42%; top: 32%; width: 16%; height: 22%; border: 2px solid var(--glyph-glow); border-radius: 50%; background: var(--glyph-accent); box-shadow: 0 0 10px var(--glyph-glow); }
+.hero-item-glyph-gloves .glyph-glove { top: 29%; width: 29%; height: 45%; border: 2px solid var(--glyph-accent); border-radius: 42%; background: linear-gradient(135deg, var(--glyph-main), var(--glyph-dark)); }
+.hero-item-glyph-gloves .glyph-glove-left { left: 15%; transform: rotate(18deg); }
+.hero-item-glyph-gloves .glyph-glove-right { right: 15%; transform: rotate(-18deg); }
+.hero-item-glyph-gloves .glyph-glove-link { left: 33%; top: 45%; width: 34%; height: 11%; border-radius: 999px; background: var(--glyph-glow); box-shadow: 0 0 8px var(--glyph-accent); }
+.hero-item-glyph-shoes .glyph-shoe { bottom: 19%; width: 35%; height: 38%; border: 2px solid var(--glyph-accent); border-radius: 30% 50% 20% 20%; background: linear-gradient(135deg, var(--glyph-main), var(--glyph-dark)); }
+.hero-item-glyph-shoes .glyph-shoe-left { left: 10%; transform: rotate(9deg); }
+.hero-item-glyph-shoes .glyph-shoe-right { right: 10%; transform: rotate(-9deg); }
+.hero-item-glyph-shoes .glyph-shoe-wing { left: 24%; top: 18%; width: 52%; height: 25%; border-top: 3px solid var(--glyph-glow); border-radius: 50%; transform: rotate(-8deg); box-shadow: 0 -5px 0 -2px var(--glyph-accent); }
+.hero-item-glyph-accessory .glyph-accessory-ring { left: 20%; top: 19%; width: 60%; height: 60%; border: 5px solid var(--glyph-accent); border-radius: 50%; box-shadow: 0 0 12px var(--glyph-glow); }
+.hero-item-glyph-accessory .glyph-accessory-gem { left: 36%; top: 30%; width: 28%; height: 34%; border: 2px solid var(--glyph-glow); background: linear-gradient(135deg, var(--glyph-main), var(--glyph-accent)); clip-path: polygon(50% 0, 100% 36%, 70% 100%, 30% 100%, 0 36%); }
+.hero-item-glyph-accessory .glyph-accessory-orbit { left: 4%; top: 41%; width: 92%; height: 18%; border-top: 2px solid var(--glyph-glow); border-radius: 50%; transform: rotate(-24deg); }
+.hero-item-glyph-pet .glyph-pet-body { left: 15%; top: 20%; width: 70%; height: 65%; border: 2px solid var(--glyph-accent); border-radius: 48%; background: linear-gradient(135deg, var(--glyph-main), var(--glyph-accent)); }
+.hero-item-glyph-pet .glyph-pet-ear { top: 6%; width: 30%; height: 34%; border: 2px solid var(--glyph-accent); background: var(--glyph-main); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.hero-item-glyph-pet .glyph-pet-ear-left { left: 16%; transform: rotate(-15deg); }
+.hero-item-glyph-pet .glyph-pet-ear-right { right: 16%; transform: rotate(15deg); }
+.hero-item-glyph-pet .glyph-pet-eye { top: 46%; width: 9%; height: 13%; border-radius: 50%; background: #111936; }
+.hero-item-glyph-pet .glyph-pet-eye-left { left: 32%; }
+.hero-item-glyph-pet .glyph-pet-eye-right { right: 32%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-card-animated .hero-card-figure,
+  .hero-card-pet,
+  .hero-card-sparks i { animation: none; }
+}
+
+/* 카드 RPG 정보 패널 */
+.hero-profile-effects {
+  position: relative;
+  padding: .65rem;
+  border: 1px solid rgba(196, 181, 253, .28);
+  border-radius: 1rem;
+  background: rgba(8, 12, 42, .36);
+  text-align: left;
+  backdrop-filter: blur(8px);
+}
+
+.hero-profile-effect-title {
+  margin-bottom: .45rem;
+  color: rgba(224, 231, 255, .62);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .18em;
+}
+
+.hero-profile-effect-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .4rem;
+}
+
+.hero-profile-effect-grid span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: .35rem;
+  padding: .42rem .5rem;
+  border: 1px solid rgba(165, 180, 252, .18);
+  border-radius: .7rem;
+  background: rgba(99, 102, 241, .18);
+}
+
+.hero-profile-effect-grid small {
+  overflow: hidden;
+  color: rgba(224, 231, 255, .7);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-profile-effect-grid b {
+  flex-shrink: 0;
+  color: #fbbf24;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-loadout-panel {
+  border: 1px solid #dbeafe;
+  background: linear-gradient(180deg, #ffffff, #f8faff);
+}
+
+.hero-loadout-count {
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: .25rem .55rem;
+  color: #6366f1;
+  background: #eef2ff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.hero-loadout-row {
+  transition: border-color .18s ease, background-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+.hero-loadout-row:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 16px -13px #4f46e5;
+}
+
+.hero-loadout-pet:not(:disabled):hover {
+  box-shadow: 0 7px 16px -13px #d946ef;
+}
+
+.hero-next-stage-card {
+  border: 1px solid rgba(129, 140, 248, .46);
+  background:
+    linear-gradient(180deg, rgba(11, 18, 48, .84), rgba(22, 18, 64, .94)),
+    url('./assets/hero-card-arena.png') center / cover;
+  color: #eef2ff;
+}
+
+.hero-next-stage-card .text-gray-400 { color: rgba(224, 231, 255, .6); }
+.hero-next-stage-card .text-gray-700 { color: #f8fafc; }
+.hero-next-stage-card .text-rose-500 { color: #fda4af; }
+.hero-next-stage-card .text-fuchsia-600 { color: #f0abfc; }
+.hero-next-stage-card .text-amber-600 { color: #fde68a; }
+
+/* 상점도 아이템 카드와 같은 인디고·코랄 팔레트를 사용합니다. */
+.hero-shop-card {
+  border-color: rgba(129, 140, 248, .42);
+  background: linear-gradient(145deg, #111936 0%, #1e2a63 58%, #40194e 100%);
+  color: #eef2ff;
+  box-shadow: 0 16px 28px -22px #312e81, inset 0 1px 0 rgba(255,255,255,.14);
+}
+
+.hero-shop-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,.12), transparent 34%, rgba(244,114,182,.08));
+}
+
+.hero-shop-card > *:not(.absolute) { position: relative; z-index: 1; }
+.hero-shop-card > .absolute { z-index: 2; }
+.hero-shop-card .hero-shop-item-name { color: #f8fafc; font-weight: 800; }
+.hero-shop-card .hero-shop-item-meta .bg-indigo-50 { color: #c7d2fe; background: rgba(99,102,241,.25); }
+.hero-shop-card .hero-shop-item-power { color: #a5f3fc; }
+.hero-shop-card .hero-shop-item-effect { color: #f5d0fe; }
+.hero-shop-card .hero-shop-item-price { color: #fde68a; font-weight: 800; }
+.hero-shop-card .hero-shop-item-tax { color: rgba(224,231,255,.52); }
+.hero-shop-card .bg-indigo-100 { color: #c7d2fe; background: rgba(99,102,241,.32); }
+.hero-shop-card .bg-emerald-100 { color: #a7f3d0; background: rgba(16,185,129,.24); }
+.hero-shop-card .text-rose-500 { color: #fda4af; }
+.hero-shop-card .bg-amber-400 { background: #e8793f; }
+.hero-shop-card .bg-amber-400:hover { background: #f08a4b; }
+
+.hero-shop-rarity-common { border-color: rgba(148,163,184,.56); }
+.hero-shop-rarity-rare { border-color: rgba(56,189,248,.72); background: linear-gradient(145deg, #102c51, #163c66 56%, #422052); }
+.hero-shop-rarity-elite { border-color: rgba(167,139,250,.8); background: linear-gradient(145deg, #21134f, #312168 56%, #561c58); }
+.hero-shop-rarity-legendary { border-color: rgba(245,158,11,.86); background: linear-gradient(145deg, #3b2411, #51301a 56%, #55203d); }
+.hero-shop-rarity-transcendent { border-color: transparent; background: linear-gradient(145deg, #201449, #36145a 58%, #142f5b) padding-box, conic-gradient(from 20deg, #fb7185, #fbbf24, #4ade80, #22d3ee, #a78bfa, #fb7185) border-box; }
+.hero-shop-character { border-color: rgba(244,114,182,.55); background: linear-gradient(145deg, #111936, #292064 55%, #651d63); }
+
+.hero-shop-guide {
+  border: 1px solid rgba(129, 140, 248, .38);
+  background: linear-gradient(120deg, #111936, #241a59 58%, #491946);
+  color: #eef2ff;
+  box-shadow: 0 14px 24px -20px #312e81;
+}
+
+.hero-shop-guide-title {
+  margin-bottom: .55rem;
+  color: #fbbf24;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .2em;
+}
+
+.hero-shop-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .5rem;
+}
+
+.hero-shop-guide-grid span {
+  display: flex;
+  flex-direction: column;
+  gap: .18rem;
+  border-left: 2px solid #fb7185;
+  padding-left: .55rem;
+}
+
+.hero-shop-guide-grid b { color: #f8fafc; font-size: 11px; }
+.hero-shop-guide-grid small { color: rgba(224,231,255,.68); font-size: 10px; line-height: 1.3; }
+
+/* 몬스터도 이모지 대신 어두운 카드 실루엣으로 정리합니다. */
+.monster-visual {
+  filter: drop-shadow(0 12px 8px rgba(8, 12, 42, .4));
+}
+
+.monster-aura {
+  inset: 12%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--monster-body) 58%, #a5b4fc), transparent 68%);
+  filter: blur(14px);
+}
+
+.monster-body {
+  width: 64%;
+  height: 64%;
+  border: 3px solid color-mix(in srgb, var(--monster-body) 62%, #e0e7ff);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--monster-body) 72%, #f8fafc), var(--monster-body) 52%, var(--monster-accent));
+  box-shadow: inset -8px -10px 0 rgba(5, 8, 28, .22), inset 6px 5px 0 rgba(255,255,255,.12), 0 0 0 5px rgba(129,140,248,.12);
+}
+
+.monster-pattern {
+  inset: 10%;
+  background: linear-gradient(135deg, transparent 0 44%, rgba(255,255,255,.26) 45% 47%, transparent 48% 100%), linear-gradient(45deg, transparent 0 62%, rgba(8,12,42,.22) 63% 65%, transparent 66% 100%);
+  opacity: .9;
+}
+
+.monster-eye { background: #f8fafc; box-shadow: inset 0 -2px 0 #1e293b, 0 0 0 1px rgba(255,255,255,.2); }
+.monster-mouth { border-bottom-color: #f8fafc; }
+
+.monster-glyph {
+  right: 9%;
+  bottom: 8%;
+  display: flex;
+  width: 20%;
+  height: 20%;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,.45);
+  border-radius: .35rem;
+  color: #fff;
+  background: rgba(8,12,42,.55);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.monster-crown {
+  top: 2%;
+  left: 50%;
+  border: 1px solid rgba(251,191,36,.65);
+  border-radius: 999px;
+  padding: .2rem .4rem;
+  color: #fef3c7;
+  background: rgba(120,53,15,.74);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  line-height: 1;
+  text-shadow: 0 0 8px #f59e0b;
+}
+
+.monster-boss .monster-body {
+  border-color: #fbbf24;
+  box-shadow: inset -8px -10px 0 rgba(5,8,28,.26), 0 0 18px var(--monster-body), 0 0 34px color-mix(in srgb, var(--monster-body) 60%, transparent);
+}
+
+@media (max-width: 640px) {
+  .hero-shop-guide-grid { grid-template-columns: 1fr; gap: .45rem; }
+  .hero-profile-effect-grid small { font-size: 8px; }
+}

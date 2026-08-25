@@ -4,8 +4,8 @@ import { collection, doc, onSnapshot, runTransaction } from 'firebase/firestore'
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
 import {
-  HERO_DUEL_LIMIT, HERO_DUEL_WIN_REWARD, battleChance, heroDateKey,
-  heroDuelExtraCost, heroDuelWinReward, heroDisplayName, heroPower, normalizeHero, HERO_ITEM_MAP,
+  HERO_DUEL_LIMIT, HERO_DUEL_WIN_REWARD, heroBattleChance, heroDateKey,
+  heroDuelExtraCost, heroDuelWinReward, heroDisplayName, heroBattlePower, normalizeHero, HERO_ITEM_MAP,
 } from '../../lib/hero';
 import { isActiveStudent } from '../../lib/studentState';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
@@ -25,7 +25,7 @@ export default function HeroDuelPage() {
   const [fireworks, setFireworks] = useState(false);
   const today = heroDateKey();
   const myHero = normalizeHero(student.rpg);
-  const myPower = heroPower(myHero);
+  const myPower = heroBattlePower(myHero);
   const duelState = student.heroDuel || {};
   const attempts = duelState.date === today ? Math.max(0, Number(duelState.count) || 0) : 0;
   const extraCost = heroDuelExtraCost(attempts);
@@ -40,7 +40,7 @@ export default function HeroDuelPage() {
     .filter(isActiveStudent)
     .map((item) => {
       const hero = normalizeHero(item.rpg);
-      return { ...item, hero, power: heroPower(hero) };
+      return { ...item, hero, power: heroBattlePower(hero) };
     })
     .filter((item) => item.hero.character), [students]);
 
@@ -53,7 +53,7 @@ export default function HeroDuelPage() {
     rankDelta: ordered.findIndex((candidate) => candidate.id === item.id) - myIndex,
   }));
   const selected = candidates.find((item) => item.id === selectedId) || null;
-  const chance = selected ? battleChance(myPower, selected.power) : 0;
+  const chance = selected ? heroBattleChance(myPower, selected.power, myHero) : 0;
   const selectedReward = selected ? heroDuelWinReward(selected.rankDelta) : HERO_DUEL_WIN_REWARD;
 
   useEffect(() => {
@@ -102,9 +102,9 @@ export default function HeroDuelPage() {
         const cash = Number(own.cash) || 0;
         if (cash < currentExtraCost) throw new Error(`추가 대결에는 ${currentExtraCost}${klass.currency}가 필요해요.`);
 
-        const currentPower = heroPower(currentHero);
-        const opponentPower = heroPower(opponentHero);
-        const winChance = battleChance(currentPower, opponentPower);
+        const currentPower = heroBattlePower(currentHero);
+        const opponentPower = heroBattlePower(opponentHero);
+        const winChance = heroBattleChance(currentPower, opponentPower, currentHero);
         const won = roll < winChance;
         const reward = won ? heroDuelWinReward(selected.rankDelta) : 0;
         const update = {

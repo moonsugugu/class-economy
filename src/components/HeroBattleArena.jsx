@@ -1,4 +1,4 @@
-import HeroPreview from '../three/Hero3D.jsx';
+import HeroCardVisual from './HeroCardVisual.jsx';
 import { fmt } from '../lib/util';
 import { bossCriticalMultiplier } from '../lib/hero.js';
 import MonsterVisual from './MonsterVisual.jsx';
@@ -16,22 +16,22 @@ export default function HeroBattleArena({ hero, power = 0, monster, phase = 'idl
   const monsterMotion = phase === 'attack' ? 'battle-monster-attack' : phase === 'win' || phase === 'lose' ? 'battle-monster-hit' : '';
   const showActionFx = phase === 'attack' || phase === 'win' || phase === 'lose';
   return (
-    <section className="battle-arena rounded-[2rem] border border-white/80 p-4 shadow-xl sm:p-6">
+    <section className="battle-arena hero-battle-card rounded-[2rem] border border-indigo-300/30 p-4 shadow-xl sm:p-6">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
-          <div className="text-[10px] font-bold tracking-[0.25em] text-indigo-400">BATTLE ARENA</div>
-          <h3 className="text-lg font-bold text-slate-700">{phaseText[phase] || phaseText.idle}</h3>
+          <div className="text-[10px] font-bold tracking-[0.25em] text-cyan-300">BATTLE ARENA</div>
+          <h3 className="text-lg font-bold text-white">{phaseText[phase] || phaseText.idle}</h3>
         </div>
-        <div className="rounded-2xl bg-white/70 px-3 py-2 text-right text-xs text-slate-500 backdrop-blur">
+        <div className="rounded-2xl border border-white/15 bg-slate-950/35 px-3 py-2 text-right text-xs text-indigo-100 backdrop-blur">
           <div>승리 확률</div>
-          <b className="text-lg text-indigo-600">{Math.round(chance * 100)}%</b>
+          <b className="text-lg text-cyan-200">{Math.round(chance * 100)}%</b>
         </div>
       </div>
 
       <div className="relative grid min-h-[270px] grid-cols-[1fr_auto_1fr] items-end gap-2 sm:gap-6">
         <div className={`relative flex flex-col items-center justify-end transition ${phase === 'win' ? 'battle-hero-win' : phase === 'lose' ? 'battle-hero-lose' : ''}`}>
-          <div className="mb-1 rounded-full bg-indigo-500/10 px-3 py-1 text-[10px] font-bold text-indigo-600">MY HERO</div>
-          <HeroPreview hero={hero} size={172} animated action={heroAction} />
+          <div className="mb-1 rounded-full bg-indigo-400/20 px-3 py-1 text-[10px] font-bold text-cyan-200">MY HERO</div>
+          <HeroCardVisual hero={hero} size={172} animated action={heroAction} />
           <div className="mt-[-6px] rounded-full bg-indigo-500 px-3 py-1 text-xs font-bold text-white shadow-lg">용사 전투력 {fmt(power)}</div>
         </div>
 
@@ -54,7 +54,7 @@ export default function HeroBattleArena({ hero, power = 0, monster, phase = 'idl
 
         <div className="relative flex flex-col items-center justify-end">
           <div className="mb-1 rounded-full bg-rose-500/10 px-3 py-1 text-[10px] font-bold text-rose-600">NEXT MONSTER</div>
-          <div className={['flex h-[172px] w-[172px] items-center justify-center rounded-[2rem] border-2 border-white/80 bg-gradient-to-b from-rose-50 to-orange-100 shadow-inner', monsterMotion].join(' ')}>
+          <div className={['flex h-[172px] w-[172px] items-center justify-center rounded-[2rem] border border-rose-200/30 bg-slate-950/35 shadow-inner', monsterMotion].join(' ')}>
             <div className="battle-monster drop-shadow-[0_10px_6px_rgba(124,45,18,.22)]">
               <MonsterVisual monster={monster} size={132} />
             </div>
@@ -62,7 +62,7 @@ export default function HeroBattleArena({ hero, power = 0, monster, phase = 'idl
           <div className="mt-[-6px] rounded-full bg-rose-500 px-3 py-1 text-xs font-bold text-white shadow-lg">{monster.name} · 전투력 {fmt(monster.power)}</div>
           {monster.boss && (
             <div className="mt-2 w-full max-w-[172px]">
-              <div className="mb-1 flex justify-between text-[10px] font-bold text-fuchsia-700">
+              <div className="mb-1 flex justify-between text-[10px] font-bold text-fuchsia-200">
                 <span>보스 HP</span>
                 <span>{fmt(Math.max(0, monster.maxHp - bossDamage))} / {fmt(monster.maxHp)}</span>
               </div>
@@ -78,7 +78,7 @@ export default function HeroBattleArena({ hero, power = 0, monster, phase = 'idl
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500">
+      <div className="mt-4 flex items-center justify-center gap-2 text-xs text-indigo-100">
         <span className={`h-2 w-2 rounded-full ${phase === 'win' ? 'bg-emerald-400' : phase === 'lose' ? 'bg-rose-400' : phase === 'idle' ? 'bg-slate-300' : 'bg-amber-400 animate-pulse'}`} />
         {phaseText[phase] || phaseText.idle}
       </div>
