@@ -85,7 +85,7 @@ export function bossRaidRewardPool(klass = {}, level) {
   return BOSS_RAID_DEFAULT_REWARD_POOL + (normalizeBossRaidLevel(level) - 1) * 25;
 }
 
-/** 날짜가 바뀌면 같은 단계라도 다른 디자인을 선택합니다. 단계는 학급 문서에서 순서대로 관리합니다. */
+/** 새 보스를 생성할 때 단계·날짜로 디자인을 고릅니다. 진행 중인 보스는 호출부에서 학급 문서에 보존해요. */
 export function bossRaidFor(level, dateKey = '') {
   const safeLevel = normalizeBossRaidLevel(level);
   const ordinal = dayOrdinal(dateKey);
@@ -135,4 +135,3 @@ export function allocateBossRaidRewards(participants = [], pool = 0) {
     .sort((a, b) => b.damage - a.damage || String(a.studentName || '').localeCompare(String(b.studentName || ''), 'ko'))
     .map(({ remainder, ...participant }, index) => ({ ...participant, rank: index + 1 }));
 }
-

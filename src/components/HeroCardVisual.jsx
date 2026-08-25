@@ -1,6 +1,6 @@
 import { HERO_ITEM_MAP, HERO_RARITIES, normalizeHero } from '../lib/hero';
 import arenaBackground from '../assets/hero-card-arena.png';
-import { HeroPetVisual } from './HeroItemVisual.jsx';
+import { HeroEquipmentOverlay, HeroPetVisual } from './HeroItemVisual.jsx';
 
 const FALLBACK_TONE = {
   main: '#5964d8',
@@ -24,6 +24,15 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
   const shoes = HERO_ITEM_MAP[hero.equipment.shoes];
   const accessory = HERO_ITEM_MAP[hero.equipment.accessory];
   const pet = HERO_ITEM_MAP[hero.pet];
+  const equipmentItems = [
+    ['helmet', helmet],
+    ['weapon', weapon],
+    ['armor', armor],
+    ['gloves', gloves],
+    ['shoes', shoes],
+    ['accessory', accessory],
+  ];
+  const equippedCount = equipmentItems.filter(([, item]) => item).length;
   const female = hero.character === 'hero_female';
   const characterTone = toneOf(character, female
     ? { main: '#7c3aed', accent: '#22d3ee', glow: '#f9a8d4', dark: '#26124f', hair: '#26124f' }
@@ -91,8 +100,14 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
       <div className="hero-card-ground" />
 
       {character?.visual?.art ? (
-        <div className="hero-card-art-wrap">
+        <div className={`hero-card-art-wrap hero-card-gear-count-${equippedCount}`}>
+          <div className="hero-card-art-backdrop" aria-hidden="true" />
           <img className="hero-card-art" src={character.visual.art} alt={character.name || '용사'} />
+          <div className="hero-card-gear-layer" aria-label={`장비 ${equippedCount}개 장착`}>
+            {equipmentItems.filter(([, item]) => item).map(([slot, item]) => (
+              <HeroEquipmentOverlay key={item.id} item={item} className={`hero-card-equip-${slot}`} />
+            ))}
+          </div>
         </div>
       ) : (
       <div className="hero-card-figure">

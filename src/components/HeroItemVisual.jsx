@@ -469,6 +469,15 @@ function ItemArtwork({ item }) {
   );
 }
 
+export function HeroEquipmentOverlay({ item, className = '' }) {
+  if (!item) return null;
+  return (
+    <span className={`hero-equipment-overlay ${className}`} aria-label={`${item.name} 장착`}>
+      <ItemArtwork item={item} />
+    </span>
+  );
+}
+
 export function HeroPetVisual({ item, size = 56, className = '' }) {
   if (!item) return null;
   return (

@@ -15,6 +15,32 @@ import { isActiveStudent } from '../../lib/studentState';
 import BossRaidVisual from '../../components/BossRaidVisual.jsx';
 import VictoryFireworks from '../../components/VictoryFireworks.jsx';
 
+function bossFromClassState(classData = {}, level, dateKey) {
+  const generated = bossRaidFor(level, dateKey);
+  const saved = classData.bossRaidActiveBoss;
+  if (!saved || typeof saved !== 'object' || normalizeBossRaidLevel(saved.level) !== generated.level || !saved.designId) {
+    return generated;
+  }
+  return {
+    ...generated,
+    ...saved,
+    level: generated.level,
+    maxHp: generated.maxHp,
+    visual: { ...generated.visual, ...(saved.visual || {}) },
+  };
+}
+
+function bossStateSnapshot(boss, rewardPool) {
+  return {
+    level: boss.level,
+    name: boss.name,
+    designId: boss.designId,
+    visual: boss.visual,
+    maxHp: boss.maxHp,
+    rewardPool,
+  };
+}
+
 export default function BossRaidPage() {
   const { klass, student } = useOutletContext();
   const [raid, setRaid] = useState(null);
@@ -30,16 +56,20 @@ export default function BossRaidPage() {
   const classRef = doc(db, 'classes', klass.id);
   const hero = normalizeHero(student.rpg);
   const levelPreview = normalizeBossRaidLevel(klass.bossRaidLevel);
-  const previewBoss = bossRaidFor(levelPreview, today);
+  const previewBoss = bossFromClassState(klass, levelPreview, today);
   const currentBoss = raid || previewBoss;
-  const rewardPool = Number(raid?.rewardPool) || bossRaidRewardPool(klass, currentBoss.level);
+  const rewardPool = Number(raid?.rewardPool) || Number(currentBoss.rewardPool) || bossRaidRewardPool(klass, currentBoss.level);
   const defeated = raid?.status === 'defeated';
   const completed = Boolean(klass.bossRaidComplete) && !raid;
   const raidFinished = defeated || completed;
   const myContribution = participants.find((participant) => participant.studentId === student.id) || null;
   const fixedDamage = hero.character ? Math.max(1, heroBattlePower(hero)) : 0;
   const totalDamage = Math.max(0, Number(raid?.totalDamage) || raidParticipantTotalDamage(participants));
-  const remainingHp = raidFinished ? 0 : raid ? Math.max(0, Number(raid.hp) || 0) : currentBoss.maxHp;
+  const savedHp = Number(klass.bossRaidHp);
+  const previewHp = Number.isFinite(savedHp) && savedHp > 0
+    ? Math.min(currentBoss.maxHp, savedHp)
+    : currentBoss.maxHp;
+  const remainingHp = raidFinished ? 0 : raid ? Math.max(0, Number(raid.hp) || 0) : previewHp;
   const nextLevel = Math.min(100, Number(currentBoss.level) + 1);
 
   useEffect(() => {
@@ -54,7 +84,18 @@ export default function BossRaidPage() {
           const classData = classSnap.data() || {};
           if (classData.bossRaidComplete) return;
           const level = normalizeBossRaidLevel(classData.bossRaidLevel);
-          const boss = bossRaidFor(level, today);
+          const savedBoss = classData.bossRaidActiveBoss;
+          const hasSavedBoss = Boolean(
+            savedBoss && typeof savedBoss === 'object' && savedBoss.designId
+              && normalizeBossRaidLevel(savedBoss.level) === level,
+          );
+          const boss = bossFromClassState(classData, level, today);
+          const rewardPoolForBoss = hasSavedBoss && Number(savedBoss.rewardPool) > 0
+            ? Math.floor(Number(savedBoss.rewardPool))
+            : bossRaidRewardPool(classData, boss.level);
+          const startingHp = hasSavedBoss && Number.isFinite(Number(classData.bossRaidHp))
+            ? Math.max(0, Math.min(boss.maxHp, Number(classData.bossRaidHp)))
+            : boss.maxHp;
           tx.set(raidRef, {
             dateKey: today,
             status: 'active',
@@ -63,13 +104,19 @@ export default function BossRaidPage() {
             designId: boss.designId,
             visual: boss.visual,
             maxHp: boss.maxHp,
-            hp: boss.maxHp,
-            rewardPool: bossRaidRewardPool(classData, boss.level),
+            hp: startingHp,
+            rewardPool: rewardPoolForBoss,
             totalDamage: 0,
             participantCount: 0,
             createdAt: Date.now(),
             updatedAt: Date.now(),
           });
+          if (!hasSavedBoss) {
+            tx.update(classRef, {
+              bossRaidActiveBoss: bossStateSnapshot(boss, rewardPoolForBoss),
+              bossRaidHp: startingHp,
+            });
+          }
         });
       } catch (error) {
         if (alive) setMsg({ type: 'err', text: `오늘 보스를 불러오지 못했어요: ${error.message}` });
@@ -151,6 +198,10 @@ export default function BossRaidPage() {
             participantCount: (Number(currentRaid.participantCount) || 0) + (participantSnap.exists() ? 0 : 1),
             updatedAt: Date.now(),
           });
+          tx.update(classRef, {
+            bossRaidActiveBoss: bossStateSnapshot(currentRaid, Number(currentRaid.rewardPool) || bossRaidRewardPool(classSnap.data() || {}, currentRaid.level)),
+            bossRaidHp: nextHp,
+          });
           tx.set(doc(participantCollection, student.id), nextParticipant, { merge: true });
           result = { damage, defeated: false, reward: 0, hp: nextHp };
           return;
@@ -163,13 +214,14 @@ export default function BossRaidPage() {
         );
         participantMap.set(student.id, { id: student.id, ...nextParticipant });
         const payouts = allocateBossRaidRewards([...participantMap.values()], Number(currentRaid.rewardPool) || bossRaidRewardPool(classSnap.data() || {}, currentRaid.level));
+        const finalTotalDamage = raidParticipantTotalDamage([...participantMap.values()]);
         const payoutStudentRefs = payouts.map((payout) => doc(db, 'classes', klass.id, 'students', payout.studentId));
         const payoutStudentSnaps = await Promise.all(payoutStudentRefs.map((ref) => tx.get(ref)));
         const payoutById = new Map(payouts.map((payout) => [payout.studentId, payout]));
 
         tx.update(raidRef, {
           hp: 0,
-          totalDamage: Number(currentRaid.maxHp) || (Number(currentRaid.totalDamage) || 0) + damage,
+          totalDamage: finalTotalDamage,
           participantCount: participantMap.size,
           status: 'defeated',
           defeatedAt: Date.now(),
@@ -177,8 +229,18 @@ export default function BossRaidPage() {
           updatedAt: Date.now(),
         });
         tx.update(classRef, currentRaid.level >= 100
-          ? { bossRaidComplete: true, bossRaidLastDefeatedDate: today }
-          : { bossRaidLevel: Math.min(100, Number(currentRaid.level) + 1), bossRaidLastDefeatedDate: today });
+          ? {
+            bossRaidComplete: true,
+            bossRaidLastDefeatedDate: today,
+            bossRaidActiveBoss: null,
+            bossRaidHp: 0,
+          }
+          : {
+            bossRaidLevel: Math.min(100, Number(currentRaid.level) + 1),
+            bossRaidLastDefeatedDate: today,
+            bossRaidActiveBoss: null,
+            bossRaidHp: 0,
+          });
 
         payouts.forEach((payout, index) => {
           const payoutRef = doc(participantCollection, payout.studentId);
@@ -319,7 +381,7 @@ export default function BossRaidPage() {
           ? '🏆 100단계 최종 보스를 정복했어요! 학급 보스레이드가 완주되었습니다.'
           : defeated
             ? `내일은 ${nextLevel}단계의 새로운 보스가 순서대로 등장해요.`
-            : `오늘 보스를 잡지 못하면 내일 같은 ${currentBoss.level}단계에서 다른 디자인의 보스로 다시 시작해요.`}
+            : `오늘 보스를 잡지 못하면 내일도 같은 ${currentBoss.level}단계 보스가 남은 HP 그대로 이어져요.`}
       </div>
     </div>
   );
