@@ -3,7 +3,7 @@ import { useOutletContext, Link } from 'react-router-dom';
 import { collection, doc, query, where, onSnapshot, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt, netAssets } from '../../lib/util';
-import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT } from '../../lib/stocks';
+import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT, mergeSeedStocks } from '../../lib/stocks';
 import { ensureBaselines } from '../../lib/marketSync';
 import AvatarView from '../../components/AvatarView';
 import { PROFILE_ITEMS, PROFILE_SLOTS, normalizeProfileOwned } from '../../lib/profile';
@@ -115,7 +115,7 @@ export default function MyPage() {
   useEffect(() => {
     return onSnapshot(doc(db, ...MARKET_PATH(klass.id)), (snap) => {
       const data = snap.exists() ? snap.data() : null;
-      setStocks((data?.stocks || []).map((s) => ({ id: s.symbol, ...s })));
+      setStocks(mergeSeedStocks(data?.stocks || []).map((s) => ({ id: s.symbol, ...s })));
       setFx(data?.fx || DEFAULT_FX);
     });
   }, [klass.id]);

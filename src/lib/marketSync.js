@@ -2,7 +2,7 @@ import { doc, updateDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   MARKET_PATH, advance, dueScheduleKeys, nextFx, DEFAULT_FX,
-  fetchRealQuotes, applyRealPrices,
+  fetchRealQuotes, applyRealPrices, mergeSeedStocks, stockListsEqual,
 } from './stocks';
 import { periodKeys, rankAssets } from './util';
 
@@ -22,6 +22,20 @@ export async function ensureBaselines(classId, student, stocks, fx, krwPerUnit =
   try {
     await updateDoc(doc(db, 'classes', classId, 'students', student.id), upd);
   } catch { /* 실패해도 게임 진행에는 지장 없음 */ }
+}
+
+/** 예전 시장 문서의 ???·누락 필드·중복 종목을 한 번에 복구합니다. */
+export async function repairMarketStocks(classId) {
+  const ref = doc(db, ...MARKET_PATH(classId));
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return false;
+    const current = snap.data()?.stocks || [];
+    const stocks = mergeSeedStocks(current);
+    if (stockListsEqual(current, stocks)) return false;
+    tx.update(ref, { stocks, updatedAt: Date.now() });
+    return true;
+  });
 }
 
 /**
@@ -47,10 +61,10 @@ export async function applyScheduledTicks(classId) {
       const m = snap.data();
       const done = m.schedDone || [];
       const todo = dueScheduleKeys().filter((k) => !done.includes(k));
-      if (!todo.length) return;
-
-      let stocks = m.stocks || [];
+      let stocks = mergeSeedStocks(m.stocks || []);
       let fx = m.fx || DEFAULT_FX;
+      const repaired = !stockListsEqual(m.stocks || [], stocks);
+      if (!todo.length && !repaired) return;
 
       if (real?.prices) {
         stocks = applyRealPrices(stocks, real.prices);

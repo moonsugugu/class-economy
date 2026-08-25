@@ -3,7 +3,7 @@ import {
   collection, doc, getDoc, getDocs, updateDoc, writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { advance, MARKET_PATH } from '../../lib/stocks';
+import { advance, MARKET_PATH, mergeSeedStocks } from '../../lib/stocks';
 import {
   ECONOMY_EVENTS,
   activeEconomyEvents,
@@ -73,7 +73,7 @@ export default function EconomyEventsPanel({ klass }) {
 
       if (marketSnap.exists() && Array.isArray(marketSnap.data()?.stocks)) {
         const market = marketSnap.data();
-        const stocks = market.stocks.map((stock) => {
+        const stocks = mergeSeedStocks(market.stocks).map((stock) => {
           const symbol = stock.symbol || stock.id;
           const globalPct = Number(effects.stockChangePct) || 0;
           const targetPct = Array.isArray(effects.stockSymbols) && effects.stockSymbols.includes(symbol)

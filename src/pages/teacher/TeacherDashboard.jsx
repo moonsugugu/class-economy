@@ -9,7 +9,7 @@ import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 import { fmt, makeClassCode, netAssets } from '../../lib/util';
 import {
-  changePct, advance, usedTicks, makeInitialMarket, makeCustomStock, mergeSeedStocks, normalizeStocks,
+  changePct, advance, usedTicks, makeInitialMarket, makeCustomStock, mergeSeedStocks, stockListsEqual,
   MARKET_PATH, MARKET_LABEL, DEFAULT_TICK_LIMIT, MAX_TICK_LIMIT, normalizedTickLimit, AUTO_TICK_MS, DEFAULT_FX, todayKey,
   pendingSchedule, SCHEDULE_LABEL, fetchRealQuotes, applyRealPrices,
   DEFAULT_KRW_PER_UNIT,
@@ -355,7 +355,7 @@ function StudentsTab({ klass }) {
     });
     return totals;
   }, [loans]);
-  const marketStocks = market?.stocks || [];
+  const marketStocks = mergeSeedStocks(market?.stocks || []);
   const fx = Number(market?.fx) || DEFAULT_FX;
   const kpu = Number(klass.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
   const wholeFmt = (value) => fmt(Math.floor(Number(value) || 0));
@@ -1266,11 +1266,7 @@ function StocksTab({ klass }) {
   useEffect(() => {
     if (!market?.stocks) return;
     const stocks = mergeSeedStocks(market.stocks);
-    const needsRepair = stocks.length !== market.stocks.length
-      || stocks.some((stock, index) => (
-        stock.symbol !== market.stocks[index]?.symbol
-        || stock.name !== market.stocks[index]?.name
-      ));
+    const needsRepair = !stockListsEqual(market.stocks, stocks);
     if (!needsRepair) return;
     updateDoc(mref, { stocks, updatedAt: Date.now() })
       .then(() => flash(
@@ -1439,7 +1435,7 @@ function StocksTab({ klass }) {
     );
   }
 
-  const displayStocks = normalizeStocks(market.stocks || []);
+  const displayStocks = mergeSeedStocks(market.stocks || []);
   const list = displayStocks.filter((s) => filter === 'ALL' || s.market === filter);
   const customCount = displayStocks.filter((s) => s.market === 'CUSTOM').length;
   const stockPriceLabels = (stock) => {

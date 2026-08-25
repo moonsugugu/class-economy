@@ -9,9 +9,9 @@ import { fmt, periodKeys, rankAssets } from '../../lib/util';
 import {
   changePct, MARKET_PATH, MARKET_LABEL, DEFAULT_FX, DEFAULT_KRW_PER_UNIT,
   pendingSchedule, SCHEDULE_LABEL, stockCur, WALLET_FIELD,
-  normalizeStocks,
+  mergeSeedStocks, stockListsEqual, stockNameFor,
 } from '../../lib/stocks';
-import { applyScheduledTicks } from '../../lib/marketSync';
+import { applyScheduledTicks, repairMarketStocks } from '../../lib/marketSync';
 import { isActiveStudent } from '../../lib/studentState';
 import { TAX_LEDGER_ID, stockTradeTax } from '../../lib/taxes';
 
@@ -43,7 +43,7 @@ export default function StocksPage() {
   const [msg, setMsg] = useState(null);
   const [filter, setFilter] = useState('ALL');
 
-  const stocks = normalizeStocks(market?.stocks || []).map((s) => ({ id: s.symbol, ...s }));
+  const stocks = mergeSeedStocks(market?.stocks || []).map((s) => ({ id: s.symbol, ...s }));
   const fx = market?.fx || DEFAULT_FX;
 
   // 시장 전체가 문서 1개 — 읽기 비용이 예전의 1/20이에요
@@ -52,6 +52,12 @@ export default function StocksPage() {
       setMarket(snap.exists() ? snap.data() : null);
     });
   }, [klass.id]);
+
+  // 학생 화면에 들어와도 예전 문서의 누락 종목·??? 이름을 안전하게 복구해요.
+  useEffect(() => {
+    if (!market?.stocks) return;
+    repairMarketStocks(klass.id).catch(() => { /* 표시에는 이미 복구값을 사용합니다. */ });
+  }, [market?.stocks, klass.id]);
 
   // 예약 시세 변동(아침 8:30 · 오후 3:00) — 밀린 게 있으면 딱 한 번 적용
   useEffect(() => {
@@ -96,8 +102,12 @@ export default function StocksPage() {
         const mkt = (await tx.get(marketRef)).data();
         const s = (await tx.get(studentRef)).data();
         const settings = { ...klass, ...((await tx.get(classRef)).data() || {}) };
-        const st = (mkt?.stocks || []).find((x) => x.symbol === sel.id);
+        const liveStocks = mergeSeedStocks(mkt?.stocks || []);
+        const st = liveStocks.find((x) => x.symbol === sel.id);
         if (!st) throw new Error('지금은 거래할 수 없는 종목이에요.');
+        if (!stockListsEqual(mkt?.stocks || [], liveStocks)) {
+          tx.update(marketRef, { stocks: liveStocks, updatedAt: Date.now() });
+        }
         const price = st.price;
         const cur = stockCur(st);                 // KRW(한국) / USD(미국) / UNIT(우리 반)
         const field = WALLET_FIELD[cur];
@@ -226,7 +236,7 @@ export default function StocksPage() {
       </div>
 
       {tab === 'rank' && <RankBoard klass={klass} student={student} stocks={stocks} fx={fx} kpu={kpu} />}
-      {tab === 'log' && <TradeLog klass={klass} student={student} />}
+      {tab === 'log' && <TradeLog klass={klass} student={student} stocks={stocks} />}
 
       {tab === 'market' && (
         <>
@@ -430,7 +440,7 @@ function RankBoard({ klass, student, stocks, fx, kpu }) {
 }
 
 /* ---------- 📒 매매일지 ---------- */
-function TradeLog({ klass, student }) {
+function TradeLog({ klass, student, stocks }) {
   const [rows, setRows] = useState(null);
   const [mine, setMine] = useState(true);
 
@@ -467,7 +477,8 @@ function TradeLog({ klass, student }) {
             </span>
             <span className="flex-1">
               {!mine && <b className="text-gray-500">{t.studentName} </b>}
-              {t.name} <span className="text-gray-400">{t.qty}주</span>
+              {stocks.find((stock) => stock.symbol === t.symbol)?.name
+                || stockNameFor({ symbol: t.symbol, name: t.name })} <span className="text-gray-400">{t.qty}주</span>
             </span>
             <span className="tabular-nums text-gray-500">
               {t.cur === 'USD' ? '$' : ''}{fmt(t.total)}

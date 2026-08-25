@@ -5,7 +5,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt, netAssets } from '../../lib/util';
-import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT } from '../../lib/stocks';
+import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT, mergeSeedStocks } from '../../lib/stocks';
 import { isActiveStudent } from '../../lib/studentState';
 import {
   DEFAULT_LOTTERY_DISTRIBUTION_RATE,
@@ -92,7 +92,7 @@ export default function LotteryTab({ klass }) {
       ...student,
       assets: netAssets(
         student,
-        market?.stocks || [],
+        mergeSeedStocks(market?.stocks || []),
         fx,
         kpu,
         accounts.filter((account) => account.studentId === student.id),

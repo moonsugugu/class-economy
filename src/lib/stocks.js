@@ -48,30 +48,124 @@ export const STOCK_SEED = [
 ];
 
 const STOCK_SEED_BY_SYMBOL = new Map(STOCK_SEED.map((stock) => [stock.symbol, stock]));
+const STOCK_SEED_BY_NAME = new Map(
+  STOCK_SEED.map((stock) => [String(stock.name).replace(/\s+/g, '').toUpperCase(), stock])
+);
+const STOCK_SEED_BY_QUOTE_SYMBOL = new Map(
+  Object.entries(QUOTE_SYMBOL_MAP)
+    .map(([symbol, quote]) => [String(quote).toUpperCase(), STOCK_SEED_BY_SYMBOL.get(symbol)])
+    .filter(([, stock]) => stock)
+);
+
+const stockLookupKey = (value) => String(value ?? '').normalize('NFKC').trim().replace(/\s+/g, '').toUpperCase();
 
 const isBrokenStockName = (value) => {
-  const name = String(value || '').trim();
-  return !name || /^[?？\s]+$/.test(name);
+  const name = String(value ?? '').trim();
+  if (!name) return true;
+  const lower = name.toLowerCase().replace(/\s+/g, '');
+  return /^(?:\?+|？+|undefined|null|n\/a|na|unknown|알수없음|이름없음)$/.test(lower)
+    || /[?？]{2,}/.test(name);
 };
+
+const stockSymbolValue = (stock = {}) => String(
+  stock.symbol || stock.id || stock.ticker || stock.code || stock.stockCode || ''
+).trim();
+
+const stockNameValue = (stock = {}) => {
+  const values = [stock.name, stock.stockName, stock.displayName, stock.title, stock.label];
+  return values.find((value) => !isBrokenStockName(value)) || stock.name || '';
+};
+
+function seedForStock(stock = {}) {
+  const symbol = stockLookupKey(stockSymbolValue(stock));
+  const name = stockLookupKey(stockNameValue(stock));
+  return STOCK_SEED_BY_SYMBOL.get(symbol)
+    || STOCK_SEED_BY_QUOTE_SYMBOL.get(symbol)
+    || STOCK_SEED_BY_QUOTE_SYMBOL.get(symbol.replace(/\.(?:KS|KQ)$/, ''))
+    || STOCK_SEED_BY_NAME.get(name)
+    || null;
+}
 
 /** 예전 시장 문서에 이름이 비어 있거나 ???로 저장된 종목을 표시 가능한 이름으로 복구합니다. */
 export function stockNameFor(stock = {}) {
-  const symbol = stock.symbol || stock.id;
-  if (!isBrokenStockName(stock.name)) return String(stock.name).trim();
-  return STOCK_SEED_BY_SYMBOL.get(symbol)?.name || `우리 반 종목 (${symbol || '이름 없음'})`;
+  const rawName = stockNameValue(stock);
+  if (!isBrokenStockName(rawName)) return String(rawName).trim();
+  const seed = seedForStock(stock);
+  const symbol = stockSymbolValue(stock) || seed?.symbol || '';
+  return seed?.name || `우리 반 종목 (${symbol || '이름 없음'})`;
 }
 
+const validPrice = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
+
 export function normalizeStock(stock = {}) {
-  const symbol = stock.symbol || stock.id;
+  const seed = seedForStock(stock);
+  const rawSymbol = stockSymbolValue(stock);
+  const symbol = rawSymbol || seed?.symbol || '';
+  const price = validPrice(stock.price) ? Number(stock.price) : seed?.base;
+  const prevClose = validPrice(stock.prevClose) ? Number(stock.prevClose) : price;
+  const history = Array.isArray(stock.history)
+    ? stock.history.map(Number).filter((value) => value > 0)
+    : [];
   return {
     ...stock,
     ...(symbol ? { symbol } : {}),
+    ...(seed?.market || stock.market ? { market: seed?.market || stock.market } : {}),
+    ...(validPrice(price) ? { price } : {}),
+    ...(validPrice(prevClose) ? { prevClose } : {}),
+    ...(history.length ? { history } : validPrice(price) ? { history: [price] } : {}),
     name: stockNameFor({ ...stock, symbol }),
   };
 }
 
+const stockIdentity = (stock) => {
+  const seed = seedForStock(stock);
+  if (seed) return `seed:${seed.symbol}`;
+  const symbol = stockSymbolValue(stock);
+  return symbol ? `symbol:${symbol}` : '';
+};
+
+/** 화면과 저장 전 모두 같은 종목은 하나로 합쳐 중복·누락 필드를 없앱니다. */
 export function normalizeStocks(stocks = []) {
-  return (Array.isArray(stocks) ? stocks : []).map(normalizeStock);
+  const result = [];
+  const positions = new Map();
+  (Array.isArray(stocks) ? stocks : []).forEach((stock, index) => {
+    const normalized = normalizeStock(stock || {});
+    const identity = stockIdentity(normalized) || `row:${index}`;
+    const previousIndex = positions.get(identity);
+    if (previousIndex == null) {
+      positions.set(identity, result.length);
+      result.push(normalized);
+      return;
+    }
+
+    const previous = result[previousIndex];
+    result[previousIndex] = {
+      ...normalized,
+      ...previous,
+      symbol: previous.symbol || normalized.symbol,
+      market: previous.market || normalized.market,
+      name: isBrokenStockName(previous.name) ? normalized.name : previous.name,
+      price: validPrice(previous.price) ? previous.price : normalized.price,
+      prevClose: validPrice(previous.prevClose) ? previous.prevClose : normalized.prevClose,
+      history: Array.isArray(previous.history) && previous.history.length ? previous.history : normalized.history,
+    };
+  });
+  return result;
+}
+
+/** 두 목록이 저장해야 할 종목 식별자·표시 정보·기본 가격이 같은지 확인합니다. */
+export function stockListsEqual(left = [], right = []) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  return right.every((stock, index) => {
+    const previous = left[index] || {};
+    const previousSymbol = stockSymbolValue(previous);
+    return stock.symbol === previousSymbol
+      && stock.name === previous.name
+      && stock.market === previous.market
+      && Number(stock.price || 0) === Number(previous.price || 0)
+      && Number(stock.prevClose || 0) === Number(previous.prevClose || 0)
+      && JSON.stringify(stock.history || []) === JSON.stringify(previous.history || []);
+  });
 }
 
 // 랜덤워크: 한 틱에 최대 ±3% 변동
@@ -126,7 +220,7 @@ export function makeInitialMarket() {
 /** 기존 시장 문서를 보존하면서 새 기본 종목만 뒤에 추가합니다. */
 export function mergeSeedStocks(stocks = []) {
   const normalized = normalizeStocks(stocks);
-  const existing = new Set(normalized.map((s) => s.symbol));
+  const existing = new Set(normalized.map((s) => seedForStock(s)?.symbol || s.symbol));
   const additions = STOCK_SEED
     .filter((s) => !existing.has(s.symbol))
     .map((s) => ({

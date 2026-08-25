@@ -4,7 +4,7 @@ import { collection, doc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 import { fmt, netAssets } from '../../lib/util';
-import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT } from '../../lib/stocks';
+import { MARKET_PATH, DEFAULT_FX, DEFAULT_KRW_PER_UNIT, mergeSeedStocks } from '../../lib/stocks';
 import { activeEconomyEvents, eventEffectSummary } from '../../lib/economyEvents.js';
 import FeatureGuideModal from '../../components/FeatureGuideModal.jsx';
 
@@ -86,7 +86,7 @@ export default function StudentLayout() {
 
   // 총자산 = 현금 + 예금 + 적금 + 달러 + 주식 평가액
   const fx = market?.fx || DEFAULT_FX;
-  const stockList = market?.stocks || [];
+  const stockList = mergeSeedStocks(market?.stocks || []);
   const kpu = Number(klass?.krwPerUnit) || DEFAULT_KRW_PER_UNIT;
   const totalAssets = student ? netAssets(student, stockList, fx, kpu, savings, loans) : 0;
   const currentEvents = activeEconomyEvents(klass || {});
