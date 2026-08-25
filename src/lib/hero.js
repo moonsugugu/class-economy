@@ -369,16 +369,22 @@ export function normalizeHero(raw = {}) {
   // 화면이 이해하지 못하는 미래/구버전 필드도 먼저 보존합니다.
   // 정규화는 계산용 값만 보정하고, 학생 문서에 있던 데이터 자체를 삭제하지 않아요.
   const source = raw && typeof raw === 'object' ? raw : {};
-  const owned = Array.isArray(source.owned)
+  const listedOwned = Array.isArray(source.owned)
     ? [...new Set(source.owned.filter((id) => typeof id === 'string' && id.trim()))]
     : [];
   const equipment = source.equipment && typeof source.equipment === 'object' ? { ...source.equipment } : {};
-  const character = owned.includes(source.character) && HERO_ITEM_MAP[source.character]?.slot === 'character'
+  // 구버전 문서에는 장착 정보만 있고 owned 배열에 캐릭터·장비가 빠진 경우가 있어요.
+  // 장착되어 있다는 것은 이미 구매했다는 뜻이므로 계산용 소유 목록에 합쳐 기존 학생도 대결·인벤토리를 이용하게 합니다.
+  const equippedIds = Object.values(equipment).filter((id) => typeof id === 'string' && id.trim());
+  const implicitOwned = [source.character, source.pet, ...equippedIds]
+    .filter((id) => HERO_ITEM_MAP[id]);
+  const owned = [...new Set([...listedOwned, ...implicitOwned])];
+  const character = HERO_ITEM_MAP[source.character]?.slot === 'character'
     ? source.character
-    : null;
-  const pet = owned.includes(source.pet) && HERO_ITEM_MAP[source.pet]?.slot === 'pet'
+    : owned.find((id) => HERO_ITEM_MAP[id]?.slot === 'character') || null;
+  const pet = HERO_ITEM_MAP[source.pet]?.slot === 'pet'
     ? source.pet
-    : null;
+    : owned.find((id) => HERO_ITEM_MAP[id]?.slot === 'pet') || null;
   const bossProgress = source.bossProgress && typeof source.bossProgress === 'object'
     ? Object.fromEntries(Object.entries(source.bossProgress)
       .map(([level, damage]) => [level, Math.max(0, Number(damage) || 0)]))

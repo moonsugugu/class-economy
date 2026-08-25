@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
 import { doc, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmt } from '../../lib/util';
@@ -14,16 +14,26 @@ import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
 
 export default function HeroShopPage() {
   const { klass, student } = useOutletContext();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [busyId, setBusyId] = useState(null);
   const [msg, setMsg] = useState(null);
-  const [view, setView] = useState('shop');
+  const requestedView = ['shop', 'catalog', 'inventory'].includes(searchParams.get('view'))
+    ? searchParams.get('view')
+    : 'shop';
+  const [view, setView] = useState(requestedView);
   const hero = normalizeHero(student.rpg);
   const today = heroDateKey();
   const refreshes = hero.shop.date === today ? hero.shop.refreshes : 0;
   const shopIds = Object.values(heroShopFor(klass.id, today, refreshes)).flat();
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
   const characters = HERO_ITEMS.filter((item) => item.slot === 'character');
+  const inventoryItems = HERO_ITEMS.filter((item) => hero.owned.includes(item.id));
   const costOf = (item) => itemPrice(item.price, klass);
+
+  const changeView = (nextView) => {
+    setView(nextView);
+    setSearchParams(nextView === 'shop' ? {} : { view: nextView });
+  };
 
   const flash = (type, text) => {
     setMsg({ type, text });
@@ -230,9 +240,15 @@ export default function HeroShopPage() {
         <Link to="/student/hero" className="ml-auto text-sm text-indigo-500 underline">← 용사 화면</Link>
       </div>
       <div className="flex gap-2">
-        <button onClick={() => setView('shop')} className={`rounded-xl px-3 py-1.5 text-sm ${view === 'shop' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-500'}`}>오늘 상점</button>
-        <button onClick={() => setView('catalog')} className={`rounded-xl px-3 py-1.5 text-sm ${view === 'catalog' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-500'}`}>전체 20단계 도감</button>
+        <button onClick={() => changeView('inventory')} className={`rounded-xl px-3 py-1.5 text-sm ${view === 'inventory' ? 'bg-emerald-500 text-white' : 'bg-white text-gray-500'}`}>📦 내 인벤토리 ({inventoryItems.length})</button>
+        <button onClick={() => changeView('shop')} className={`rounded-xl px-3 py-1.5 text-sm ${view === 'shop' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-500'}`}>오늘 상점</button>
+        <button onClick={() => changeView('catalog')} className={`rounded-xl px-3 py-1.5 text-sm ${view === 'catalog' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-500'}`}>전체 20단계 도감</button>
       </div>
+      {view === 'inventory' && (
+        <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          📦 구매한 아이템만 모아 두었어요. 장착하거나 구매가의 50%로 환불할 수 있어요. 강화한 아이템은 누적 강화 투자액도 환불가에 포함돼요.
+        </div>
+      )}
       <div className="rounded-2xl bg-amber-50 text-amber-700 px-4 py-3 text-sm flex items-center gap-2 flex-wrap">
         <span>내 현금: <b>{fmt(student.cash)} {klass.currency}</b> · {pricePolicyLabel(klass, klass.currency)} · 구매 후 장착해야 패시브가 적용돼요.</span>
         <button onClick={refreshShop} disabled={!!busyId || refreshes >= HERO_SHOP_REFRESH_LIMIT} className="ml-auto rounded-xl px-3 py-1.5 bg-amber-500 text-white disabled:bg-gray-300">
@@ -244,7 +260,7 @@ export default function HeroShopPage() {
       <section>
         <h3 className="text-lg text-gray-600 mb-2">🧙 캐릭터 선택</h3>
         <div className="grid grid-cols-2 gap-3">
-          {characters.map((item) => {
+          {characters.filter((item) => view !== 'inventory' || hero.owned.includes(item.id)).map((item) => {
             const previewHero = { ...hero, character: item.id };
             return (
               <div key={item.id} className="hero-shop-card hero-shop-character relative overflow-hidden rounded-3xl border-2 p-4 text-center shadow-lg">
@@ -285,25 +301,35 @@ export default function HeroShopPage() {
           장착한 펫은 보스전에서 일정 확률로 치명타를 발생시켜요. 치명타가 터진 순간에만 기본 2배 피해를 주고, 치명타 피해 +5%가 붙으면 2.05배가 됩니다. 일반 몬스터 공격과 일반 피해에는 2배가 적용되지 않아요. 펫의 기본 전투력은 0이지만 강화로 얻은 전투력과 패시브는 반영돼요.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {(view === 'shop'
-            ? HERO_PETS.filter((item) => shopIds.includes(item.id))
-            : HERO_PETS
-          ).map((item) => card(item, view === 'shop' && shopIds.includes(item.id)))}
+          {(view === 'inventory'
+            ? HERO_PETS.filter((item) => hero.owned.includes(item.id))
+            : view === 'shop'
+              ? HERO_PETS.filter((item) => shopIds.includes(item.id))
+              : HERO_PETS
+          ).map((item) => card(item, view === 'inventory' || (view === 'shop' && shopIds.includes(item.id))))}
         </div>
+        {view === 'inventory' && !HERO_PETS.some((item) => hero.owned.includes(item.id)) && (
+          <p className="py-6 text-center text-sm text-gray-400">구매한 펫이 아직 없어요.</p>
+        )}
       </section>
 
       {HERO_SLOTS.map(([slot, label]) => (
         <section key={slot}>
           <div className="flex items-center gap-2 mb-2">
             <h3 className="text-lg text-gray-600">{label}</h3>
-            <span className="text-xs text-gray-400">20단계 · 오늘 3개 판매</span>
+            <span className="text-xs text-gray-400">{view === 'inventory' ? `${inventoryItems.filter((item) => item.slot === slot).length}개 보유` : '20단계 · 오늘 3개 판매'}</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {(view === 'shop'
-              ? HERO_ITEMS.filter((item) => item.slot === slot && shopIds.includes(item.id))
-              : HERO_ITEMS.filter((item) => item.slot === slot)
-            ).map((item) => card(item, view === 'shop' && shopIds.includes(item.id)))}
+            {(view === 'inventory'
+              ? HERO_ITEMS.filter((item) => item.slot === slot && hero.owned.includes(item.id))
+              : view === 'shop'
+                ? HERO_ITEMS.filter((item) => item.slot === slot && shopIds.includes(item.id))
+                : HERO_ITEMS.filter((item) => item.slot === slot)
+            ).map((item) => card(item, view === 'inventory' || (view === 'shop' && shopIds.includes(item.id))))}
           </div>
+          {view === 'inventory' && !inventoryItems.some((item) => item.slot === slot) && (
+            <p className="py-6 text-center text-sm text-gray-400">구매한 {label}이(가) 아직 없어요.</p>
+          )}
         </section>
       ))}
     </div>

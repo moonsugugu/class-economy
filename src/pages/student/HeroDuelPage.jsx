@@ -32,7 +32,7 @@ export default function HeroDuelPage() {
 
   useEffect(() => (
     onSnapshot(collection(db, 'classes', klass.id, 'students'), (snap) => {
-      setStudents(snap.docs.map((item) => ({ id: item.id, ...item.data() })));
+      setStudents(snap.docs.map((item) => ({ ...item.data(), id: item.id })));
     })
   ), [klass.id]);
 
@@ -45,7 +45,7 @@ export default function HeroDuelPage() {
     .filter((item) => item.hero.character), [students]);
 
   const ordered = useMemo(() => [...ranked].sort(sortByPower), [ranked]);
-  const myIndex = ordered.findIndex((item) => item.id === student.id);
+  const myIndex = ordered.findIndex((item) => String(item.id) === String(student.id));
   const above = myIndex >= 0 ? ordered.slice(Math.max(0, myIndex - 2), myIndex) : [];
   const below = myIndex >= 0 ? ordered.slice(myIndex + 1, myIndex + 3) : [];
   const candidates = [...above, ...below].map((item) => ({
@@ -234,7 +234,7 @@ export default function HeroDuelPage() {
         <>
           <div className="rounded-3xl bg-white p-5 shadow">
             <h3 className="mb-1 text-lg text-gray-700">🎯 대결 상대 선택</h3>
-            <p className="mb-4 text-xs text-gray-400">내 전투력 순위에서 위 2명·아래 2명, 최대 4명 중에서 선택할 수 있어요.</p>
+            <p className="mb-4 text-xs text-gray-400">내 전투력 순위에서 위 {above.length}/2명·아래 {below.length}/2명, 최대 4명 중에서 선택할 수 있어요.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               {above.map((item) => opponentCard(item, '전투력 위'))}
               {below.map((item) => opponentCard(item, '전투력 아래'))}

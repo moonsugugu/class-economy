@@ -400,7 +400,7 @@ export default function HeroPage() {
             </button>
           </div>
           <p className="mt-3 text-center text-[11px] text-gray-400">장착 아이템을 누르면 강화 창이 열려요.</p>
-          <Link to="/student/hero/shop" className="block text-center text-sm text-indigo-500 underline mt-1">장비 바꾸러 가기 →</Link>
+          <Link to="/student/hero/shop?view=inventory" className="block text-center text-sm text-indigo-500 underline mt-1">내 장비 바꾸러 가기 →</Link>
         </div>
       </div>
 
