@@ -41,6 +41,7 @@ import RecoveryTab from './RecoveryTab.jsx';
 import MissionsTab from './MissionsTab.jsx';
 import LotteryTab from './LotteryTab.jsx';
 import FeatureGuideModal from '../../components/FeatureGuideModal.jsx';
+import StudentShowcaseTab from './StudentShowcaseTab.jsx';
 
 const card = 'bg-white rounded-3xl shadow p-6';
 const input = 'rounded-xl border-2 border-gray-200 px-3 py-2 focus:border-indigo-400 outline-none';
@@ -170,6 +171,7 @@ export default function TeacherDashboard() {
 
   const tabs = [
     ['students', '🧑‍🎓', '학생', 'from-emerald-400 to-teal-500'],
+    ['showcase', '🏠', '학생 구경', 'from-pink-400 to-violet-500'],
     ['shop', '🏪', '상점', 'from-amber-400 to-orange-500'],
     ['alerts', '🔔', pendingCount + pendingPaymentCount ? `알림 ${pendingCount + pendingPaymentCount}` : '알림', 'from-rose-400 to-pink-500'],
     ['stocks', '📈', '주식', 'from-blue-400 to-indigo-500'],
@@ -248,22 +250,27 @@ export default function TeacherDashboard() {
 
       {klass && (
         <>
-          <nav className="flex gap-2 mb-5 flex-wrap">
-            {tabs.map(([id, emoji, label, grad]) => (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className={`px-4 py-2.5 rounded-2xl text-lg transition flex items-center gap-1.5 ${
-                  tab === id
-                    ? `bg-gradient-to-r ${grad} text-white shadow-lg scale-105`
-                    : 'bg-white text-gray-500 hover:scale-105 shadow-sm'
-                }`}
-              >
-                <span className="text-xl">{emoji}</span>{label}
-              </button>
+          <nav className="teacher-tab-nav mb-5 grid grid-cols-7 gap-2" aria-label="선생님 메뉴">
+            {[tabs.slice(0, 7), tabs.slice(7)].map((row, rowIndex) => (
+              <div key={rowIndex} className="contents">
+                {row.map(([id, emoji, label, grad]) => (
+                  <button
+                    key={id}
+                    onClick={() => setTab(id)}
+                    className={`min-w-0 rounded-2xl px-2 py-2.5 text-sm transition flex items-center justify-center gap-1.5 ${
+                      tab === id
+                        ? `bg-gradient-to-r ${grad} text-white shadow-lg scale-[1.02]`
+                        : 'bg-white text-gray-500 hover:scale-[1.02] shadow-sm'
+                    }`}
+                  >
+                    <span className="text-lg">{emoji}</span><span className="truncate">{label}</span>
+                  </button>
+                ))}
+              </div>
             ))}
           </nav>
           {tab === 'students' && <StudentsTab klass={klass} />}
+          {tab === 'showcase' && <StudentShowcaseTab klass={klass} />}
           {tab === 'shop' && <ShopTab klass={klass} />}
           {tab === 'alerts' && <AlertsTab klass={klass} />}
           {tab === 'stocks' && <StocksTab klass={klass} />}

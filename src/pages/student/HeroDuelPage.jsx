@@ -195,7 +195,10 @@ export default function HeroDuelPage() {
           <h2 className="text-2xl text-rose-600">⚔️ 친구와 대결하기</h2>
           <p className="text-sm text-gray-400">전투력 비율로 승률을 정해 우리 반 친구와 겨뤄요.</p>
         </div>
-        <Link to="/student/hero" className="ml-auto rounded-2xl bg-indigo-100 px-4 py-2 text-sm text-indigo-600">용사키우기 →</Link>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <Link to="/student/hero/raid" className="rounded-2xl bg-violet-100 px-4 py-2 text-sm text-violet-600">보스레이드 →</Link>
+          <Link to="/student/hero" className="rounded-2xl bg-indigo-100 px-4 py-2 text-sm text-indigo-600">용사키우기 →</Link>
+        </div>
       </div>
 
       {msg && <div className={`rounded-2xl px-4 py-3 ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>{msg.text}</div>}

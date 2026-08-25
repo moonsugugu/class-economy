@@ -22,6 +22,7 @@ const NAV = [
   ['/student/visit', '🏠', '놀러가기'],
   ['/student/hero', '⚔️', '용사키우기'],
   ['/student/hero/duel', '🥊', '친구 대결'],
+  ['/student/hero/raid', '🛡️', '보스레이드'],
 ];
 
 export default function StudentLayout() {
@@ -97,7 +98,7 @@ export default function StudentLayout() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto min-h-screen pb-28">
+    <div className="max-w-3xl mx-auto min-h-screen pb-40">
       <header className="m-3 mb-4 rounded-3xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-400 text-white shadow-lg px-5 py-3 flex items-center gap-3 relative overflow-hidden">
         <span className="absolute -right-3 -top-4 text-6xl opacity-20 select-none">🏫</span>
         <span className="text-3xl drop-shadow">{student.avatar?.base || '🙂'}</span>
@@ -139,15 +140,15 @@ export default function StudentLayout() {
         <Outlet context={{ klass, student, session, loans, savings, market }} />
       </main>
 
-      <nav className="fixed bottom-3 inset-x-0 px-3 z-40">
-        <div className="max-w-3xl mx-auto flex overflow-x-auto bg-white/95 backdrop-blur rounded-3xl shadow-xl border border-purple-100 p-1.5">
+      <nav className="fixed bottom-3 inset-x-0 px-3 z-40" aria-label="학생 메뉴">
+        <div className="student-bottom-nav max-w-3xl mx-auto grid grid-cols-7 gap-1 bg-white/95 backdrop-blur rounded-3xl shadow-xl border border-purple-100 p-1.5">
           {NAV.map(([to, icon, label, end]) => (
             <NavLink
               key={to}
               to={to}
               end={end}
               className={({ isActive }) =>
-                `min-w-[58px] flex-none py-1.5 text-center rounded-2xl transition ${
+                `min-w-0 py-1.5 text-center rounded-2xl transition ${
                   isActive ? 'bg-gradient-to-b from-indigo-500 to-purple-500 text-white shadow' : 'text-gray-400 hover:bg-purple-50'
                 }`
               }

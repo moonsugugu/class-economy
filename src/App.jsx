@@ -15,6 +15,7 @@ import RoomPage from './pages/student/RoomPage.jsx';
 import HeroPage from './pages/student/HeroPage.jsx';
 import HeroShopPage from './pages/student/HeroShopPage.jsx';
 import HeroDuelPage from './pages/student/HeroDuelPage.jsx';
+import BossRaidPage from './pages/student/BossRaidPage.jsx';
 import MissionsPage from './pages/student/MissionsPage.jsx';
 import PaymentRequestPage from './pages/student/PaymentRequestPage.jsx';
 import LotteryPage from './pages/student/LotteryPage.jsx';
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="hero" element={<HeroPage />} />
         <Route path="hero/shop" element={<HeroShopPage />} />
         <Route path="hero/duel" element={<HeroDuelPage />} />
+        <Route path="hero/raid" element={<BossRaidPage />} />
       </Route>
       <Route path="/demo" element={<DemoRoom />} />
       <Route path="*" element={<Navigate to="/" replace />} />

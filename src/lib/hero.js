@@ -1,3 +1,6 @@
+import maleHeroArt from '../assets/hero-guardian-male.png';
+import femaleHeroArt from '../assets/hero-guardian-female.png';
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 export const HERO_SLOTS = [
@@ -39,11 +42,11 @@ export const HERO_SHOP_REFRESH_LIMIT = 3;
 const HERO_CHARACTERS = [
   {
     id: 'hero_male', slot: 'character', name: '네온 수호자', emoji: '🛡️', price: 100, power: 12,
-    visual: { main: '#4f46e5', accent: '#fb7185', glow: '#fbbf24', hair: '#171b55', role: 'guardian' },
+    visual: { main: '#4f46e5', accent: '#fb7185', glow: '#fbbf24', hair: '#171b55', role: 'guardian', art: maleHeroArt },
   },
   {
     id: 'hero_female', slot: 'character', name: '루미나 가디언', emoji: '⚔️', price: 100, power: 14,
-    visual: { main: '#7c3aed', accent: '#22d3ee', glow: '#f9a8d4', hair: '#26124f', role: 'guardian' },
+    visual: { main: '#7c3aed', accent: '#22d3ee', glow: '#f9a8d4', hair: '#26124f', role: 'arcane', art: femaleHeroArt },
   },
 ];
 
@@ -67,6 +70,22 @@ const GEAR_EMOJIS = {
 
 const PET_MARKS = ['●', '◆', '◉', '✿', '✦', '☾', '❧', 'ϟ', '◇', '❄', '✧', '◈', '☽', '☀', '⚡', '◒', '◌', '✦', '♜', '✹'];
 
+// 같은 슬롯이어도 단계가 올라갈수록 외형의 뼈대가 바뀌도록 디자인 패밀리를 분리합니다.
+// 기존 item ID·가격·능력치는 건드리지 않고, 표시용 메타데이터만 추가해요.
+const GEAR_DESIGNS = {
+  helmet: ['headband', 'visor', 'horn', 'hood', 'crown', 'halo', 'mask', 'crest', 'circlet', 'antler', 'sail', 'rune', 'royal', 'halo-crest', 'ancient', 'dragon', 'flame', 'storm', 'constellation', 'sky-crown'],
+  weapon: ['blade', 'dagger', 'saber', 'sword', 'breaker', 'pulse', 'edge', 'cutter', 'spear', 'axe', 'greatsword', 'rune-blade', 'king-sword', 'greatblade', 'ancient-edge', 'cleaver', 'buster', 'lance', 'bow', 'arc'],
+  armor: ['vest', 'mail', 'scale', 'plate', 'knight', 'shell', 'harness', 'coat', 'rune-armor', 'crystal-plate', 'sentinel', 'nebula-mail', 'royal-armor', 'star-armor', 'ancient-armor', 'dragon-plate', 'flame-armor', 'storm-armor', 'constellation-coat', 'sky-armor'],
+  gloves: ['wrap', 'glove', 'knuckle', 'gauntlet', 'grip', 'fist', 'sigil-gauntlet', 'chain-knuckle', 'rune-bracer', 'crystal-gauntlet', 'power-fist', 'nebula-glove', 'royal-gauntlet', 'star-knuckle', 'ancient-hand', 'dragon-gauntlet', 'flame-fist', 'storm-grip', 'constellation-bracer', 'sky-gauntlet'],
+  shoes: ['sandal', 'boot', 'runner', 'greave', 'walker', 'step', 'crest-boot', 'star-strider', 'rune-walker', 'crystal-greave', 'knight-boot', 'nebula-step', 'royal-greave', 'sun-runner', 'ancient-boot', 'dragon-claw', 'flame-walker', 'storm-step', 'constellation-boot', 'sky-greave'],
+  accessory: ['charm', 'chip', 'core', 'ring', 'sigil', 'pendant', 'medal', 'brooch', 'crystal', 'heart', 'emblem', 'nebula', 'seal', 'sun-medal', 'rune-core', 'dragon-gem', 'flame-ring', 'storm-sigil', 'constellation', 'crown-gem'],
+};
+
+const PET_DESIGNS = [
+  'slime', 'fox', 'seal', 'panda', 'cat', 'wolf', 'deer', 'hawk', 'turtle', 'penguin',
+  'monkey', 'dragon', 'owl', 'lion', 'eagle', 'viper', 'whale', 'unicorn', 'griffin', 'phoenix',
+];
+
 const HERO_ITEM_PALETTES = [
   { main: '#5964d8', accent: '#22d3ee', glow: '#a5f3fc', dark: '#151a4e' },
   { main: '#e05288', accent: '#fbbf24', glow: '#fde68a', dark: '#541b52' },
@@ -84,6 +103,9 @@ function visualForItem(slot, level, rarity, index = 0) {
     shape: slot,
     finish: rarity === 'transcendent' ? 'prismatic' : rarity === 'legendary' ? 'gold' : 'ink',
     mark: slot === 'pet' ? PET_MARKS[index] : GEAR_EMOJIS[slot]?.[index] || '✦',
+    design: slot === 'pet' ? PET_DESIGNS[index] : GEAR_DESIGNS[slot]?.[index] || slot,
+    variant: index % 5,
+    designIndex: index,
   };
 }
 
@@ -605,6 +627,7 @@ const MONSTER_PALETTES = [
   ['#22d3ee', '#164e63'], ['#bef264', '#365314'], ['#fb923c', '#7c2d12'],
   ['#c084fc', '#581c87'],
 ];
+const MONSTER_GLOWS = ['#a7f3d0', '#bae6fd', '#fbcfe8', '#fef3c7', '#ddd6fe', '#fecdd3', '#cffafe', '#ecfccb', '#fed7aa', '#f3e8ff'];
 
 const MONSTER_DESIGNS = Array.from({ length: 100 }, (_, index) => {
   const level = index + 1;
@@ -625,6 +648,7 @@ const MONSTER_DESIGNS = Array.from({ length: 100 }, (_, index) => {
       radius: species.radius,
       body: palette[0],
       accent: palette[1],
+      glow: MONSTER_GLOWS[(index * 3 + variantIndex) % MONSTER_GLOWS.length],
       variant: variantIndex,
       mark: (index * 13 + 7) % 10,
       emoji: species.emoji,

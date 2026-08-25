@@ -1,5 +1,6 @@
 import { HERO_ITEM_MAP, HERO_RARITIES, normalizeHero } from '../lib/hero';
 import arenaBackground from '../assets/hero-card-arena.png';
+import { HeroPetVisual } from './HeroItemVisual.jsx';
 
 const FALLBACK_TONE = {
   main: '#5964d8',
@@ -89,6 +90,11 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
       <div className="hero-card-sigil" aria-hidden="true">✦</div>
       <div className="hero-card-ground" />
 
+      {character?.visual?.art ? (
+        <div className="hero-card-art-wrap">
+          <img className="hero-card-art" src={character.visual.art} alt={character.name || '용사'} />
+        </div>
+      ) : (
       <div className="hero-card-figure">
         <div className="hero-card-cape" />
         <div className="hero-card-legs">
@@ -110,14 +116,10 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
         </div>
         <div className="hero-card-necklace"><span>{accessory?.visual?.mark || '✦'}</span></div>
       </div>
+      )}
 
       {pet && (
-        <div className="hero-card-pet" aria-label={pet.name}>
-          <span className="hero-card-pet-aura" />
-          <span className="hero-card-pet-ear hero-card-pet-ear-left" />
-          <span className="hero-card-pet-ear hero-card-pet-ear-right" />
-          <span className="hero-card-pet-body"><i /><i /><b>{pet.visual?.mark || '✦'}</b></span>
-        </div>
+        <HeroPetVisual item={pet} size={58} className="hero-card-pet" />
       )}
       <div className="hero-card-footer">
         <span>{character?.name || '용사 대기 중'}</span>
