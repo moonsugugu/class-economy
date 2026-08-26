@@ -1,6 +1,7 @@
 import { HERO_ITEM_MAP, HERO_RARITIES, normalizeHero } from '../lib/hero';
 import arenaBackground from '../assets/hero-card-arena.png';
 import { HeroEquipmentOverlay, HeroPetVisual } from './HeroItemVisual.jsx';
+import HeroCharacterArt from './HeroCharacterArt.jsx';
 
 const FALLBACK_TONE = {
   main: '#5964d8',
@@ -33,6 +34,14 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
     ['accessory', accessory],
   ];
   const equippedCount = equipmentItems.filter(([, item]) => item).length;
+  const slotLabels = {
+    helmet: '머리',
+    weapon: '무기',
+    armor: '갑옷',
+    gloves: '장갑',
+    shoes: '신발',
+    accessory: '장신구',
+  };
   const female = hero.character === 'hero_female';
   const characterTone = toneOf(character, female
     ? { main: '#7c3aed', accent: '#22d3ee', glow: '#f9a8d4', dark: '#26124f', hair: '#26124f' }
@@ -102,10 +111,24 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
       {character?.visual?.art ? (
         <div className={`hero-card-art-wrap hero-card-gear-count-${equippedCount}`}>
           <div className="hero-card-art-backdrop" aria-hidden="true" />
-          <img className="hero-card-art" src={character.visual.art} alt={character.name || '용사'} />
-          <div className="hero-card-gear-layer" aria-label={`장비 ${equippedCount}개 장착`}>
+          <HeroCharacterArt className="hero-card-art" src={character.visual.art} alt={character.name || '용사'} />
+          <div className="hero-card-gear-constellation" aria-label={`장비 ${equippedCount}개 장착`}>
             {equipmentItems.filter(([, item]) => item).map(([slot, item]) => (
-              <HeroEquipmentOverlay key={item.id} item={item} className={`hero-card-equip-${slot}`} />
+              <span
+                key={item.id}
+                className={`hero-card-gear-chip hero-card-gear-chip-${slot}`}
+                style={{
+                  '--gear-main': item.visual?.main || '#6366f1',
+                  '--gear-accent': item.visual?.accent || '#22d3ee',
+                  '--gear-glow': item.visual?.glow || '#a5f3fc',
+                }}
+                title={`${slotLabels[slot]} · ${item.name}`}
+              >
+                <span className="hero-card-gear-chip-art">
+                  <HeroEquipmentOverlay item={item} className="hero-card-gear-art" />
+                </span>
+                <span className="hero-card-gear-chip-label">{slotLabels[slot]}</span>
+              </span>
             ))}
           </div>
         </div>

@@ -10,6 +10,34 @@ import RoomScene from '../../three/RoomScene.jsx';
 import HeroCardVisual from '../../components/HeroCardVisual.jsx';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
 
+const placedCountFor = (student, spaceId) => {
+  const config = spaceConfig(spaceId);
+  if (!student || !isSpaceUnlocked(student, spaceId)) return 0;
+  return Object.keys(normalizeRoom(student[config.mapField])).length;
+};
+
+const unlockedSpaceCountFor = (student) => SPACE_TABS.filter((entry) => isSpaceUnlocked(student, entry.id)).length;
+
+const roomMetricFor = (student, spaceId) => {
+  const config = spaceConfig(spaceId);
+  if (!isSpaceUnlocked(student, spaceId)) {
+    return { icon: '🔒', label: '미개방', detail: `${config.visitLabel} 잠김`, locked: true };
+  }
+  const placed = placedCountFor(student, spaceId);
+  return {
+    icon: '🏠',
+    label: placed ? `${placed}개 배치` : '비어 있음',
+    detail: `${config.visitLabel} · ${unlockedSpaceCountFor(student)}/8 공간 열림`,
+  };
+};
+
+const heroMetricFor = (student) => {
+  const hero = normalizeHero(student?.rpg);
+  return hero.character
+    ? { icon: '⚔️', label: `${hero.clearedLevel}단계`, detail: `전투력 ${fmt(heroBattlePower(hero))}` }
+    : { icon: '⚔️', label: '미시작', detail: '아직 용사를 시작하지 않았어요.', locked: true };
+};
+
 export default function StudentShowcaseTab({ klass }) {
   const [students, setStudents] = useState(null);
   const [view, setView] = useState('room');
@@ -37,8 +65,10 @@ export default function StudentShowcaseTab({ klass }) {
   const spaceUnlocked = selected ? isSpaceUnlocked(selected, space) : false;
   const roomMap = selected && spaceUnlocked ? normalizeRoom(selected[currentSpace.mapField]) : {};
   const companions = selected
-    ? (selected.walking || []).map((id) => ITEM_MAP[id]).filter(Boolean).slice(0, 8)
+    ? (Array.isArray(selected.walking) ? selected.walking : []).map((id) => ITEM_MAP[id]).filter(Boolean).slice(0, 8)
     : [];
+  const roomItemCount = Object.keys(roomMap).length;
+  const unlockedSpaceCount = selected ? unlockedSpaceCountFor(selected) : 0;
 
   const selectStudent = (studentId) => {
     setSelectedId(studentId);
@@ -74,7 +104,7 @@ export default function StudentShowcaseTab({ klass }) {
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
               {orderedStudents.map((item) => {
-                const itemHero = normalizeHero(item.rpg);
+                const metric = view === 'room' ? roomMetricFor(item, space) : heroMetricFor(item);
                 return (
                   <button
                     key={item.id}
@@ -86,7 +116,9 @@ export default function StudentShowcaseTab({ klass }) {
                       <span className="text-2xl">{item.avatar?.base || '🙂'}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-bold text-gray-700">{item.name}</span>
-                        <span className="block text-[10px] text-gray-400">{itemHero.character ? `${itemHero.clearedLevel}단계 용사` : '용사 미시작'}</span>
+                        <span className={`showcase-student-metric ${metric.locked ? 'showcase-student-metric-muted' : view === 'room' ? 'showcase-student-metric-room' : 'showcase-student-metric-hero'}`} title={metric.detail}>
+                          <span aria-hidden="true">{metric.icon}</span> {metric.label}
+                        </span>
                       </span>
                     </div>
                   </button>
@@ -98,8 +130,32 @@ export default function StudentShowcaseTab({ klass }) {
           {selected && view === 'room' && (
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-xl font-bold text-pink-600">{selected.avatar?.base || '🙂'} {selected.name}의 공간</h3>
+                <h3 className="text-xl font-bold text-pink-600">{selected.avatar?.base || '🙂'} {selected.name}의 {currentSpace.label}</h3>
                 <span className="text-xs text-gray-400">선생님 관람 모드 · 편집 불가</span>
+              </div>
+              <div className="showcase-space-summary">
+                <div className="showcase-space-summary-main">
+                  <span className="showcase-space-summary-kicker">SPACE VISIT</span>
+                  <strong>{currentSpace.icon} {currentSpace.label}</strong>
+                  <p>{spaceUnlocked ? `${selected.name}이 꾸민 ${currentSpace.visitLabel}의 현재 모습이에요.` : '아직 잠금 해제하지 않은 공간이에요.'}</p>
+                </div>
+                <div className="showcase-space-stat-grid">
+                  <div className="showcase-space-stat">
+                    <span>배치 오브젝트</span>
+                    <b>{spaceUnlocked ? roomItemCount : '—'}</b>
+                    <small>{spaceUnlocked ? '현재 공간' : '미개방'}</small>
+                  </div>
+                  <div className="showcase-space-stat">
+                    <span>열린 공간</span>
+                    <b>{unlockedSpaceCount}<em>/8</em></b>
+                    <small>전체 공간</small>
+                  </div>
+                  <div className="showcase-space-stat">
+                    <span>함께 있는 친구</span>
+                    <b>{companions.length}</b>
+                    <small>동행 캐릭터</small>
+                  </div>
+                </div>
               </div>
               <div className="flex min-w-0 max-w-full flex-nowrap overflow-x-auto rounded-2xl bg-white shadow">
                 {SPACE_TABS.map((entry) => {
@@ -138,9 +194,21 @@ export default function StudentShowcaseTab({ klass }) {
 
           {selected && view === 'hero' && (
             <section className="teacher-hero-showcase rounded-3xl p-5 shadow-xl">
-              <div className="grid items-center gap-5 md:grid-cols-[260px_minmax(0,1fr)]">
-                <div className="flex justify-center">
-                  {hero?.character ? <HeroCardVisual hero={hero} size={235} animated /> : <div className="flex h-[235px] w-[235px] items-center justify-center rounded-3xl bg-white/10 text-6xl">❔</div>}
+              <div className="teacher-hero-showcase-head">
+                <div>
+                  <div className="teacher-hero-showcase-kicker">HERO GALLERY</div>
+                  <h3 className="mt-1 text-2xl font-black">{selected.name}의 용사 프로필</h3>
+                  <p className="mt-1 text-sm text-indigo-100/75">장착한 장비는 캐릭터를 가리지 않는 슬롯 배지로 확인할 수 있어요.</p>
+                </div>
+                <div className="teacher-hero-stage-pill">
+                  <span>STAGE</span>
+                  <b>{hero?.character ? String(hero.clearedLevel).padStart(2, '0') : '—'}</b>
+                </div>
+              </div>
+              <div className="grid items-center gap-5 md:grid-cols-[270px_minmax(0,1fr)]">
+                <div className="hero-showcase-portrait flex justify-center">
+                  {hero?.character ? <HeroCardVisual hero={hero} size={245} animated className="hero-showcase-card" /> : <div className="flex h-[245px] w-[245px] items-center justify-center rounded-3xl bg-white/10 text-6xl">❔</div>}
+                  {hero?.character && <div className="hero-showcase-portrait-note">장비 {Object.values(hero.equipment || {}).filter(Boolean).length}개 장착</div>}
                 </div>
                 <div className="text-white">
                   <div className="text-xs font-bold tracking-[0.2em] text-cyan-200">HERO PROFILE</div>

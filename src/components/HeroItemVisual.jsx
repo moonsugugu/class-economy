@@ -1,4 +1,5 @@
 import { HERO_RARITIES } from '../lib/hero';
+import HeroCharacterArt from './HeroCharacterArt.jsx';
 
 const SLOT_MARKS = {
   helmet: 'HEAD', weapon: 'ATK', armor: 'DEF', gloves: 'CORE',
@@ -490,7 +491,7 @@ export function HeroPetVisual({ item, size = 56, className = '' }) {
 function CharacterArtwork({ item }) {
   const art = item.visual?.art;
   if (!art) return <span className="hero-item-character-fallback">✦</span>;
-  return <img className="hero-item-character-art" src={art} alt="" />;
+  return <HeroCharacterArt className="hero-item-character-art" src={art} alt="" />;
 }
 
 export function HeroItemVisual({ item, size = 76, className = '', showLevel = true }) {

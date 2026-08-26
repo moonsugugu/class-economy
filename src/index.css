@@ -1381,3 +1381,300 @@ input, select, textarea, button {
 .hero-loadout-panel .text-fuchsia-500 { color: #f0abfc !important; }
 .hero-loadout-panel .text-amber-600 { color: #fde68a !important; }
 .hero-loadout-panel > p { color: rgba(224, 231, 255, .58) !important; }
+
+/* 쇼케이스 용사 카드 — 캐릭터와 장비를 한 몸처럼 겹치지 않고, 장착 슬롯으로 명확하게 보여줍니다. */
+.hero-character-art-processing { opacity: .02; }
+
+.hero-card-art-wrap {
+  inset: 10% 5% 14%;
+  border: 1px solid color-mix(in srgb, var(--hero-accent) 56%, transparent);
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at 50% 52%, color-mix(in srgb, var(--hero-glow) 22%, transparent), transparent 48%),
+    linear-gradient(180deg, rgba(8, 12, 42, .02), rgba(8, 12, 42, .64));
+  box-shadow: inset 0 0 32px rgba(4, 7, 30, .45), 0 0 26px color-mix(in srgb, var(--hero-accent) 24%, transparent);
+}
+
+.hero-card-art-backdrop {
+  inset: 12% 14% 8%;
+  background:
+    radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--hero-accent) 38%, transparent), transparent 62%),
+    linear-gradient(120deg, transparent 42%, color-mix(in srgb, var(--hero-glow) 18%, transparent) 50%, transparent 58%);
+  filter: blur(14px);
+  opacity: .82;
+}
+
+.hero-card-art {
+  width: 84%;
+  height: 90%;
+  object-fit: contain;
+  object-position: center;
+  filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(1.08) contrast(1.05);
+  opacity: 1;
+}
+
+.hero-card-gear-constellation {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.hero-card-gear-chip {
+  position: absolute;
+  display: grid;
+  width: 17%;
+  aspect-ratio: 1 / 1.16;
+  place-items: center;
+  padding: 1.5%;
+  border: 1px solid color-mix(in srgb, var(--gear-glow) 72%, white 10%);
+  border-radius: .7rem;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--gear-main) 72%, #0b1230), rgba(8, 12, 42, .94));
+  box-shadow: 0 7px 12px -8px #020617, 0 0 13px color-mix(in srgb, var(--gear-accent) 40%, transparent), inset 0 1px 0 rgba(255,255,255,.22);
+  transform: rotate(var(--gear-rotate, 0deg));
+}
+
+.hero-card-gear-chip::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid color-mix(in srgb, var(--gear-accent) 54%, transparent);
+  border-radius: .48rem;
+  opacity: .72;
+}
+
+.hero-card-gear-chip::after {
+  content: '';
+  position: absolute;
+  width: 34%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--gear-glow) 70%, transparent));
+  opacity: .7;
+}
+
+.hero-card-gear-chip-art {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 84%;
+  aspect-ratio: 1;
+}
+
+.hero-card-gear-chip .hero-equipment-overlay {
+  position: relative;
+  inset: auto;
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 3px 2px rgba(2, 6, 23, .72));
+  opacity: 1;
+  mix-blend-mode: normal;
+}
+
+.hero-card-gear-chip .hero-item-art {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 2px rgba(2, 6, 23, .62));
+}
+
+.hero-card-gear-chip-label {
+  position: absolute;
+  right: 50%;
+  bottom: -15%;
+  z-index: 2;
+  padding: 2px 4px;
+  border-radius: 999px;
+  color: #e0e7ff;
+  background: rgba(8, 12, 42, .82);
+  font-size: clamp(5px, 3.2%, 8px);
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateX(50%);
+}
+
+.hero-card-gear-chip-helmet { left: 5%; top: 23%; --gear-rotate: -8deg; }
+.hero-card-gear-chip-helmet::after { right: -28%; top: 60%; transform: rotate(18deg); }
+.hero-card-gear-chip-weapon { right: 4%; top: 34%; --gear-rotate: 8deg; }
+.hero-card-gear-chip-weapon::after { left: -28%; top: 38%; transform: rotate(-20deg); }
+.hero-card-gear-chip-armor { left: 5%; bottom: 25%; --gear-rotate: -5deg; }
+.hero-card-gear-chip-armor::after { right: -28%; top: 38%; transform: rotate(-18deg); }
+.hero-card-gear-chip-gloves { right: 5%; bottom: 24%; --gear-rotate: 6deg; }
+.hero-card-gear-chip-gloves::after { left: -28%; top: 62%; transform: rotate(18deg); }
+.hero-card-gear-chip-shoes { left: 22%; bottom: 7%; --gear-rotate: -4deg; }
+.hero-card-gear-chip-shoes::after { right: -25%; top: 4%; transform: rotate(-22deg); }
+.hero-card-gear-chip-accessory { right: 22%; top: 11%; --gear-rotate: 5deg; }
+.hero-card-gear-chip-accessory::after { left: -25%; bottom: 2%; transform: rotate(22deg); }
+
+.hero-card-gear-count-0 .hero-card-gear-constellation { display: none; }
+
+/* 학생 공간 모드의 선택 카드와 현재 공간 요약 */
+.showcase-student-metric {
+  display: flex;
+  align-items: center;
+  gap: .2rem;
+  margin-top: .15rem;
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.showcase-student-metric-room { color: #ec4899; }
+.showcase-student-metric-hero { color: #6366f1; }
+.showcase-student-metric-muted { color: #94a3b8; }
+
+.showcase-space-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(0, 1.9fr);
+  gap: .75rem;
+  padding: .85rem;
+  border: 1px solid rgba(244, 114, 182, .22);
+  border-radius: 1.5rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, .96), rgba(253, 242, 248, .92));
+  box-shadow: 0 15px 28px -25px rgba(190, 24, 93, .55);
+}
+
+.showcase-space-summary-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: .55rem .7rem;
+  border-radius: 1.15rem;
+  background: radial-gradient(circle at 100% 0, rgba(244, 114, 182, .22), transparent 45%), #fff;
+}
+
+.showcase-space-summary-kicker,
+.teacher-hero-showcase-kicker {
+  color: #db2777;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .2em;
+}
+
+.showcase-space-summary-main strong {
+  margin-top: .2rem;
+  color: #334155;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.showcase-space-summary-main p {
+  margin-top: .2rem;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.showcase-space-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .55rem;
+}
+
+.showcase-space-stat {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: .65rem .75rem;
+  border: 1px solid rgba(226, 232, 240, .9);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, .82);
+}
+
+.showcase-space-stat span,
+.showcase-space-stat small {
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.showcase-space-stat b {
+  margin: .16rem 0;
+  color: #e11d72;
+  font-size: 1.35rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.showcase-space-stat b em {
+  color: #cbd5e1;
+  font-size: .7rem;
+  font-style: normal;
+}
+
+.teacher-hero-showcase-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+  color: #fff;
+}
+
+.teacher-hero-showcase-kicker { color: #67e8f9; }
+.teacher-hero-stage-pill {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.5rem;
+  min-height: 4.5rem;
+  border: 1px solid rgba(165, 180, 252, .38);
+  border-radius: 1.25rem;
+  background: rgba(8, 12, 42, .38);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 12px 22px -18px #020617;
+}
+
+.teacher-hero-stage-pill span {
+  color: #a5f3fc;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.teacher-hero-stage-pill b {
+  margin-top: .1rem;
+  color: #fff;
+  font-size: 1.55rem;
+  font-weight: 950;
+}
+
+.hero-showcase-portrait {
+  position: relative;
+  min-height: 265px;
+  padding-bottom: 1rem;
+}
+
+.hero-showcase-portrait-note {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  padding: .35rem .7rem;
+  border: 1px solid rgba(103, 232, 249, .3);
+  border-radius: 999px;
+  color: #cffafe;
+  background: rgba(8, 12, 42, .45);
+  font-size: 10px;
+  font-weight: 900;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .showcase-space-summary { grid-template-columns: 1fr; }
+  .showcase-space-stat-grid { gap: .35rem; }
+  .showcase-space-stat { padding: .55rem .45rem; }
+  .showcase-space-stat b { font-size: 1.1rem; }
+  .teacher-hero-showcase-head { margin-bottom: .7rem; }
+  .teacher-hero-stage-pill { min-width: 3.8rem; min-height: 3.8rem; }
+}
