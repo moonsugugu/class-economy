@@ -64,7 +64,10 @@ const isBrokenStockName = (value) => {
   if (!name) return true;
   const lower = name.toLowerCase().replace(/\s+/g, '');
   return /^(?:\?+|？+|undefined|null|n\/a|na|unknown|알수없음|이름없음)$/.test(lower)
-    || /[?？]{2,}/.test(name);
+    || /[?？]{2,}/.test(name)
+    // 잘못된 UTF-8 디코딩으로 저장된 문자열에 들어가는 replacement
+    // character(�)도 정상 종목명으로 취급하지 않습니다.
+    || name.includes('\uFFFD');
 };
 
 const stockSymbolValue = (stock = {}) => String(
