@@ -299,14 +299,14 @@ export default function HeroPage() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="hero-profile-panel text-white rounded-3xl shadow-lg p-5 text-center">
+      <div className="hero-page-columns grid gap-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+        <div className="hero-profile-panel hero-profile-panel-tall text-white rounded-3xl shadow-lg p-5 text-center">
           <div
-            className={`flex w-full justify-center ${hero.character ? 'cursor-pointer' : ''}`}
+            className={`hero-profile-visual-stage flex w-full justify-center ${hero.character ? 'cursor-pointer' : ''}`}
             onClick={() => hero.character && setEnhancementItemId(hero.character)}
             title={hero.character ? '캐릭터를 눌러 강화' : undefined}
           >
-            {hero.character ? <HeroCardVisual hero={hero} size={210} /> : <div className="h-[210px] w-[210px] rounded-2xl bg-white/15 flex items-center justify-center text-7xl">❔</div>}
+            {hero.character ? <HeroCardVisual hero={hero} size={300} /> : <div className="h-[300px] w-[300px] rounded-2xl bg-white/15 flex items-center justify-center text-7xl">❔</div>}
           </div>
           {hero.character ? (
             <>

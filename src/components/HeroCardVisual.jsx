@@ -1,6 +1,6 @@
 import { HERO_GRADE_VISUALS, HERO_ITEM_MAP, HERO_RARITIES, normalizeHero } from '../lib/hero';
 import arenaBackground from '../assets/hero-card-arena.png';
-import { HeroPetVisual } from './HeroItemVisual.jsx';
+import { HeroEquipmentOverlay, HeroPetVisual } from './HeroItemVisual.jsx';
 import HeroCharacterArt from './HeroCharacterArt.jsx';
 
 const FALLBACK_TONE = {
@@ -34,22 +34,21 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
     ['accessory', accessory],
   ];
   const equippedCount = equipmentItems.filter(([, item]) => item).length;
-  const strongestEquipment = equipmentItems.reduce((strongest, [, item]) => {
-    if (!item) return strongest;
-    const candidateGrade = HERO_GRADE_VISUALS[item.rarity] || HERO_GRADE_VISUALS.common;
-    if (!strongest || candidateGrade.rank > strongest.grade.rank) return { item, grade: candidateGrade };
-    return strongest;
-  }, null);
   const equippedGradeKeys = equipmentItems
     .map(([, item]) => item?.rarity)
     .filter((rarity) => rarity && HERO_GRADE_VISUALS[rarity]);
+  const mixedGrade = new Set(equippedGradeKeys).size > 1;
+  const frameGradeKey = armor?.rarity && HERO_GRADE_VISUALS[armor.rarity]
+    ? armor.rarity
+    : 'common';
   const secondaryGradeKey = [...new Set(equippedGradeKeys)]
     .sort((left, right) => HERO_GRADE_VISUALS[right].rank - HERO_GRADE_VISUALS[left].rank)
-    .find((rarity) => rarity !== strongestEquipment?.item?.rarity) || 'common';
-  const gradeKey = strongestEquipment?.item?.rarity && HERO_GRADE_VISUALS[strongestEquipment.item.rarity]
-    ? strongestEquipment.item.rarity
-    : 'common';
+    .find((rarity) => rarity !== frameGradeKey) || 'common';
+  const gradeKey = frameGradeKey;
   const grade = HERO_GRADE_VISUALS[gradeKey];
+  const loadoutLabel = mixedGrade || (equippedGradeKeys.length > 0 && !armor)
+    ? 'LOADOUT'
+    : grade.label;
   const female = hero.character === 'hero_female';
   const characterTone = toneOf(character, female
     ? { main: '#7c3aed', accent: '#22d3ee', glow: '#f9a8d4', dark: '#26124f', hair: '#26124f' }
@@ -107,7 +106,7 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
         rarity?.label ? `hero-card-rarity-${character.rarity}` : '',
         `hero-card-grade-${gradeKey}`,
         `hero-card-grade-shape-${grade.shape}`,
-        new Set(equippedGradeKeys).size > 1 ? 'hero-card-loadout-mixed' : '',
+        mixedGrade ? 'hero-card-loadout-mixed' : '',
         className,
       ].filter(Boolean).join(' ')}
       style={style}
@@ -118,7 +117,7 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
         {Array.from({ length: 7 }, (_, index) => <i key={index} style={{ '--spark-index': index }} />)}
       </div>
       <div className="hero-card-header">
-        <span>HERO CORE <em className="hero-card-grade-mini">{grade.label}</em></span>
+        <span>HERO CORE <em className="hero-card-grade-mini">{loadoutLabel}</em></span>
         <b>{String(hero.clearedLevel).padStart(2, '0')}</b>
       </div>
       <div className="hero-card-sigil" aria-hidden="true">✦</div>
@@ -130,18 +129,18 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
           <div className="hero-card-evolution-aura" aria-hidden="true">
             <span className="hero-card-evolution-ring hero-card-evolution-ring-outer" />
             <span className="hero-card-evolution-ring hero-card-evolution-ring-inner" />
-            <span className="hero-card-evolution-core">{grade.symbol}</span>
-          </div>
-          <div className="hero-card-evolution-silhouette" aria-hidden="true">
-            <span className="hero-card-evolution-shoulder hero-card-evolution-shoulder-left" />
-            <span className="hero-card-evolution-shoulder hero-card-evolution-shoulder-right" />
-            <span className="hero-card-evolution-wing hero-card-evolution-wing-left" />
-            <span className="hero-card-evolution-wing hero-card-evolution-wing-right" />
-            <span className="hero-card-evolution-crown" />
-            <span className="hero-card-evolution-star hero-card-evolution-star-left">✦</span>
-            <span className="hero-card-evolution-star hero-card-evolution-star-right">✦</span>
+            <span className="hero-card-evolution-core">{mixedGrade ? '✦' : grade.symbol}</span>
           </div>
           <HeroCharacterArt className="hero-card-art" src={character.visual.art} alt={character.name || '용사'} />
+          <div className="hero-card-gear-layer" aria-label="장착 장비 외형">
+            {equipmentItems.map(([slot, item]) => item && (
+              <HeroEquipmentOverlay
+                key={item.id}
+                item={item}
+                className={`hero-card-equip-${slot}`}
+              />
+            ))}
+          </div>
         </div>
       ) : (
       <div className="hero-card-figure">
@@ -176,7 +175,7 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
       )}
       <div className="hero-card-footer">
         <span>{character?.name || '용사 대기 중'}</span>
-        <b><i>{grade.label}</i> · {hero.clearedLevel >= 100 ? 'FINAL' : `STAGE ${hero.clearedLevel + 1}`}</b>
+        <b><i>{loadoutLabel}</i> · {hero.clearedLevel >= 100 ? 'FINAL' : `STAGE ${hero.clearedLevel + 1}`}</b>
       </div>
     </div>
   );

@@ -477,6 +477,36 @@ input, select, textarea, button {
   z-index: 1;
 }
 
+.hero-page-columns {
+  align-items: start;
+}
+
+.hero-profile-panel-tall {
+  min-height: 760px;
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-profile-visual-stage {
+  min-height: 360px;
+  flex: 1 1 auto;
+  align-items: center;
+}
+
+.hero-profile-visual-stage .hero-card-visual {
+  max-width: 100%;
+}
+
+@media (max-width: 639px) {
+  .hero-profile-panel-tall {
+    min-height: 700px;
+  }
+
+  .hero-profile-visual-stage {
+    min-height: 330px;
+  }
+}
+
 .hero-preview-stage {
   background:
     radial-gradient(circle at 24% 20%, rgba(96, 165, 250, .75), transparent 36%),
@@ -1321,8 +1351,8 @@ input, select, textarea, button {
   display: block;
   overflow: visible;
   filter: drop-shadow(0 4px 3px rgba(4, 7, 30, .72));
-  opacity: .8;
-  mix-blend-mode: screen;
+  opacity: .96;
+  mix-blend-mode: normal;
 }
 
 .hero-equipment-overlay .hero-item-art {
@@ -1347,7 +1377,7 @@ input, select, textarea, button {
   height: 49%;
   z-index: 4;
   transform: rotate(8deg);
-  opacity: .72;
+  opacity: .98;
 }
 
 .hero-card-equip-armor {
@@ -1356,7 +1386,7 @@ input, select, textarea, button {
   width: 32%;
   height: 31%;
   z-index: 3;
-  opacity: .34;
+  opacity: .86;
 }
 
 .hero-card-equip-gloves {
@@ -1365,7 +1395,7 @@ input, select, textarea, button {
   width: 25%;
   height: 28%;
   z-index: 5;
-  opacity: .62;
+  opacity: .9;
 }
 
 .hero-card-equip-shoes {
@@ -1374,7 +1404,7 @@ input, select, textarea, button {
   width: 40%;
   height: 22%;
   z-index: 4;
-  opacity: .52;
+  opacity: .9;
 }
 
 .hero-card-equip-accessory {

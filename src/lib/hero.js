@@ -1,5 +1,5 @@
-import maleHeroArt from '../assets/hero-guardian-male-mixed.png';
-import femaleHeroArt from '../assets/hero-guardian-female-mixed.png';
+import maleHeroArt from '../assets/hero-guardian-male-base.png';
+import femaleHeroArt from '../assets/hero-guardian-female-base.png';
 import neonFoxPetArt from '../assets/hero-pet-neon-fox.png';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -38,8 +38,8 @@ export const HERO_RARITIES = {
   },
 };
 
-// 장비 슬롯이 아니라 등급 자체가 용사의 외형을 결정하도록 공통 비주얼 토큰을 둡니다.
-// 상점·인벤토리·용사 카드가 같은 등급 모양과 색을 공유해요.
+// 각 장비 슬롯이 자기 등급의 모양과 색을 유지하도록 공통 비주얼 토큰을 둡니다.
+// 상점·인벤토리·용사 카드가 같은 슬롯별 등급 스타일을 공유해요.
 export const HERO_GRADE_VISUALS = {
   common: {
     rank: 1, label: 'COMMON', korean: '일반', symbol: '●', shape: 'seal',
