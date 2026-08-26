@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
 import { doc, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -17,6 +17,7 @@ export default function HeroShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [busyId, setBusyId] = useState(null);
   const [msg, setMsg] = useState(null);
+  const refundBusyRef = useRef(false);
   const requestedView = ['shop', 'catalog', 'inventory'].includes(searchParams.get('view'))
     ? searchParams.get('view')
     : 'shop';
@@ -138,9 +139,11 @@ export default function HeroShopPage() {
   };
 
   const refund = async (item) => {
+    if (refundBusyRef.current) return;
     const enhancement = heroEnhancementFor(hero, item.id);
     const refundPrice = Math.floor((costOf(item) + enhancement.invested) * 0.5);
     if (!confirm(`'${item.name}'을(를) ${refundPrice}${klass.currency}에 환불할까요?`)) return;
+    refundBusyRef.current = true;
     setBusyId(item.id);
     try {
       let refundResult = refundPrice;
@@ -156,17 +159,21 @@ export default function HeroShopPage() {
           ...current,
           owned: current.owned.filter((id) => id !== item.id),
           character: current.character === item.id ? null : current.character,
-          equipment: { ...current.equipment },
+          equipment: Object.fromEntries(
+            Object.entries(current.equipment || {}).filter(([, equippedId]) => equippedId !== item.id),
+          ),
+          enhancements: Object.fromEntries(
+            Object.entries(current.enhancements || {}).filter(([itemId]) => itemId !== item.id),
+          ),
         };
         if (item.slot === 'pet' && next.pet === item.id) next.pet = null;
-        if (item.slot !== 'pet' && next.equipment[item.slot] === item.id) delete next.equipment[item.slot];
-        delete next.enhancements[item.id];
         tx.update(studentRef, { cash: (s.cash || 0) + refundResult, rpg: next });
       });
       flash('ok', `♻️ ${item.name} 환불 완료! 50%를 돌려받았어요.`);
     } catch (e) {
       flash('err', e.message);
     } finally {
+      refundBusyRef.current = false;
       setBusyId(null);
     }
   };

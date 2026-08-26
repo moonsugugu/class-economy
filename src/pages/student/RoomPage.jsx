@@ -350,20 +350,35 @@ function RoomInner({ klass, student }) {
           // a refund can never leave an item that is no longer owned.
           const remainingCopies = inv.filter((id) => id === item.id).length;
           const excess = Math.max(0, placedKeys.length - remainingCopies);
-          const removeCount = Math.max(1, excess);
-          placedKeys.slice(0, removeCount).forEach((key) => {
-            upd[`${sp}.${key}`] = deleteField();
-          });
+          if (excess > 0) {
+            // 중첩 deleteField에 의존하지 않고 공간 맵 전체를 다시 저장해요.
+            // 운영 API가 점 표기법 삭제를 놓쳐도 환불한 물건이 공간에 남지 않습니다.
+            const nextMap = { ...(s[sp] && typeof s[sp] === 'object' ? s[sp] : {}) };
+            placedKeys.slice(0, excess).forEach((key) => delete nextMap[key]);
+            upd[sp] = nextMap;
+          }
         }
         if (isCompanion(item.slot)) {
-          const nextWalking = [...(s.walking || [])];
-          const walkingIndex = nextWalking.indexOf(item.id);
-          if (walkingIndex >= 0) nextWalking.splice(walkingIndex, 1);
+          const nextWalking = Array.isArray(s.walking) ? s.walking.filter((id) => id !== item.id) : [];
           upd.walking = nextWalking;
         }
-        if (item.slot === 'char' && s.avatar?.base === item.base) upd['avatar.base'] = deleteField();
-        if (s.avatar?.[item.slot] === item.id) upd[`avatar.${item.slot}`] = deleteField();
-        if (s.roomSkin?.[item.slot] === item.id) upd[`roomSkin.${item.slot}`] = deleteField();
+        const nextAvatar = { ...(s.avatar && typeof s.avatar === 'object' ? s.avatar : {}) };
+        let avatarChanged = false;
+        if (item.slot === 'char' && nextAvatar.base === item.base) {
+          delete nextAvatar.base;
+          avatarChanged = true;
+        }
+        if (nextAvatar[item.slot] === item.id) {
+          delete nextAvatar[item.slot];
+          avatarChanged = true;
+        }
+        if (avatarChanged) upd.avatar = nextAvatar;
+
+        const nextRoomSkin = { ...(s.roomSkin && typeof s.roomSkin === 'object' ? s.roomSkin : {}) };
+        if (nextRoomSkin[item.slot] === item.id) {
+          delete nextRoomSkin[item.slot];
+          upd.roomSkin = nextRoomSkin;
+        }
         tx.update(studentRef, upd);
       });
       setSelected(null);

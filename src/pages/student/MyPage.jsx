@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { collection, doc, query, where, onSnapshot, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -20,6 +20,7 @@ export default function MyPage() {
   const [fx, setFx] = useState(DEFAULT_FX);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileBusy, setProfileBusy] = useState(null);
+  const profileRefundBusyRef = useRef(false);
 
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
   const profileOwned = normalizeProfileOwned(student.profileOwned);
@@ -77,9 +78,10 @@ export default function MyPage() {
   };
 
   const refundProfile = async (item) => {
-    if (profileBusy) return;
+    if (profileBusy || profileRefundBusyRef.current) return;
     const refund = Math.floor(itemPrice(item.price, klass) * 0.5);
     if (!window.confirm(item.name + '을(를) ' + fmt(refund) + klass.currency + '에 환불할까요?')) return;
+    profileRefundBusyRef.current = true;
     setProfileBusy(item.id);
     try {
       await runTransaction(db, async (tx) => {
@@ -87,8 +89,8 @@ export default function MyPage() {
         const owned = normalizeProfileOwned(s.profileOwned);
         if (!owned.includes(item.id)) throw new Error('구매한 프로필 아이템이 아니에요.');
         const avatar = { ...(s.avatar || {}) };
-        const equipped = avatar.base === item.value;
-        if (equipped) delete avatar[item.slot];
+        if (avatar.base === item.value || avatar.base === item.id) delete avatar.base;
+        if (avatar[item.slot] === item.id) delete avatar[item.slot];
         tx.update(studentRef, {
           cash: (s.cash || 0) + refund,
           profileOwned: owned.filter((id) => id !== item.id),
@@ -98,6 +100,7 @@ export default function MyPage() {
     } catch (e) {
       window.alert(e.message);
     } finally {
+      profileRefundBusyRef.current = false;
       setProfileBusy(null);
     }
   };
