@@ -37,6 +37,31 @@ export const HERO_RARITIES = {
   },
 };
 
+// 장비 슬롯이 아니라 등급 자체가 용사의 외형을 결정하도록 공통 비주얼 토큰을 둡니다.
+// 상점·인벤토리·용사 카드가 같은 등급 모양과 색을 공유해요.
+export const HERO_GRADE_VISUALS = {
+  common: {
+    rank: 1, label: 'COMMON', korean: '일반', symbol: '●', shape: 'seal',
+    main: '#64748b', accent: '#cbd5e1', glow: '#f8fafc', dark: '#1e293b',
+  },
+  rare: {
+    rank: 2, label: 'RARE', korean: '희귀', symbol: '◇', shape: 'hex',
+    main: '#0284c7', accent: '#22d3ee', glow: '#bae6fd', dark: '#082f49',
+  },
+  elite: {
+    rank: 3, label: 'ELITE', korean: '엘리트', symbol: '✦', shape: 'diamond',
+    main: '#7c3aed', accent: '#c084fc', glow: '#ede9fe', dark: '#2e1065',
+  },
+  legendary: {
+    rank: 4, label: 'LEGENDARY', korean: '전설', symbol: '♛', shape: 'crown',
+    main: '#d97706', accent: '#fbbf24', glow: '#fef3c7', dark: '#78350f',
+  },
+  transcendent: {
+    rank: 5, label: 'TRANSCENDENT', korean: '초월', symbol: '✧', shape: 'orbit',
+    main: '#db2777', accent: '#22d3ee', glow: '#f5d0fe', dark: '#4a044e',
+  },
+};
+
 export const HERO_SHOP_REFRESH_LIMIT = 3;
 
 const HERO_CHARACTERS = [
@@ -97,9 +122,12 @@ const HERO_ITEM_PALETTES = [
 
 function visualForItem(slot, level, rarity, index = 0) {
   const palette = HERO_ITEM_PALETTES[(level + index * 2) % HERO_ITEM_PALETTES.length];
+  const grade = HERO_GRADE_VISUALS[rarity] || HERO_GRADE_VISUALS.common;
   return {
     ...palette,
     tier: Math.max(1, Math.ceil(level / 4)),
+    gradeShape: grade.shape,
+    gradeSymbol: grade.symbol,
     shape: slot,
     finish: rarity === 'transcendent' ? 'prismatic' : rarity === 'legendary' ? 'gold' : 'ink',
     mark: slot === 'pet' ? PET_MARKS[index] : GEAR_EMOJIS[slot]?.[index] || '✦',
@@ -583,15 +611,15 @@ export function heroDuelExtraCost(attempts) {
   return Math.max(0, Number(attempts) || 0) >= HERO_DUEL_LIMIT ? HERO_DUEL_EXTRA_COST : 0;
 }
 
-// 용사 배틀은 10단계 단위로 기본 보상이 올라가고, 일반 보스는 기존 10배에서 줄여 일반 보상의 5배를 지급합니다.
-// 최종 보스만 최종 도전 보상으로 기존과 같은 10배를 지급합니다.
+// 용사 배틀은 10단계 단위로 기본 보상이 올라갑니다.
+// 일반 보스는 해당 구간의 기본 보상과 같은 금액을 주고, 최종 보스만 10배를 지급합니다.
 export function heroBattleWinReward(level, boss = false, baseReward = 10) {
   const safeLevel = clamp(Math.floor(Number(level) || 1), 1, 100);
   const tier = Math.ceil(safeLevel / 10);
   const safeBaseReward = Math.max(0, Math.floor(Number(baseReward) || 0));
   const normalReward = tier === 10 ? safeBaseReward * 100 : safeBaseReward * tier;
   if (!boss) return normalReward;
-  return safeLevel === 100 ? normalReward * 10 : normalReward * 5;
+  return safeLevel === 100 ? normalReward * 10 : normalReward;
 }
 
 export function battleConfig(klass = {}) {

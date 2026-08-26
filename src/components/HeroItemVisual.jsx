@@ -1,10 +1,5 @@
-import { HERO_RARITIES } from '../lib/hero';
+import { HERO_GRADE_VISUALS, HERO_RARITIES } from '../lib/hero';
 import HeroCharacterArt from './HeroCharacterArt.jsx';
-
-const SLOT_MARKS = {
-  helmet: 'HEAD', weapon: 'ATK', armor: 'DEF', gloves: 'CORE',
-  shoes: 'MOVE', accessory: 'LUCK', character: 'HERO', pet: 'PET',
-};
 
 const SLOT_LABELS = {
   helmet: '머리', weapon: '무기', armor: '갑옷', gloves: '장갑',
@@ -503,6 +498,8 @@ export function HeroItemVisual({ item, size = 76, className = '', showLevel = tr
     );
   }
 
+  const gradeKey = item.rarity && HERO_GRADE_VISUALS[item.rarity] ? item.rarity : 'common';
+  const grade = HERO_GRADE_VISUALS[gradeKey];
   const theme = item.rarity ? HERO_RARITIES[item.rarity] : null;
   const tone = toneOf(item);
   const transcendent = item.rarity === 'transcendent';
@@ -514,10 +511,14 @@ export function HeroItemVisual({ item, size = 76, className = '', showLevel = tr
     '--item-glow': tone.glow,
     '--item-dark': tone.dark,
     '--item-rarity': theme?.accent || tone.accent,
+    '--item-grade-main': grade.main,
+    '--item-grade-accent': grade.accent,
+    '--item-grade-glow': grade.glow,
+    '--item-grade-dark': grade.dark,
   };
   return (
     <div
-      className={`hero-item-card-v2 ${transcendent ? 'hero-item-card-prismatic' : ''} ${item.rarity === 'legendary' ? 'hero-item-card-legendary' : ''} ${item.rarity === 'elite' ? 'hero-item-card-elite' : ''} ${className}`}
+      className={`hero-item-card-v2 hero-item-grade-${gradeKey} hero-item-shape-${grade.shape} ${transcendent ? 'hero-item-card-prismatic' : ''} ${item.rarity === 'legendary' ? 'hero-item-card-legendary' : ''} ${item.rarity === 'elite' ? 'hero-item-card-elite' : ''} ${className}`}
       style={style}
       title={item.name}
       aria-label={item.name}
@@ -525,8 +526,11 @@ export function HeroItemVisual({ item, size = 76, className = '', showLevel = tr
       <div className="hero-item-card-grid" />
       <div className="hero-item-card-corner hero-item-card-corner-left" />
       <div className="hero-item-card-corner hero-item-card-corner-right" />
+      <div className={`hero-item-grade-frame hero-item-grade-frame-${grade.shape}`} aria-hidden="true">
+        <span className="hero-item-grade-symbol">{grade.symbol}</span>
+      </div>
       <div className="hero-item-card-topline">
-        <span>{SLOT_MARKS[item.slot] || 'ITEM'}</span>
+        <span className="hero-item-card-grade-label">{grade.label}</span>
         <b>{item.slot === 'character' ? '01' : String(item.level).padStart(2, '0')}</b>
       </div>
       <div className={`hero-item-card-glyph hero-item-card-glyph-${item.visual?.design || item.slot}`}>
@@ -534,7 +538,7 @@ export function HeroItemVisual({ item, size = 76, className = '', showLevel = tr
       </div>
       <div className="hero-item-card-bottomline">
         <span>{SLOT_LABELS[item.slot] || '아이템'}</span>
-        {showLevel && item.rarity && <b>{item.rarityLabel}</b>}
+        {showLevel && <b>{item.rarityLabel || grade.korean}</b>}
       </div>
       {item.slot === 'pet' && <span className="hero-item-card-pet-rate">{item.critChance}%</span>}
     </div>

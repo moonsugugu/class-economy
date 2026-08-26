@@ -1382,7 +1382,7 @@ input, select, textarea, button {
 .hero-loadout-panel .text-amber-600 { color: #fde68a !important; }
 .hero-loadout-panel > p { color: rgba(224, 231, 255, .58) !important; }
 
-/* 쇼케이스 용사 카드 — 캐릭터와 장비를 한 몸처럼 겹치지 않고, 장착 슬롯으로 명확하게 보여줍니다. */
+/* 쇼케이스 용사 카드 — 장비 슬롯을 흩뿌리지 않고, 가장 높은 등급이 용사의 진화 형태를 결정합니다. */
 .hero-character-art-processing { opacity: .02; }
 
 .hero-card-art-wrap {
@@ -1398,115 +1398,272 @@ input, select, textarea, button {
 .hero-card-art-backdrop {
   inset: 12% 14% 8%;
   background:
-    radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--hero-accent) 38%, transparent), transparent 62%),
-    linear-gradient(120deg, transparent 42%, color-mix(in srgb, var(--hero-glow) 18%, transparent) 50%, transparent 58%);
+    radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--hero-grade-main) 46%, transparent), transparent 62%),
+    linear-gradient(120deg, transparent 42%, color-mix(in srgb, var(--hero-grade-glow) 18%, transparent) 50%, transparent 58%);
   filter: blur(14px);
   opacity: .82;
 }
 
 .hero-card-art {
-  width: 84%;
+  width: 86%;
   height: 90%;
   object-fit: contain;
   object-position: center;
   filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(1.08) contrast(1.05);
   opacity: 1;
+  position: relative;
+  z-index: 3;
 }
 
-.hero-card-gear-constellation {
+.hero-card-grade-mini {
+  display: inline-block;
+  margin-left: .3em;
+  color: var(--hero-grade-glow);
+  font-size: .72em;
+  font-style: normal;
+  letter-spacing: .08em;
+  text-shadow: 0 0 8px var(--hero-grade-main);
+}
+
+.hero-card-footer b i {
+  color: var(--hero-grade-glow);
+  font-style: normal;
+  letter-spacing: .08em;
+  text-shadow: 0 0 8px var(--hero-grade-main);
+}
+
+.hero-card-visual.hero-card-grade-common { border-color: color-mix(in srgb, var(--hero-grade-glow) 56%, var(--hero-grade-main)); }
+.hero-card-visual.hero-card-grade-rare { border-color: color-mix(in srgb, var(--hero-grade-glow) 68%, var(--hero-grade-main)); box-shadow: 0 18px 35px -18px rgba(15, 23, 42, .85), 0 0 18px color-mix(in srgb, var(--hero-grade-main) 32%, transparent), inset 0 1px 0 rgba(255,255,255,.22); }
+.hero-card-visual.hero-card-grade-elite { border-color: color-mix(in srgb, var(--hero-grade-glow) 70%, var(--hero-grade-main)); box-shadow: 0 18px 35px -18px rgba(15, 23, 42, .85), 0 0 25px color-mix(in srgb, var(--hero-grade-main) 42%, transparent), inset 0 1px 0 rgba(255,255,255,.22); }
+.hero-card-visual.hero-card-grade-legendary { border-color: color-mix(in srgb, var(--hero-grade-glow) 78%, var(--hero-grade-main)); box-shadow: 0 18px 35px -18px rgba(15, 23, 42, .85), 0 0 30px color-mix(in srgb, var(--hero-grade-main) 50%, transparent), inset 0 1px 0 rgba(255,255,255,.22); }
+.hero-card-visual.hero-card-grade-transcendent { border-color: color-mix(in srgb, var(--hero-grade-glow) 78%, var(--hero-grade-accent)); box-shadow: 0 18px 35px -18px rgba(15, 23, 42, .85), 0 0 36px color-mix(in srgb, var(--hero-grade-main) 58%, transparent), inset 0 1px 0 rgba(255,255,255,.28); }
+
+.hero-card-evolution-aura,
+.hero-card-evolution-silhouette {
   position: absolute;
   inset: 0;
-  z-index: 8;
   pointer-events: none;
 }
 
-.hero-card-gear-chip {
-  position: absolute;
-  display: grid;
-  width: 17%;
-  aspect-ratio: 1 / 1.16;
-  place-items: center;
-  padding: 1.5%;
-  border: 1px solid color-mix(in srgb, var(--gear-glow) 72%, white 10%);
-  border-radius: .7rem;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--gear-main) 72%, #0b1230), rgba(8, 12, 42, .94));
-  box-shadow: 0 7px 12px -8px #020617, 0 0 13px color-mix(in srgb, var(--gear-accent) 40%, transparent), inset 0 1px 0 rgba(255,255,255,.22);
-  transform: rotate(var(--gear-rotate, 0deg));
+.hero-card-evolution-aura {
+  inset: 8% 8% 3%;
+  z-index: 1;
+  opacity: .36;
 }
 
-.hero-card-gear-chip::before {
-  content: '';
+.hero-card-evolution-ring {
   position: absolute;
-  inset: 3px;
-  border: 1px solid color-mix(in srgb, var(--gear-accent) 54%, transparent);
-  border-radius: .48rem;
+  display: block;
+  border: 1px solid color-mix(in srgb, var(--hero-grade-glow) 78%, var(--hero-grade-accent));
+  border-radius: 48%;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--hero-grade-main) 42%, transparent), inset 0 0 16px color-mix(in srgb, var(--hero-grade-accent) 18%, transparent);
+  animation: heroGradeOrbit 7s linear infinite;
+}
+
+.hero-card-evolution-ring-outer {
+  inset: 0 3%;
+  border-style: dashed;
   opacity: .72;
+  transform: rotate(-10deg);
 }
 
-.hero-card-gear-chip::after {
+.hero-card-evolution-ring-inner {
+  inset: 11% 15% 12%;
+  opacity: .7;
+  transform: rotate(17deg);
+  animation-direction: reverse;
+}
+
+.hero-card-evolution-core {
+  position: absolute;
+  top: 1%;
+  left: 50%;
+  z-index: 3;
+  color: var(--hero-grade-glow);
+  font-size: 15%;
+  font-weight: 900;
+  text-shadow: 0 0 12px var(--hero-grade-main), 0 0 22px var(--hero-grade-accent);
+  transform: translateX(-50%);
+  animation: heroGradePulse 2.2s ease-in-out infinite;
+}
+
+.hero-card-evolution-silhouette {
+  inset: 11% 1% 2%;
+  z-index: 2;
+  opacity: .78;
+}
+
+.hero-card-evolution-shoulder,
+.hero-card-evolution-wing,
+.hero-card-evolution-crown,
+.hero-card-evolution-star {
+  display: none;
+  position: absolute;
+  pointer-events: none;
+}
+
+.hero-card-evolution-shoulder {
+  top: 35%;
+  width: 29%;
+  height: 20%;
+  border: 1px solid color-mix(in srgb, var(--hero-grade-glow) 76%, var(--hero-grade-accent));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--hero-grade-main) 82%, transparent), color-mix(in srgb, var(--hero-grade-dark) 74%, transparent));
+  clip-path: polygon(0 34%, 72% 0, 100% 38%, 76% 100%, 19% 86%);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--hero-grade-main) 54%, transparent));
+}
+
+.hero-card-evolution-shoulder-left { left: 4%; transform: rotate(-18deg); }
+.hero-card-evolution-shoulder-right { right: 4%; transform: scaleX(-1) rotate(-18deg); }
+
+.hero-card-evolution-wing {
+  top: 27%;
+  width: 37%;
+  height: 39%;
+  border: 1px solid color-mix(in srgb, var(--hero-grade-glow) 68%, var(--hero-grade-accent));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--hero-grade-accent) 58%, transparent), color-mix(in srgb, var(--hero-grade-dark) 76%, transparent));
+  clip-path: polygon(100% 0, 34% 18%, 0 52%, 35% 48%, 8% 100%, 68% 65%);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--hero-grade-main) 52%, transparent));
+}
+
+.hero-card-evolution-wing-left { left: -3%; transform: rotate(-7deg); }
+.hero-card-evolution-wing-right { right: -3%; transform: scaleX(-1) rotate(-7deg); }
+
+.hero-card-evolution-crown {
+  top: 4%;
+  left: 35%;
+  width: 30%;
+  height: 17%;
+  border: 1px solid color-mix(in srgb, var(--hero-grade-glow) 86%, var(--hero-grade-accent));
+  background: linear-gradient(180deg, var(--hero-grade-glow), var(--hero-grade-main));
+  clip-path: polygon(0 20%, 22% 46%, 35% 0, 50% 43%, 66% 0, 78% 46%, 100% 20%, 88% 100%, 12% 100%);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--hero-grade-main) 65%, transparent));
+}
+
+.hero-card-evolution-star {
+  top: 16%;
+  color: var(--hero-grade-glow);
+  font-size: 11%;
+  line-height: 1;
+  text-shadow: 0 0 9px var(--hero-grade-accent);
+  animation: heroGradeSpark 1.8s ease-in-out infinite;
+}
+
+.hero-card-evolution-star-left { left: 12%; }
+.hero-card-evolution-star-right { right: 12%; animation-delay: -900ms; }
+
+.hero-card-grade-common .hero-card-evolution-aura { opacity: .25; }
+.hero-card-grade-rare .hero-card-evolution-aura { opacity: .48; }
+.hero-card-grade-rare .hero-card-evolution-shoulder { display: block; }
+.hero-card-grade-elite .hero-card-evolution-aura { opacity: .64; }
+.hero-card-grade-elite .hero-card-evolution-shoulder,
+.hero-card-grade-elite .hero-card-evolution-wing { display: block; }
+.hero-card-grade-legendary .hero-card-evolution-aura { opacity: .78; }
+.hero-card-grade-legendary .hero-card-evolution-wing,
+.hero-card-grade-legendary .hero-card-evolution-crown { display: block; }
+.hero-card-grade-transcendent .hero-card-evolution-aura { opacity: .92; }
+.hero-card-grade-transcendent .hero-card-evolution-wing,
+.hero-card-grade-transcendent .hero-card-evolution-crown,
+.hero-card-grade-transcendent .hero-card-evolution-star { display: block; }
+
+.hero-card-grade-common .hero-card-art { filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(.88) contrast(1.02) brightness(.94); }
+.hero-card-grade-rare .hero-card-art { filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(1.12) contrast(1.06) brightness(1.02); }
+.hero-card-grade-elite .hero-card-art { filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(1.2) contrast(1.08) brightness(1.04); }
+.hero-card-grade-legendary .hero-card-art { filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(1.28) contrast(1.1) brightness(1.08); }
+.hero-card-grade-transcendent .hero-card-art { filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(1.42) contrast(1.12) brightness(1.1); }
+
+.hero-card-grade-shape-seal .hero-card-evolution-ring-outer { border-radius: 50%; }
+.hero-card-grade-shape-hex .hero-card-evolution-ring-outer { border-radius: 17%; clip-path: polygon(50% 0, 94% 25%, 94% 75%, 50% 100%, 6% 75%, 6% 25%); }
+.hero-card-grade-shape-diamond .hero-card-evolution-ring-inner { border-radius: 8%; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.hero-card-grade-shape-crown .hero-card-evolution-ring-outer { border-radius: 28% 28% 48% 48%; }
+.hero-card-grade-shape-orbit .hero-card-evolution-ring-outer { border-radius: 50%; border-width: 2px; }
+
+@keyframes heroGradeOrbit { from { transform: rotate(-10deg); } to { transform: rotate(350deg); } }
+@keyframes heroGradePulse { 0%, 100% { opacity: .62; transform: translateX(-50%) scale(.92); } 50% { opacity: 1; transform: translateX(-50%) scale(1.08); } }
+@keyframes heroGradeSpark { 0%, 100% { opacity: .45; transform: scale(.82) rotate(0deg); } 50% { opacity: 1; transform: scale(1.16) rotate(18deg); } }
+
+/* 아이템 카드는 슬롯이 아니라 등급마다 다른 실루엣·문양을 먼저 보여줍니다. */
+.hero-item-card-v2 {
+  border-color: color-mix(in srgb, var(--item-grade-accent) 72%, white);
+  background: linear-gradient(145deg, var(--item-grade-dark), color-mix(in srgb, var(--item-grade-main) 58%, #080c28));
+  box-shadow: 0 12px 22px -14px var(--item-grade-main), inset 0 1px 0 rgba(255,255,255,.28);
+}
+
+.hero-item-card-v2::before {
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--item-grade-glow) 24%, transparent), transparent 46%),
+    linear-gradient(145deg, transparent 45%, color-mix(in srgb, var(--item-grade-accent) 18%, transparent));
+}
+
+.hero-item-card-grid { border-color: color-mix(in srgb, var(--item-grade-accent) 44%, transparent); }
+.hero-item-card-topline, .hero-item-card-bottomline { color: color-mix(in srgb, var(--item-grade-glow) 78%, white); }
+.hero-item-card-bottomline b { color: var(--item-grade-glow); }
+.hero-item-card-corner { border-color: var(--item-grade-accent); }
+
+.hero-item-grade-frame {
+  position: absolute;
+  left: 16%;
+  top: 23%;
+  z-index: 1;
+  display: grid;
+  width: 68%;
+  height: 53%;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--item-grade-glow) 72%, var(--item-grade-accent));
+  background: radial-gradient(circle, color-mix(in srgb, var(--item-grade-main) 48%, transparent), color-mix(in srgb, var(--item-grade-dark) 58%, transparent) 68%);
+  box-shadow: 0 0 13px color-mix(in srgb, var(--item-grade-main) 46%, transparent), inset 0 0 12px color-mix(in srgb, var(--item-grade-accent) 20%, transparent);
+  opacity: .9;
+}
+
+.hero-item-grade-frame::before {
   content: '';
   position: absolute;
-  width: 34%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--gear-glow) 70%, transparent));
+  inset: 9%;
+  border: 1px solid color-mix(in srgb, var(--item-grade-glow) 48%, transparent);
   opacity: .7;
 }
 
-.hero-card-gear-chip-art {
+.hero-item-grade-symbol {
   position: relative;
   z-index: 1;
-  display: block;
-  width: 84%;
-  aspect-ratio: 1;
-}
-
-.hero-card-gear-chip .hero-equipment-overlay {
-  position: relative;
-  inset: auto;
-  display: block;
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(0 3px 2px rgba(2, 6, 23, .72));
-  opacity: 1;
-  mix-blend-mode: normal;
-}
-
-.hero-card-gear-chip .hero-item-art {
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(0 2px 2px rgba(2, 6, 23, .62));
-}
-
-.hero-card-gear-chip-label {
-  position: absolute;
-  right: 50%;
-  bottom: -15%;
-  z-index: 2;
-  padding: 2px 4px;
-  border-radius: 999px;
-  color: #e0e7ff;
-  background: rgba(8, 12, 42, .82);
-  font-size: clamp(5px, 3.2%, 8px);
+  color: var(--item-grade-glow);
+  font-size: 34%;
   font-weight: 900;
   line-height: 1;
-  white-space: nowrap;
-  transform: translateX(50%);
+  opacity: .54;
+  text-shadow: 0 0 9px var(--item-grade-accent);
 }
 
-.hero-card-gear-chip-helmet { left: 5%; top: 23%; --gear-rotate: -8deg; }
-.hero-card-gear-chip-helmet::after { right: -28%; top: 60%; transform: rotate(18deg); }
-.hero-card-gear-chip-weapon { right: 4%; top: 34%; --gear-rotate: 8deg; }
-.hero-card-gear-chip-weapon::after { left: -28%; top: 38%; transform: rotate(-20deg); }
-.hero-card-gear-chip-armor { left: 5%; bottom: 25%; --gear-rotate: -5deg; }
-.hero-card-gear-chip-armor::after { right: -28%; top: 38%; transform: rotate(-18deg); }
-.hero-card-gear-chip-gloves { right: 5%; bottom: 24%; --gear-rotate: 6deg; }
-.hero-card-gear-chip-gloves::after { left: -28%; top: 62%; transform: rotate(18deg); }
-.hero-card-gear-chip-shoes { left: 22%; bottom: 7%; --gear-rotate: -4deg; }
-.hero-card-gear-chip-shoes::after { right: -25%; top: 4%; transform: rotate(-22deg); }
-.hero-card-gear-chip-accessory { right: 22%; top: 11%; --gear-rotate: 5deg; }
-.hero-card-gear-chip-accessory::after { left: -25%; bottom: 2%; transform: rotate(22deg); }
+.hero-item-grade-frame-seal { border-radius: 36% 64% 52% 48%; }
+.hero-item-grade-frame-hex { clip-path: polygon(50% 0, 94% 25%, 94% 75%, 50% 100%, 6% 75%, 6% 25%); }
+.hero-item-grade-frame-diamond { left: 20%; top: 18%; width: 60%; height: 64%; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.hero-item-grade-frame-crown { left: 14%; top: 20%; width: 72%; height: 59%; clip-path: polygon(0 18%, 22% 37%, 35% 0, 50% 31%, 65% 0, 78% 37%, 100% 18%, 89% 100%, 11% 100%); }
+.hero-item-grade-frame-orbit { left: 13%; top: 16%; width: 74%; height: 68%; border-radius: 50%; border-width: 2px; background: radial-gradient(circle, color-mix(in srgb, var(--item-grade-accent) 35%, transparent), transparent 62%); }
 
-.hero-card-gear-count-0 .hero-card-gear-constellation { display: none; }
+.hero-item-grade-rare { clip-path: polygon(9% 0, 91% 0, 100% 10%, 100% 90%, 91% 100%, 9% 100%, 0 90%, 0 10%); }
+.hero-item-grade-elite { border-radius: .62rem 1.1rem .62rem 1.1rem; }
+.hero-item-grade-legendary { border-radius: .9rem .9rem .55rem .55rem; }
+.hero-item-grade-transcendent { border-radius: 1.2rem .55rem 1.2rem .55rem; }
+
+.hero-item-grade-rare .hero-item-grade-frame { box-shadow: 0 0 15px color-mix(in srgb, var(--item-grade-main) 54%, transparent), inset 0 0 14px color-mix(in srgb, var(--item-grade-accent) 24%, transparent); }
+.hero-item-grade-elite .hero-item-grade-frame { box-shadow: 0 0 18px color-mix(in srgb, var(--item-grade-main) 62%, transparent), inset 0 0 15px color-mix(in srgb, var(--item-grade-accent) 28%, transparent); }
+.hero-item-grade-legendary .hero-item-grade-frame { box-shadow: 0 0 22px color-mix(in srgb, var(--item-grade-main) 68%, transparent), inset 0 0 17px color-mix(in srgb, var(--item-grade-accent) 32%, transparent); }
+.hero-item-grade-transcendent .hero-item-grade-frame { box-shadow: 0 0 27px color-mix(in srgb, var(--item-grade-main) 74%, transparent), inset 0 0 20px color-mix(in srgb, var(--item-grade-accent) 38%, transparent); animation: heroItemGradePulse 2.2s ease-in-out infinite; }
+
+.hero-item-card-glyph { z-index: 2; }
+.hero-item-card-grade-label { color: var(--item-grade-glow); letter-spacing: .1em; text-shadow: 0 0 6px var(--item-grade-main); }
+
+@keyframes heroItemGradePulse { 0%, 100% { transform: scale(.96); opacity: .72; } 50% { transform: scale(1.04); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-card-evolution-ring,
+  .hero-card-evolution-core,
+  .hero-card-evolution-star,
+  .hero-item-grade-transcendent .hero-item-grade-frame { animation: none; }
+}
+
+/* 이전 슬롯 칩 레이아웃은 더 이상 사용하지 않습니다. */
+.hero-card-gear-constellation,
+.hero-card-gear-chip { display: none; }
 
 /* 학생 공간 모드의 선택 카드와 현재 공간 요약 */
 .showcase-student-metric {

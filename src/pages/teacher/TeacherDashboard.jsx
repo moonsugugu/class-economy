@@ -1746,7 +1746,7 @@ function SettingsTab({ klass }) {
          '주식 시세를 하루에 몇 번까지 바꿀 수 있는지 정해요. (기본 25회)'
       )}
       {field('용사 전투 하루 도전 횟수', 'heroBattleLimit', 'number', '학생 한 명이 하루에 용사 전투를 도전할 수 있는 횟수예요. 기본 10회.')}
-      {field('용사 전투 1구간 승리 보상', 'heroWinReward', 'number', '1~10단계의 일반 몬스터 승리 보상이에요. 다음 구간마다 보상이 올라가고, 보스는 해당 구간 보상의 10배를 지급해요. 기본 10.')}
+      {field('용사 전투 1구간 승리 보상', 'heroWinReward', 'number', '1~10단계의 일반 몬스터 승리 보상이에요. 다음 구간마다 보상이 올라가고, 일반 보스는 해당 구간 기본 보상과 같은 금액을 지급해요. 최종 보스만 10배예요. 기본 10.')}
       {field('용사 전투 패배 보상', 'heroLoseReward', 'number', '용사가 졌을 때 지급할 학급화폐예요. 기본 0.')}
       <div>
         <label className="text-sm text-gray-500 block mb-1">상점·내 공간 물가 상승 방식</label>
