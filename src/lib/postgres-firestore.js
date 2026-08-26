@@ -92,7 +92,20 @@ export async function runTransaction(_db, handler) {
   for (let attempt=0; attempt<20; attempt++) {
     const reads=[], operations=[];
     const tx={
-      async get(ref) { const snap=await getDoc(ref); reads.push({path:ref.path,version:snap.version}); return snap; },
+      async get(ref) {
+        // Firestore transactions can read a query as well as a document. The
+        // raid payout path uses this to read every participant before the
+        // final HP update. Treating a collection as a document makes that
+        // path fail with a DocSnapshot that has no `docs` property.
+        if (ref?.type === 'collection' || ref?.type === 'query') {
+          const snap = await getDocs(ref);
+          reads.push(...snap.docs.map((item) => ({ path: item.ref.path, version: item.version })));
+          return snap;
+        }
+        const snap=await getDoc(ref);
+        reads.push({path:ref.path,version:snap.version});
+        return snap;
+      },
       set(ref,data,options={}) { operations.push({type:'set',path:ref.path,data,merge:!!options.merge}); return tx; },
       update(ref,data) { operations.push({type:'update',path:ref.path,data}); return tx; },
       delete(ref) { operations.push({type:'delete',path:ref.path}); return tx; },

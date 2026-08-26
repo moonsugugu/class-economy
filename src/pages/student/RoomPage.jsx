@@ -54,7 +54,12 @@ function RoomInner({ klass, student }) {
   const [msg, setMsg] = useState(null);
   const [previewItem, setPreviewItem] = useState(null);
   const [spaceBusy, setSpaceBusy] = useState(null);
+  const [purchaseBusy, setPurchaseBusy] = useState(null);
+  const [placementBusy, setPlacementBusy] = useState(false);
   const [refundBusy, setRefundBusy] = useState(null);
+  const purchaseBusyRef = useRef(false);
+  const placementBusyRef = useRef(false);
+  const refundBusyRef = useRef(false);
   const glRef = useRef(null);
 
   const studentRef = doc(db, 'classes', klass.id, 'students', student.id);
@@ -143,12 +148,15 @@ function RoomInner({ klass, student }) {
 
   /* ----- 구매 ----- */
   const buyItem = async (item) => {
+    if (purchaseBusyRef.current) return;
     const stackable = isStackableRoomItem(item.slot);
     if (inventory.includes(item.id) && !stackable) return;
     const price = costOf(item);
     const previewTax = taxForPart(price, klass, 'item').tax;
     const previewTotal = price + previewTax;
     if (!confirm(`'${item.name}'을(를) 살까요?\n상품가 ${fmt(price)} + 세금 ${fmt(previewTax)} = 총 ${fmt(previewTotal)}${klass.currency}`)) return;
+    purchaseBusyRef.current = true;
+    setPurchaseBusy(item.id);
     try {
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
@@ -181,16 +189,22 @@ function RoomInner({ klass, student }) {
       flash('ok', `🛍️ '${item.name}' 구매 완료!`);
     } catch (e) {
       flash('err', e.message);
+    } finally {
+      purchaseBusyRef.current = false;
+      setPurchaseBusy(null);
     }
   };
 
   /* ----- 세트 구매 ----- */
   const buySet = async (set) => {
+    if (purchaseBusyRef.current) return;
     const { need, full, price, saved } = setPriceFor(set, inventory);
     if (!need.length) return flash('err', '이미 세트를 다 가지고 있어요!');
     const previewTax = taxForPart(price, klass, 'item').tax;
     const previewTotal = price + previewTax;
     if (!confirm(`${set.name}\n${need.length}개 아이템을 살까요?\n상품가 ${fmt(price)} + 세금 ${fmt(previewTax)} = 총 ${fmt(previewTotal)}${klass.currency}\n(따로 사면 ${fmt(full)} → ${fmt(saved)} 절약!)`)) return;
+    purchaseBusyRef.current = true;
+    setPurchaseBusy(set.id);
     try {
       await runTransaction(db, async (tx) => {
         const s = (await tx.get(studentRef)).data();
@@ -214,28 +228,43 @@ function RoomInner({ klass, student }) {
       flash('ok', `🎁 ${set.name} 구매 완료! ${fmt(saved)}${klass.currency} 아꼈어요.`);
     } catch (e) {
       flash('err', e.message);
+    } finally {
+      purchaseBusyRef.current = false;
+      setPurchaseBusy(null);
     }
   };
 
   /* ----- 배치 ----- */
   const onPlace = async (key) => {
+    if (placementBusyRef.current) return;
     const item = ITEM_MAP[placing];
     if (!item) return;
-    const placedCount = SPACE_KEYS.reduce((count, sp) =>
-      count + Object.values(maps[sp]).filter((p) => p.id === placing).length, 0);
-    const ownedCount = inventory.filter((id) => id === placing).length;
-    if (placedCount >= ownedCount) {
-      flash('err', '가지고 있는 수량만큼 모두 배치했어요. 기존 배치를 먼저 집어 주세요.');
-      return;
+    placementBusyRef.current = true;
+    setPlacementBusy(true);
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(studentRef);
+        const current = snap.data() || {};
+        const currentInventory = Array.isArray(current.inventory) ? current.inventory : [];
+        const placedCount = SPACE_KEYS.reduce((count, sp) =>
+          count + Object.values(normalizeRoom(current[sp])).filter((placed) => placed.id === placing).length, 0);
+        const ownedCount = currentInventory.filter((id) => id === placing).length;
+        if (placedCount >= ownedCount) {
+          throw new Error('가지고 있는 수량만큼 모두 배치했어요. 기존 배치를 먼저 집어 주세요.');
+        }
+        const currentMap = normalizeRoom(current[space]);
+        if (!canPlaceAt(currentMap, key, item, 0, null, grid.cols, grid.rows)) {
+          throw new Error('거기엔 놓을 수 없어요! (공간이 부족해요)');
+        }
+        tx.update(studentRef, { [`${space}.${key}`]: { id: placing, rot: 0 } });
+      });
+      setPlacing(null);
+    } catch (e) {
+      flash('err', e.message);
+    } finally {
+      placementBusyRef.current = false;
+      setPlacementBusy(false);
     }
-    const prevKey = null;
-    if (!canPlaceAt(activeMap, key, item, 0, prevKey, grid.cols, grid.rows)) {
-      flash('err', '거기엔 놓을 수 없어요! (공간이 부족해요)');
-      return;
-    }
-    const updates = { [`${space}.${key}`]: { id: placing, rot: 0 } };
-    await updateDoc(studentRef, updates);
-    setPlacing(null);
   };
 
   const rotateSelected = async () => {
@@ -287,9 +316,10 @@ function RoomInner({ klass, student }) {
     updateDoc(studentRef, { [`roomSkin.${item.slot}`]: skin[item.slot] === item.id ? null : item.id });
 
   const refundItem = async (item) => {
-    if (refundBusy) return;
+    if (refundBusyRef.current) return;
     const previewRefund = Math.floor(costOf(item) * 0.5);
     if (!confirm(`'${item.name}'을(를) 구매가의 50%인 ${fmt(previewRefund)}${klass.currency}에 환불할까요?`)) return;
+    refundBusyRef.current = true;
     setRefundBusy(`${item.id}:${item.inventoryIndex}`);
     try {
       let refundPrice = previewRefund;
@@ -313,13 +343,17 @@ function RoomInner({ klass, student }) {
 
         for (const sp of SPACE_KEYS) {
           const map = normalizeRoom(s[sp]);
-          const placedKey = Object.keys(map).find((key) => map[key].id === item.id);
-          if (placedKey) {
-            const nextMap = { ...map };
-            delete nextMap[placedKey];
-            upd[sp] = nextMap;
-            break;
-          }
+          const placedKeys = Object.keys(map).filter((key) => map[key].id === item.id);
+          if (!placedKeys.length) continue;
+          // One inventory entry can represent one placement. If older rapid
+          // clicks already created ghost placements, remove the excess too so
+          // a refund can never leave an item that is no longer owned.
+          const remainingCopies = inv.filter((id) => id === item.id).length;
+          const excess = Math.max(0, placedKeys.length - remainingCopies);
+          const removeCount = Math.max(1, excess);
+          placedKeys.slice(0, removeCount).forEach((key) => {
+            upd[`${sp}.${key}`] = deleteField();
+          });
         }
         if (isCompanion(item.slot)) {
           const nextWalking = [...(s.walking || [])];
@@ -327,23 +361,9 @@ function RoomInner({ klass, student }) {
           if (walkingIndex >= 0) nextWalking.splice(walkingIndex, 1);
           upd.walking = nextWalking;
         }
-        const nextAvatar = { ...(s.avatar || {}) };
-        let avatarChanged = false;
-        if (item.slot === 'char' && nextAvatar.base === item.base) {
-          delete nextAvatar.base;
-          avatarChanged = true;
-        }
-        if (nextAvatar[item.slot] === item.id) {
-          delete nextAvatar[item.slot];
-          avatarChanged = true;
-        }
-        if (avatarChanged) upd.avatar = nextAvatar;
-
-        const nextSkin = { ...(s.roomSkin || {}) };
-        if (nextSkin[item.slot] === item.id) {
-          delete nextSkin[item.slot];
-          upd.roomSkin = nextSkin;
-        }
+        if (item.slot === 'char' && s.avatar?.base === item.base) upd['avatar.base'] = deleteField();
+        if (s.avatar?.[item.slot] === item.id) upd[`avatar.${item.slot}`] = deleteField();
+        if (s.roomSkin?.[item.slot] === item.id) upd[`roomSkin.${item.slot}`] = deleteField();
         tx.update(studentRef, upd);
       });
       setSelected(null);
@@ -352,6 +372,7 @@ function RoomInner({ klass, student }) {
     } catch (e) {
       flash('err', e.message);
     } finally {
+      refundBusyRef.current = false;
       setRefundBusy(null);
     }
   };
@@ -669,7 +690,7 @@ function RoomInner({ klass, student }) {
             <div className="text-amber-600">총 {fmt(costOf(previewItem) + taxForPart(costOf(previewItem), klass, 'item').tax)} {klass.currency}</div>
             <div className="flex gap-2">
               {!inventory.includes(previewItem.id) && (
-                <button onClick={() => { setPreviewItem(null); buyItem(previewItem); }} className="flex-1 rounded-xl py-2 bg-purple-500 text-white">구매하기</button>
+                <button onClick={() => { setPreviewItem(null); buyItem(previewItem); }} disabled={Boolean(purchaseBusy)} className="flex-1 rounded-xl py-2 bg-purple-500 text-white disabled:opacity-40">구매하기</button>
               )}
               <button onClick={() => setPreviewItem(null)} className="flex-1 rounded-xl py-2 bg-gray-100 text-gray-500">닫기</button>
             </div>
@@ -716,6 +737,7 @@ function RoomInner({ klass, student }) {
                     ) : (
                       <button
                         onClick={() => buySet(set)}
+                        disabled={Boolean(purchaseBusy)}
                         className={`w-full rounded-xl py-2 text-white ${student.cash >= total ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-300'}`}
                       >
                         {fmt(total)} {klass.currency}
@@ -759,6 +781,7 @@ function RoomInner({ klass, student }) {
                             <button onClick={() => setPreviewItem(c)} className="flex-1 rounded-xl py-1.5 text-[11px] bg-sky-100 text-sky-600">자세히 보기</button>
                             <button
                               onClick={() => buyItem(c)}
+                              disabled={Boolean(purchaseBusy)}
                               className={`flex-1 rounded-xl py-1.5 text-[11px] text-white ${
                                 student.cash >= total ? 'bg-purple-400 hover:bg-purple-500' : 'bg-gray-300'
                               }`}
@@ -792,6 +815,7 @@ function RoomInner({ klass, student }) {
                     ) : (
                       <button
                         onClick={() => buyItem(item)}
+                        disabled={Boolean(purchaseBusy)}
                         className={`w-full rounded-xl py-1.5 text-sm text-white ${
                           student.cash >= total ? 'bg-purple-400 hover:bg-purple-500' : 'bg-gray-300'
                         }`}
