@@ -40,6 +40,12 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
     if (!strongest || candidateGrade.rank > strongest.grade.rank) return { item, grade: candidateGrade };
     return strongest;
   }, null);
+  const equippedGradeKeys = equipmentItems
+    .map(([, item]) => item?.rarity)
+    .filter((rarity) => rarity && HERO_GRADE_VISUALS[rarity]);
+  const secondaryGradeKey = [...new Set(equippedGradeKeys)]
+    .sort((left, right) => HERO_GRADE_VISUALS[right].rank - HERO_GRADE_VISUALS[left].rank)
+    .find((rarity) => rarity !== strongestEquipment?.item?.rarity) || 'common';
   const gradeKey = strongestEquipment?.item?.rarity && HERO_GRADE_VISUALS[strongestEquipment.item.rarity]
     ? strongestEquipment.item.rarity
     : 'common';
@@ -89,6 +95,7 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
     '--hero-grade-accent': grade.accent,
     '--hero-grade-glow': grade.glow,
     '--hero-grade-dark': grade.dark,
+    '--hero-grade-secondary': HERO_GRADE_VISUALS[secondaryGradeKey].accent,
   };
 
   return (
@@ -100,6 +107,7 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
         rarity?.label ? `hero-card-rarity-${character.rarity}` : '',
         `hero-card-grade-${gradeKey}`,
         `hero-card-grade-shape-${grade.shape}`,
+        new Set(equippedGradeKeys).size > 1 ? 'hero-card-loadout-mixed' : '',
         className,
       ].filter(Boolean).join(' ')}
       style={style}
@@ -160,7 +168,11 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
       )}
 
       {pet && (
-        <HeroPetVisual item={pet} size={58} className="hero-card-pet" />
+        <HeroPetVisual
+          item={pet}
+          size={pet.visual?.art ? 78 : 58}
+          className={pet.visual?.art ? 'hero-card-pet hero-card-pet-image' : 'hero-card-pet'}
+        />
       )}
       <div className="hero-card-footer">
         <span>{character?.name || '용사 대기 중'}</span>

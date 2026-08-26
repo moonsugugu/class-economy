@@ -447,6 +447,9 @@ function DesignSignature({ item, tone, uid }) {
 }
 
 function ItemArtwork({ item }) {
+  if (item.slot === 'pet' && item.visual?.art) {
+    return <HeroCharacterArt className="hero-item-pet-art" src={item.visual.art} alt={item.name || '펫'} />;
+  }
   const tone = toneOf(item);
   const tier = Math.min(5, Math.max(1, Number(item.level) ? Math.ceil(item.level / 4) : 1));
   const uid = `hero-art-${idPart(item.id)}`;

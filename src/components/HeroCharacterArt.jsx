@@ -69,10 +69,13 @@ function removeConnectedLightBackground(source) {
           const pixel = stack[stackSize];
           const x = pixel % canvas.width;
           const y = Math.floor(pixel / canvas.width);
-          push(x - 1, y);
-          push(x + 1, y);
-          push(x, y - 1);
-          push(x, y + 1);
+          // 생성 이미지가 체크무늬를 RGB로 구워 넣는 경우가 있어요. 대각선으로
+          // 맞닿은 타일도 배경으로 이어 보아야 바둑판이 남지 않습니다.
+          for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+            for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+              if (offsetX || offsetY) push(x + offsetX, y + offsetY);
+            }
+          }
         }
 
         let changed = false;

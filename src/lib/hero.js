@@ -1,5 +1,6 @@
-import maleHeroArt from '../assets/hero-guardian-male.png';
-import femaleHeroArt from '../assets/hero-guardian-female.png';
+import maleHeroArt from '../assets/hero-guardian-male-mixed.png';
+import femaleHeroArt from '../assets/hero-guardian-female-mixed.png';
+import neonFoxPetArt from '../assets/hero-pet-neon-fox.png';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -309,7 +310,10 @@ const petItems = Array.from({ length: 20 }, (_, index) => {
     visualKey: 'pet-' + level,
     name: PET_NAMES[index],
     emoji: PET_EMOJIS[index],
-    visual: visualForItem('pet', level, rarity, index),
+    visual: {
+      ...visualForItem('pet', level, rarity, index),
+      ...(index === 1 ? { art: neonFoxPetArt } : {}),
+    },
     price,
     power: 0,
     critChance,
