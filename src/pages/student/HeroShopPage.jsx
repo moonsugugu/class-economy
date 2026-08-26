@@ -30,6 +30,21 @@ export default function HeroShopPage() {
   const characters = HERO_ITEMS.filter((item) => item.slot === 'character');
   const inventoryItems = HERO_ITEMS.filter((item) => hero.owned.includes(item.id));
   const costOf = (item) => itemPrice(item.price, klass);
+  const isEquipped = (current, itemId) => (
+    current.character === itemId
+    || current.pet === itemId
+    || Object.values(current.equipment || {}).includes(itemId)
+  );
+  const slotLabelOf = (item) => (
+    item.slot === 'character'
+      ? '캐릭터'
+      : item.slot === 'pet'
+        ? '펫'
+        : HERO_SLOTS.find(([slot]) => slot === item.slot)?.[1] || '같은 부위'
+  );
+  const refundBlockedMessage = (item) => (
+    `장착 중인 ${slotLabelOf(item)}는 환불할 수 없어요. 같은 부위의 다른 장비를 먼저 장착해 주세요.`
+  );
 
   const changeView = (nextView) => {
     setView(nextView);
@@ -140,6 +155,10 @@ export default function HeroShopPage() {
 
   const refund = async (item) => {
     if (refundBusyRef.current) return;
+    if (isEquipped(hero, item.id)) {
+      flash('err', refundBlockedMessage(item));
+      return;
+    }
     const enhancement = heroEnhancementFor(hero, item.id);
     const refundPrice = Math.floor((costOf(item) + enhancement.invested) * 0.5);
     if (!confirm(`'${item.name}'을(를) ${refundPrice}${klass.currency}에 환불할까요?`)) return;
@@ -155,6 +174,7 @@ export default function HeroShopPage() {
         const currentEnhancement = heroEnhancementFor(current, item.id);
         refundResult = Math.floor((currentPrice + currentEnhancement.invested) * 0.5);
         if (!current.owned.includes(item.id)) throw new Error('환불할 아이템을 찾지 못했어요.');
+        if (isEquipped(current, item.id)) throw new Error(refundBlockedMessage(item));
         const next = {
           ...current,
           owned: current.owned.filter((id) => id !== item.id),
@@ -220,9 +240,13 @@ export default function HeroShopPage() {
             >
               {equipped ? '장착 중 ✓' : '장착하기'}
             </button>
-            <button onClick={() => refund(item)} disabled={busyId === item.id} className="text-xs text-rose-500 underline">
-              50% 환불 ({fmt(Math.floor((price + enhancement.invested) * 0.5))})
-            </button>
+            {equipped ? (
+              <span className="block text-[10px] leading-tight text-gray-400">🔒 다른 {slotLabelOf(item)} 장착 후 환불 가능</span>
+            ) : (
+              <button onClick={() => refund(item)} disabled={busyId === item.id} className="text-xs text-rose-500 underline">
+                50% 환불 ({fmt(Math.floor((price + enhancement.invested) * 0.5))})
+              </button>
+            )}
           </div>
         ) : (
           <button
@@ -253,7 +277,7 @@ export default function HeroShopPage() {
       </div>
       {view === 'inventory' && (
         <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          📦 구매한 아이템만 모아 두었어요. 장착하거나 구매가의 50%로 환불할 수 있어요. 강화한 아이템은 누적 강화 투자액도 환불가에 포함돼요.
+          📦 구매한 아이템만 모아 두었어요. 장착하거나 구매가의 50%로 환불할 수 있어요. 장착 중인 아이템은 같은 부위의 다른 장비를 장착한 뒤 환불할 수 있고, 강화한 아이템은 누적 강화 투자액도 환불가에 포함돼요.
         </div>
       )}
       <div className="rounded-2xl bg-amber-50 text-amber-700 px-4 py-3 text-sm flex items-center gap-2 flex-wrap">
@@ -269,6 +293,7 @@ export default function HeroShopPage() {
         <div className="grid grid-cols-2 gap-3">
           {characters.filter((item) => view !== 'inventory' || hero.owned.includes(item.id)).map((item) => {
             const previewHero = { ...hero, character: item.id };
+            const equipped = hero.character === item.id;
             return (
               <div key={item.id} className="hero-shop-card hero-shop-character relative overflow-hidden rounded-3xl border-2 p-4 text-center shadow-lg">
                 <HeroCardVisual hero={previewHero} size={150} />
@@ -278,8 +303,12 @@ export default function HeroShopPage() {
                 <div className="hero-shop-item-price text-xs text-amber-600 mb-2">총 {fmt(costOf(item) + taxForPart(costOf(item), klass, 'item').tax)} {klass.currency}</div>
                 {hero.owned.includes(item.id) ? (
                   <div className="space-y-1">
-                    <button onClick={() => equip(item)} disabled={busyId === item.id} className="w-full rounded-xl py-1.5 text-sm bg-indigo-100 text-indigo-600">{hero.character === item.id ? '장착 중 ✓' : '장착하기'}</button>
-                    <button onClick={() => refund(item)} disabled={busyId === item.id} className="text-xs text-rose-500 underline">50% 환불</button>
+                    <button onClick={() => equip(item)} disabled={busyId === item.id} className="w-full rounded-xl py-1.5 text-sm bg-indigo-100 text-indigo-600">{equipped ? '장착 중 ✓' : '장착하기'}</button>
+                    {equipped ? (
+                      <span className="block text-[10px] leading-tight text-gray-400">🔒 다른 캐릭터 장착 후 환불 가능</span>
+                    ) : (
+                      <button onClick={() => refund(item)} disabled={busyId === item.id} className="text-xs text-rose-500 underline">50% 환불</button>
+                    )}
                   </div>
                 ) : (
                 <button onClick={() => buy(item)} disabled={busyId === item.id || student.cash < costOf(item) + taxForPart(costOf(item), klass, 'item').tax} className="w-full rounded-xl py-1.5 text-sm text-white bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300">구매하기</button>
