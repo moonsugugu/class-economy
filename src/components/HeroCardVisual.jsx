@@ -1,7 +1,8 @@
 import { HERO_GRADE_VISUALS, HERO_ITEM_MAP, HERO_RARITIES, normalizeHero } from '../lib/hero';
 import arenaBackground from '../assets/hero-card-arena.png';
-import { HeroEquipmentOverlay, HeroPetVisual } from './HeroItemVisual.jsx';
+import { HeroPetVisual } from './HeroItemVisual.jsx';
 import HeroCharacterArt from './HeroCharacterArt.jsx';
+import HeroLoadoutLayers from './HeroLoadoutLayers.jsx';
 
 const FALLBACK_TONE = {
   main: '#5964d8',
@@ -60,8 +61,8 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
   const shoeTone = toneOf(shoes, { main: '#28335f', accent: '#22d3ee', glow: '#a5f3fc', dark: '#111936' });
   const accessoryTone = toneOf(accessory, { main: '#f59e0b', accent: '#fb7185', glow: '#fef3c7', dark: '#7c2d12' });
   const petTone = toneOf(pet, { main: '#a855f7', accent: '#22d3ee', glow: '#f0abfc', dark: '#3b0764' });
-  // 완성된 혼합 일러스트는 장착 상태와 상관없이 모든 장비가 들어 있어요.
-  // 따라서 항상 기본 캐릭터를 깔고, 아래에서 현재 장착된 슬롯만 합성합니다.
+  // 기본 캐릭터를 깔고, 현재 장착된 슬롯의 등급 레이어만 합성합니다.
+  // 보유 중인 최고 등급이나 전체 혼합 일러스트를 사용하지 않습니다.
   const characterArt = character?.visual?.baseArt || character?.visual?.art;
   const rarity = character?.rarity ? HERO_RARITIES[character.rarity] : null;
   const style = {
@@ -127,15 +128,7 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
         <div className="hero-card-art-wrap">
           <div className="hero-card-art-backdrop" aria-hidden="true" />
           <HeroCharacterArt className="hero-card-art" src={characterArt} alt={character.name || '용사'} />
-          <div className="hero-card-gear-layer" aria-label="현재 장착 장비 외형">
-            {equipmentItems.map(([slot, item]) => item && (
-              <HeroEquipmentOverlay
-                key={item.id}
-                item={item}
-                className={`hero-card-equip hero-card-equip-${slot} hero-card-equip-grade-${item.rarity || 'common'}`}
-              />
-            ))}
-          </div>
+          <HeroLoadoutLayers characterId={hero.character} equipmentItems={equipmentItems} />
         </div>
       ) : (
       <div className="hero-card-figure">
