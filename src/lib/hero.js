@@ -1,5 +1,7 @@
-import maleHeroArt from '../assets/hero-guardian-male-base.png';
-import femaleHeroArt from '../assets/hero-guardian-female-base.png';
+import maleHeroArt from '../assets/hero-guardian-male-mixed.png';
+import femaleHeroArt from '../assets/hero-guardian-female-mixed.png';
+import maleHeroBaseArt from '../assets/hero-guardian-male-base.png';
+import femaleHeroBaseArt from '../assets/hero-guardian-female-base.png';
 import neonFoxPetArt from '../assets/hero-pet-neon-fox.png';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -68,11 +70,11 @@ export const HERO_SHOP_REFRESH_LIMIT = 3;
 const HERO_CHARACTERS = [
   {
     id: 'hero_male', slot: 'character', name: '네온 수호자', emoji: '🛡️', price: 100, power: 12,
-    visual: { main: '#4f46e5', accent: '#fb7185', glow: '#fbbf24', hair: '#171b55', role: 'guardian', art: maleHeroArt },
+    visual: { main: '#4f46e5', accent: '#fb7185', glow: '#fbbf24', hair: '#171b55', role: 'guardian', art: maleHeroArt, baseArt: maleHeroBaseArt },
   },
   {
     id: 'hero_female', slot: 'character', name: '루미나 가디언', emoji: '⚔️', price: 100, power: 14,
-    visual: { main: '#7c3aed', accent: '#22d3ee', glow: '#f9a8d4', hair: '#26124f', role: 'arcane', art: femaleHeroArt },
+    visual: { main: '#7c3aed', accent: '#22d3ee', glow: '#f9a8d4', hair: '#26124f', role: 'arcane', art: femaleHeroArt, baseArt: femaleHeroBaseArt },
   },
 ];
 

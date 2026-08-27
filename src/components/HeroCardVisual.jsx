@@ -1,6 +1,6 @@
 import { HERO_GRADE_VISUALS, HERO_ITEM_MAP, HERO_RARITIES, normalizeHero } from '../lib/hero';
 import arenaBackground from '../assets/hero-card-arena.png';
-import { HeroEquipmentOverlay, HeroPetVisual } from './HeroItemVisual.jsx';
+import { HeroPetVisual } from './HeroItemVisual.jsx';
 import HeroCharacterArt from './HeroCharacterArt.jsx';
 
 const FALLBACK_TONE = {
@@ -34,11 +34,12 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
     ['accessory', accessory],
   ];
   const equippedCount = equipmentItems.filter(([, item]) => item).length;
+  const hasEquippedGear = equippedCount > 0;
   const equippedGradeKeys = equipmentItems
     .map(([, item]) => item?.rarity)
     .filter((rarity) => rarity && HERO_GRADE_VISUALS[rarity]);
   const mixedGrade = new Set(equippedGradeKeys).size > 1;
-  const frameGradeKey = armor?.rarity && HERO_GRADE_VISUALS[armor.rarity]
+  const frameGradeKey = !mixedGrade && armor?.rarity && HERO_GRADE_VISUALS[armor.rarity]
     ? armor.rarity
     : 'common';
   const secondaryGradeKey = [...new Set(equippedGradeKeys)]
@@ -60,6 +61,9 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
   const shoeTone = toneOf(shoes, { main: '#28335f', accent: '#22d3ee', glow: '#a5f3fc', dark: '#111936' });
   const accessoryTone = toneOf(accessory, { main: '#f59e0b', accent: '#fb7185', glow: '#fef3c7', dark: '#7c2d12' });
   const petTone = toneOf(pet, { main: '#a855f7', accent: '#22d3ee', glow: '#f0abfc', dark: '#3b0764' });
+  const characterArt = hasEquippedGear
+    ? character?.visual?.art
+    : character?.visual?.baseArt || character?.visual?.art;
   const rarity = character?.rarity ? HERO_RARITIES[character.rarity] : null;
   const style = {
     width: size,
@@ -123,21 +127,28 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
       <div className="hero-card-sigil" aria-hidden="true">✦</div>
       <div className="hero-card-ground" />
 
-      {character?.visual?.art ? (
-        <div className={`hero-card-art-wrap hero-card-gear-count-${equippedCount}`}>
+      {characterArt ? (
+        <div className="hero-card-art-wrap">
           <div className="hero-card-art-backdrop" aria-hidden="true" />
           <div className="hero-card-evolution-aura" aria-hidden="true">
             <span className="hero-card-evolution-ring hero-card-evolution-ring-outer" />
             <span className="hero-card-evolution-ring hero-card-evolution-ring-inner" />
             <span className="hero-card-evolution-core">{mixedGrade ? '✦' : grade.symbol}</span>
           </div>
-          <HeroCharacterArt className="hero-card-art" src={character.visual.art} alt={character.name || '용사'} />
-          <div className="hero-card-gear-layer" aria-label="장착 장비 외형">
+          <HeroCharacterArt className="hero-card-art" src={characterArt} alt={character.name || '용사'} />
+          <div className="hero-card-loadout-accents" aria-label="현재 장착 장비 외형">
             {equipmentItems.map(([slot, item]) => item && (
-              <HeroEquipmentOverlay
+              <span
                 key={item.id}
-                item={item}
-                className={`hero-card-equip-${slot}`}
+                className={`hero-card-slot-effect hero-card-slot-effect-${slot}`}
+                style={{
+                  '--slot-main': toneOf(item).main,
+                  '--slot-accent': toneOf(item).accent,
+                  '--slot-glow': toneOf(item).glow,
+                  '--slot-dark': toneOf(item).dark,
+                }}
+                data-rarity={item.rarity || 'common'}
+                aria-label={`${item.name} 장착`}
               />
             ))}
           </div>
