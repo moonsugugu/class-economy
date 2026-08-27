@@ -1257,16 +1257,6 @@ input, select, textarea, button {
   animation: heroCardPulse 1.8s ease-in-out infinite;
 }
 
-.hero-card-loadout-mixed .hero-card-art-backdrop {
-  background:
-    radial-gradient(ellipse at 50% 55%, color-mix(in srgb, var(--hero-grade-main) 42%, transparent), transparent 58%),
-    radial-gradient(ellipse at 30% 54%, color-mix(in srgb, var(--hero-grade-secondary) 25%, transparent), transparent 52%);
-}
-
-.hero-card-loadout-mixed .hero-card-evolution-ring-inner {
-  border-color: color-mix(in srgb, var(--hero-grade-secondary) 72%, var(--hero-grade-glow));
-}
-
 .monster-art {
   position: relative;
   z-index: 1;
@@ -1295,8 +1285,8 @@ input, select, textarea, button {
   .monster-art { animation: none; }
 }
 
-/* 완성 일러스트 위에는 장착 슬롯의 색·등급만 가볍게 표시합니다.
-   개별 아이템 SVG를 몸 위에 크게 덧씌우지 않아 캐릭터 실루엣과 일러스트를 보존해요. */
+/* 기본 캐릭터 위에 현재 장착된 아이템만 슬롯별로 합성합니다.
+   임의의 광선·원·막대를 CSS로 그리지 않고, 상점·인벤토리와 같은 SVG 외형을 사용해요. */
 .hero-card-art-wrap {
   overflow: visible;
   border: 1px solid color-mix(in srgb, var(--hero-accent) 48%, transparent);
@@ -1328,161 +1318,45 @@ input, select, textarea, button {
   opacity: .97;
 }
 
-.hero-card-loadout-accents {
+.hero-card-gear-layer {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 5;
   pointer-events: none;
-  overflow: hidden;
+  overflow: visible;
 }
 
-.hero-card-slot-effect {
+.hero-card-gear-layer .hero-equipment-overlay {
   position: absolute;
   display: block;
-  opacity: .82;
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--slot-glow) 78%, transparent));
+  overflow: visible;
+  filter: drop-shadow(0 4px 4px rgba(4, 7, 30, .68));
+  transform-origin: center;
 }
 
-.hero-card-slot-effect[data-rarity="rare"] { opacity: .88; }
-.hero-card-slot-effect[data-rarity="elite"] { opacity: .94; }
-.hero-card-slot-effect[data-rarity="legendary"] { opacity: .98; }
-.hero-card-slot-effect[data-rarity="transcendent"] {
+.hero-card-gear-layer .hero-item-art,
+.hero-card-gear-layer .hero-item-pet-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* SVG viewBox 안에 여백이 있어도 캐릭터의 실제 부위에만 닿도록 작게 배치합니다. */
+.hero-card-equip-helmet { left: 39%; top: 6%; width: 24%; height: 18%; z-index: 8; }
+.hero-card-equip-weapon { left: 3%; top: 29%; width: 40%; height: 53%; z-index: 5; transform: rotate(-12deg); }
+.hero-card-equip-armor { left: 29%; top: 27%; width: 43%; height: 35%; z-index: 4; }
+.hero-card-equip-gloves { left: 10%; top: 42%; width: 24%; height: 25%; z-index: 6; transform: rotate(-12deg); }
+.hero-card-equip-shoes { left: 28%; bottom: 4%; width: 44%; height: 19%; z-index: 6; }
+.hero-card-equip-accessory { left: 42%; top: 36%; width: 20%; height: 20%; z-index: 7; }
+
+.hero-card-equip-grade-common { opacity: .66; }
+.hero-card-equip-grade-rare { opacity: .76; }
+.hero-card-equip-grade-elite { opacity: .84; }
+.hero-card-equip-grade-legendary { opacity: .92; }
+.hero-card-equip-grade-transcendent {
   opacity: 1;
-  filter: drop-shadow(0 0 7px var(--slot-glow)) drop-shadow(0 0 14px color-mix(in srgb, var(--slot-accent) 72%, transparent));
-  animation: heroSlotTranscendentPulse 1.7s ease-in-out infinite;
-}
-
-.hero-card-slot-effect::before,
-.hero-card-slot-effect::after {
-  content: '';
-  position: absolute;
-  display: block;
-}
-
-.hero-card-slot-effect-helmet {
-  top: 13%;
-  left: 39%;
-  width: 22%;
-  height: 7%;
-  border: 1px solid color-mix(in srgb, var(--slot-accent) 90%, var(--slot-glow));
-  border-radius: 50% 50% 42% 42%;
-  box-shadow: 0 0 12px color-mix(in srgb, var(--slot-main) 72%, transparent), inset 0 -3px 5px color-mix(in srgb, var(--slot-dark) 52%, transparent);
-  transform: perspective(28px) rotateX(-12deg);
-}
-
-.hero-card-slot-effect-helmet::after {
-  left: 42%;
-  top: 24%;
-  width: 16%;
-  height: 34%;
-  border-radius: 50%;
-  background: var(--slot-glow);
-  box-shadow: 0 0 8px var(--slot-accent);
-}
-
-.hero-card-slot-effect-weapon {
-  top: 30%;
-  left: 13%;
-  width: 3%;
-  height: 37%;
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--slot-glow), var(--slot-accent) 48%, var(--slot-main));
-  box-shadow: 0 0 10px var(--slot-accent), 0 0 18px color-mix(in srgb, var(--slot-main) 66%, transparent);
-  transform: rotate(-27deg);
-}
-
-.hero-card-slot-effect-weapon::before,
-.hero-card-slot-effect-weapon::after {
-  width: 240%;
-  height: 1px;
-  left: -70%;
-  background: var(--slot-glow);
-  box-shadow: 0 0 6px var(--slot-accent);
-}
-
-.hero-card-slot-effect-weapon::before { top: 18%; transform: rotate(-9deg); }
-.hero-card-slot-effect-weapon::after { top: 81%; transform: rotate(9deg); }
-
-.hero-card-slot-effect-armor {
-  top: 37%;
-  left: 44%;
-  width: 12%;
-  height: 17%;
-  border: 1px solid color-mix(in srgb, var(--slot-accent) 88%, var(--slot-glow));
-  background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--slot-glow) 72%, transparent), color-mix(in srgb, var(--slot-main) 26%, transparent) 38%, transparent 72%);
-  clip-path: polygon(50% 0, 100% 38%, 50% 100%, 0 38%);
-  box-shadow: 0 0 13px color-mix(in srgb, var(--slot-main) 72%, transparent);
-}
-
-.hero-card-slot-effect-armor::after {
-  inset: 38% 38%;
-  border-radius: 50%;
-  background: var(--slot-glow);
-  box-shadow: 0 0 8px var(--slot-accent);
-}
-
-.hero-card-slot-effect-gloves {
-  top: 49%;
-  left: 26%;
-  width: 7%;
-  height: 13%;
-  border: 1px solid color-mix(in srgb, var(--slot-accent) 84%, var(--slot-glow));
-  border-radius: 45% 55% 48% 52%;
-  background: radial-gradient(circle at 48% 42%, color-mix(in srgb, var(--slot-glow) 62%, transparent), transparent 64%);
-  box-shadow: 0 0 9px color-mix(in srgb, var(--slot-main) 65%, transparent);
-  transform: rotate(-15deg);
-}
-
-.hero-card-slot-effect-gloves::after {
-  left: 650%;
-  top: 8%;
-  width: 100%;
-  height: 100%;
-  border: inherit;
-  border-radius: inherit;
-  background: inherit;
-  box-shadow: inherit;
-  transform: scaleX(-1) rotate(30deg);
-}
-
-.hero-card-slot-effect-shoes {
-  bottom: 13%;
-  left: 30%;
-  width: 12%;
-  height: 4%;
-  border: 1px solid color-mix(in srgb, var(--slot-accent) 86%, var(--slot-glow));
-  border-radius: 50%;
-  background: linear-gradient(90deg, var(--slot-dark), var(--slot-main), var(--slot-accent));
-  box-shadow: 0 0 10px color-mix(in srgb, var(--slot-main) 70%, transparent);
-  transform: rotate(-8deg);
-}
-
-.hero-card-slot-effect-shoes::after {
-  left: 190%;
-  top: 15%;
-  width: 100%;
-  height: 100%;
-  border: inherit;
-  border-radius: inherit;
-  background: inherit;
-  box-shadow: inherit;
-  transform: rotate(16deg);
-}
-
-.hero-card-slot-effect-accessory {
-  top: 45%;
-  left: 47%;
-  width: 6%;
-  height: 8%;
-  border: 1px solid color-mix(in srgb, var(--slot-glow) 90%, var(--slot-accent));
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--slot-glow) 0 18%, var(--slot-accent) 24% 42%, transparent 70%);
-  box-shadow: 0 0 12px var(--slot-accent), 0 0 22px color-mix(in srgb, var(--slot-main) 58%, transparent);
-}
-
-@keyframes heroSlotTranscendentPulse {
-  0%, 100% { opacity: .78; }
-  50% { opacity: 1; }
+  filter: drop-shadow(0 0 5px rgba(236, 72, 153, .58)) drop-shadow(0 4px 4px rgba(4, 7, 30, .68));
 }
 
 /* 장착 패널도 같은 다크 카드 팔레트로 맞춰 화면 전체가 한 장면처럼 보이게 합니다. */
@@ -1561,148 +1435,9 @@ input, select, textarea, button {
 .hero-card-visual.hero-card-grade-legendary { border-color: color-mix(in srgb, var(--hero-grade-glow) 78%, var(--hero-grade-main)); box-shadow: 0 18px 35px -18px rgba(15, 23, 42, .85), 0 0 30px color-mix(in srgb, var(--hero-grade-main) 50%, transparent), inset 0 1px 0 rgba(255,255,255,.22); }
 .hero-card-visual.hero-card-grade-transcendent { border-color: color-mix(in srgb, var(--hero-grade-glow) 78%, var(--hero-grade-accent)); box-shadow: 0 18px 35px -18px rgba(15, 23, 42, .85), 0 0 36px color-mix(in srgb, var(--hero-grade-main) 58%, transparent), inset 0 1px 0 rgba(255,255,255,.28); }
 
-.hero-card-evolution-aura,
-.hero-card-evolution-silhouette {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+.hero-card-art {
+  filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(1.02) contrast(1.03);
 }
-
-.hero-card-evolution-aura {
-  inset: 8% 8% 3%;
-  z-index: 1;
-  opacity: .36;
-}
-
-.hero-card-evolution-ring {
-  position: absolute;
-  display: block;
-  border: 1px solid color-mix(in srgb, var(--hero-grade-glow) 78%, var(--hero-grade-accent));
-  border-radius: 48%;
-  box-shadow: 0 0 18px color-mix(in srgb, var(--hero-grade-main) 42%, transparent), inset 0 0 16px color-mix(in srgb, var(--hero-grade-accent) 18%, transparent);
-  animation: heroGradeOrbit 7s linear infinite;
-}
-
-.hero-card-evolution-ring-outer {
-  inset: 0 3%;
-  border-style: dashed;
-  opacity: .72;
-  transform: rotate(-10deg);
-}
-
-.hero-card-evolution-ring-inner {
-  inset: 11% 15% 12%;
-  opacity: .7;
-  transform: rotate(17deg);
-  animation-direction: reverse;
-}
-
-.hero-card-evolution-core {
-  position: absolute;
-  top: 1%;
-  left: 50%;
-  z-index: 3;
-  color: var(--hero-grade-glow);
-  font-size: 15%;
-  font-weight: 900;
-  text-shadow: 0 0 12px var(--hero-grade-main), 0 0 22px var(--hero-grade-accent);
-  transform: translateX(-50%);
-  animation: heroGradePulse 2.2s ease-in-out infinite;
-}
-
-.hero-card-evolution-silhouette {
-  inset: 11% 1% 2%;
-  z-index: 2;
-  opacity: .78;
-}
-
-.hero-card-evolution-shoulder,
-.hero-card-evolution-wing,
-.hero-card-evolution-crown,
-.hero-card-evolution-star {
-  display: none;
-  position: absolute;
-  pointer-events: none;
-}
-
-.hero-card-evolution-shoulder {
-  top: 35%;
-  width: 29%;
-  height: 20%;
-  border: 1px solid color-mix(in srgb, var(--hero-grade-glow) 76%, var(--hero-grade-accent));
-  background: linear-gradient(145deg, color-mix(in srgb, var(--hero-grade-main) 82%, transparent), color-mix(in srgb, var(--hero-grade-dark) 74%, transparent));
-  clip-path: polygon(0 34%, 72% 0, 100% 38%, 76% 100%, 19% 86%);
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--hero-grade-main) 54%, transparent));
-}
-
-.hero-card-evolution-shoulder-left { left: 4%; transform: rotate(-18deg); }
-.hero-card-evolution-shoulder-right { right: 4%; transform: scaleX(-1) rotate(-18deg); }
-
-.hero-card-evolution-wing {
-  top: 27%;
-  width: 37%;
-  height: 39%;
-  border: 1px solid color-mix(in srgb, var(--hero-grade-glow) 68%, var(--hero-grade-accent));
-  background: linear-gradient(145deg, color-mix(in srgb, var(--hero-grade-accent) 58%, transparent), color-mix(in srgb, var(--hero-grade-dark) 76%, transparent));
-  clip-path: polygon(100% 0, 34% 18%, 0 52%, 35% 48%, 8% 100%, 68% 65%);
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--hero-grade-main) 52%, transparent));
-}
-
-.hero-card-evolution-wing-left { left: -3%; transform: rotate(-7deg); }
-.hero-card-evolution-wing-right { right: -3%; transform: scaleX(-1) rotate(-7deg); }
-
-.hero-card-evolution-crown {
-  top: 4%;
-  left: 35%;
-  width: 30%;
-  height: 17%;
-  border: 1px solid color-mix(in srgb, var(--hero-grade-glow) 86%, var(--hero-grade-accent));
-  background: linear-gradient(180deg, var(--hero-grade-glow), var(--hero-grade-main));
-  clip-path: polygon(0 20%, 22% 46%, 35% 0, 50% 43%, 66% 0, 78% 46%, 100% 20%, 88% 100%, 12% 100%);
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--hero-grade-main) 65%, transparent));
-}
-
-.hero-card-evolution-star {
-  top: 16%;
-  color: var(--hero-grade-glow);
-  font-size: 11%;
-  line-height: 1;
-  text-shadow: 0 0 9px var(--hero-grade-accent);
-  animation: heroGradeSpark 1.8s ease-in-out infinite;
-}
-
-.hero-card-evolution-star-left { left: 12%; }
-.hero-card-evolution-star-right { right: 12%; animation-delay: -900ms; }
-
-.hero-card-grade-common .hero-card-evolution-aura { opacity: .25; }
-.hero-card-grade-rare .hero-card-evolution-aura { opacity: .48; }
-.hero-card-grade-rare .hero-card-evolution-shoulder { display: block; }
-.hero-card-grade-elite .hero-card-evolution-aura { opacity: .64; }
-.hero-card-grade-elite .hero-card-evolution-shoulder,
-.hero-card-grade-elite .hero-card-evolution-wing { display: block; }
-.hero-card-grade-legendary .hero-card-evolution-aura { opacity: .78; }
-.hero-card-grade-legendary .hero-card-evolution-wing,
-.hero-card-grade-legendary .hero-card-evolution-crown { display: block; }
-.hero-card-grade-transcendent .hero-card-evolution-aura { opacity: .92; }
-.hero-card-grade-transcendent .hero-card-evolution-wing,
-.hero-card-grade-transcendent .hero-card-evolution-crown,
-.hero-card-grade-transcendent .hero-card-evolution-star { display: block; }
-
-.hero-card-grade-common .hero-card-art { filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(.88) contrast(1.02) brightness(.94); }
-.hero-card-grade-rare .hero-card-art { filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(1.12) contrast(1.06) brightness(1.02); }
-.hero-card-grade-elite .hero-card-art { filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(1.2) contrast(1.08) brightness(1.04); }
-.hero-card-grade-legendary .hero-card-art { filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(1.28) contrast(1.1) brightness(1.08); }
-.hero-card-grade-transcendent .hero-card-art { filter: drop-shadow(0 14px 8px rgba(6, 8, 36, .62)) saturate(1.42) contrast(1.12) brightness(1.1); }
-
-.hero-card-grade-shape-seal .hero-card-evolution-ring-outer { border-radius: 50%; }
-.hero-card-grade-shape-hex .hero-card-evolution-ring-outer { border-radius: 17%; clip-path: polygon(50% 0, 94% 25%, 94% 75%, 50% 100%, 6% 75%, 6% 25%); }
-.hero-card-grade-shape-diamond .hero-card-evolution-ring-inner { border-radius: 8%; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-.hero-card-grade-shape-crown .hero-card-evolution-ring-outer { border-radius: 28% 28% 48% 48%; }
-.hero-card-grade-shape-orbit .hero-card-evolution-ring-outer { border-radius: 50%; border-width: 2px; }
-
-@keyframes heroGradeOrbit { from { transform: rotate(-10deg); } to { transform: rotate(350deg); } }
-@keyframes heroGradePulse { 0%, 100% { opacity: .62; transform: translateX(-50%) scale(.92); } 50% { opacity: 1; transform: translateX(-50%) scale(1.08); } }
-@keyframes heroGradeSpark { 0%, 100% { opacity: .45; transform: scale(.82) rotate(0deg); } 50% { opacity: 1; transform: scale(1.16) rotate(18deg); } }
 
 /* 아이템 카드는 슬롯이 아니라 등급마다 다른 실루엣·문양을 먼저 보여줍니다. */
 .hero-item-card-v2 {
@@ -1778,9 +1513,6 @@ input, select, textarea, button {
 @keyframes heroItemGradePulse { 0%, 100% { transform: scale(.96); opacity: .72; } 50% { transform: scale(1.04); opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-card-evolution-ring,
-  .hero-card-evolution-core,
-  .hero-card-evolution-star,
   .hero-item-grade-transcendent .hero-item-grade-frame { animation: none; }
 }
 

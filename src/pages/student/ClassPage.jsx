@@ -208,12 +208,12 @@ export default function ClassPage() {
         ) : (
           logs.map((l) => (
             <div key={l.id} className="flex items-center gap-2 py-2 border-b border-gray-100 text-sm">
-              <span className={`px-2 py-0.5 rounded-lg text-xs ${l.type === 'tax' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                {l.type === 'tax' ? '세금' : '사용'}
+              <span className={`px-2 py-0.5 rounded-lg text-xs ${l.type === 'tax' || l.type === 'student-payment' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                {l.type === 'tax' ? '세금' : l.type === 'student-payment' ? '학생 납부' : '사용'}
               </span>
               <span className="flex-1">{l.memo}</span>
-              <span className={`tabular-nums ${l.type === 'tax' ? 'text-emerald-600' : 'text-rose-500'}`}>
-                {l.type === 'tax' ? '+' : '−'}{fmt(l.amount)}
+              <span className={`tabular-nums ${l.type === 'tax' || l.type === 'student-payment' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                {l.type === 'tax' || l.type === 'student-payment' ? '+' : '−'}{fmt(l.amount)}
               </span>
             </div>
           ))

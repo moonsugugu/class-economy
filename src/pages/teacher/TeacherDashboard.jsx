@@ -105,6 +105,7 @@ export default function TeacherDashboard() {
   const [tab, setTab] = useState('students');
   const [pendingCount, setPendingCount] = useState(0);
   const [pendingPaymentCount, setPendingPaymentCount] = useState(0);
+  const [pendingSubmissionCount, setPendingSubmissionCount] = useState(0);
   const [newClassName, setNewClassName] = useState('');
   const [showInvite, setShowInvite] = useState(false);
 
@@ -136,6 +137,12 @@ export default function TeacherDashboard() {
     if (!klass) return;
     const q = query(collection(db, 'classes', klass.id, 'paymentRequests'), where('status', '==', 'pending'));
     return onSnapshot(q, (snap) => setPendingPaymentCount(snap.size));
+  }, [klass?.id]);
+
+  useEffect(() => {
+    if (!klass) return;
+    const q = query(collection(db, 'classes', klass.id, 'paymentSubmissions'), where('status', '==', 'pending'));
+    return onSnapshot(q, (snap) => setPendingSubmissionCount(snap.size));
   }, [klass?.id]);
 
   if (!authReady) return <Center>불러오는 중...</Center>;
@@ -173,7 +180,7 @@ export default function TeacherDashboard() {
     ['students', '🧑‍🎓', '학생', 'from-emerald-400 to-teal-500'],
     ['showcase', '🏠', '학생 구경', 'from-pink-400 to-violet-500'],
     ['shop', '🏪', '상점', 'from-amber-400 to-orange-500'],
-    ['alerts', '🔔', pendingCount + pendingPaymentCount ? `알림 ${pendingCount + pendingPaymentCount}` : '알림', 'from-rose-400 to-pink-500'],
+    ['alerts', '🔔', pendingCount + pendingPaymentCount + pendingSubmissionCount ? `알림 ${pendingCount + pendingPaymentCount + pendingSubmissionCount}` : '알림', 'from-rose-400 to-pink-500'],
     ['stocks', '📈', '주식', 'from-blue-400 to-indigo-500'],
     ['missions', '🎯', '오늘의 미션', 'from-indigo-400 to-cyan-500'],
     ['jobs', '🧑‍🍳', '직업', 'from-teal-400 to-emerald-500'],
@@ -987,6 +994,7 @@ function ProductCard({ p, klass }) {
 function AlertsTab({ klass }) {
   const [purchases, setPurchases] = useState([]);
   const [paymentRequests, setPaymentRequests] = useState([]);
+  const [paymentSubmissions, setPaymentSubmissions] = useState([]);
   const [busyId, setBusyId] = useState('');
   const [msg, setMsg] = useState('');
   const [purchasesOpen, setPurchasesOpen] = useState(true);
@@ -1010,6 +1018,15 @@ function AlertsTab({ klass }) {
   useEffect(() => {
     const q = query(collection(db, 'classes', klass.id, 'paymentRequests'));
     return onSnapshot(q, (snap) => setPaymentRequests(
+      snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => createdAtOf(b) - createdAtOf(a))
+    ));
+  }, [klass.id]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'classes', klass.id, 'paymentSubmissions'));
+    return onSnapshot(q, (snap) => setPaymentSubmissions(
       snap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         .sort((a, b) => createdAtOf(b) - createdAtOf(a))
@@ -1050,6 +1067,71 @@ function AlertsTab({ klass }) {
     setBusyId(request.id);
     try {
       await updateDoc(doc(db, 'classes', klass.id, 'paymentRequests', request.id), { status: 'rejected', rejectedAt: Date.now() });
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const approvePaymentSubmission = async (submission) => {
+    if (busyId) return;
+    const key = `submission:${submission.id}`;
+    setBusyId(key);
+    try {
+      const submissionRef = doc(db, 'classes', klass.id, 'paymentSubmissions', submission.id);
+      const studentRef = doc(db, 'classes', klass.id, 'students', submission.studentId);
+      const classRef = doc(db, 'classes', klass.id);
+      const fundLogRef = doc(collection(db, 'classes', klass.id, 'fundLog'));
+      let paid = 0;
+      await runTransaction(db, async (tx) => {
+        const submissionSnap = await tx.get(submissionRef);
+        const studentSnap = await tx.get(studentRef);
+        const classSnap = await tx.get(classRef);
+        if (!submissionSnap.exists() || submissionSnap.data()?.status !== 'pending') throw new Error('이미 처리된 제출이에요.');
+        if (!studentSnap.exists()) throw new Error('학생 계정을 찾지 못했어요.');
+        if (!classSnap.exists()) throw new Error('학급을 찾지 못했어요.');
+        const data = submissionSnap.data() || {};
+        const amount = Math.floor(Number(data.amount) || 0);
+        if (amount < 1) throw new Error('제출 금액이 올바르지 않아요.');
+        const student = studentSnap.data() || {};
+        const cash = Number(student.cash) || 0;
+        if (cash < amount) throw new Error('학생 현금이 부족해요. 학생이 현금을 확인한 뒤 다시 승인해 주세요.');
+        const reason = String(data.reason || '').trim().slice(0, 200);
+        paid = amount;
+        tx.update(studentRef, { cash: increment(-amount) });
+        tx.update(classRef, { fund: increment(amount) });
+        tx.update(submissionRef, { status: 'approved', approvedAt: Date.now(), paidAmount: amount });
+        tx.set(fundLogRef, {
+          type: 'student-payment',
+          amount,
+          studentId: data.studentId || submission.studentId,
+          studentName: data.studentName || submission.studentName || '학생',
+          memo: `학생 납부 · ${reason || '공동기금 제출'}`,
+          at: Date.now(),
+          createdAt: serverTimestamp(),
+        });
+      });
+      setMsg(`✅ ${submission.studentName || '학생'} 학생의 ${fmt(paid)}${klass.currency} 납부를 확인했어요.`);
+      window.setTimeout(() => setMsg(''), 3500);
+    } catch (error) {
+      setMsg(`학생 제출 승인 실패: ${error.message}`);
+      window.setTimeout(() => setMsg(''), 3500);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const rejectPaymentSubmission = async (submission) => {
+    if (busyId || !confirm(`${submission.studentName || '학생'} 학생의 제출을 반려할까요?`)) return;
+    const key = `submission:${submission.id}`;
+    setBusyId(key);
+    try {
+      await updateDoc(doc(db, 'classes', klass.id, 'paymentSubmissions', submission.id), {
+        status: 'rejected',
+        rejectedAt: Date.now(),
+      });
+    } catch (error) {
+      setMsg(`학생 제출 반려 실패: ${error.message}`);
+      window.setTimeout(() => setMsg(''), 3500);
     } finally {
       setBusyId('');
     }
@@ -1155,6 +1237,28 @@ function AlertsTab({ klass }) {
           </div>
         ))}
         {!paymentRequests.length && <div className="py-2 text-center text-sm text-gray-400">지급요청이 없어요.</div>}
+      </div>
+      <div className="mb-5 space-y-2">
+        <h4 className="text-lg text-gray-700">💸 학생 제출·납부 <span className="text-sm font-normal text-gray-400">({paymentSubmissions.length})</span></h4>
+        {paymentSubmissions.map((submission) => {
+          const pendingSubmission = submission.status === 'pending';
+          return (
+            <div key={submission.id} className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${pendingSubmission ? 'border-2 border-violet-200 bg-violet-50' : submission.status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-400'}`}>
+              <span className="text-2xl">💸</span>
+              <div className="min-w-0 flex-1">
+                <b>{submission.studentName || '학생'}</b> 학생의 제출 <span className="ml-1 text-sm text-gray-500">{fmt(submission.amount)} {klass.currency}</span>
+                <p className="truncate text-sm text-gray-500">사유: {submission.reason || '사유 없음'}</p>
+              </div>
+              {pendingSubmission ? (
+                <div className="flex shrink-0 gap-1.5">
+                  <button onClick={() => approvePaymentSubmission(submission)} disabled={Boolean(busyId)} className={btn + ' bg-emerald-500 hover:bg-emerald-600 text-sm'}>✅ 확인하고 받기</button>
+                  <button onClick={() => rejectPaymentSubmission(submission)} disabled={Boolean(busyId)} className="rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-500 disabled:opacity-40">반려</button>
+                </div>
+              ) : <span className="shrink-0 text-sm">{submission.status === 'approved' ? '납부 완료' : '반려됨'}</span>}
+            </div>
+          );
+        })}
+        {!paymentSubmissions.length && <div className="py-2 text-center text-sm text-gray-400">학생 제출이 없어요.</div>}
       </div>
       <div className="mb-3 flex items-center gap-2">
         <h4 className="text-lg text-gray-700">🛒 학생 구매 알림 <span className="text-sm font-normal text-gray-400">({purchases.length})</span></h4>

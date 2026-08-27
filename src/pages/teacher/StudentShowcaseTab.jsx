@@ -198,7 +198,7 @@ export default function StudentShowcaseTab({ klass }) {
                 <div>
                   <div className="teacher-hero-showcase-kicker">HERO GALLERY</div>
                   <h3 className="mt-1 text-2xl font-black">{selected.name}의 용사 프로필</h3>
-                  <p className="mt-1 text-sm text-indigo-100/75">장착한 장비는 캐릭터를 가리지 않는 슬롯 배지로 확인할 수 있어요.</p>
+                  <p className="mt-1 text-sm text-indigo-100/75">기본 캐릭터 위에 현재 장착한 부위의 외형만 반영돼요.</p>
                 </div>
                 <div className="teacher-hero-stage-pill">
                   <span>STAGE</span>

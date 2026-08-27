@@ -265,12 +265,12 @@ export default function FundTab({ klass }) {
         ) : (
           logs.map((l) => (
             <div key={l.id} className="flex items-center gap-2 py-2 border-b border-gray-100 text-sm">
-              <span className={`px-2 py-0.5 rounded-lg text-xs ${l.type === 'tax' || l.type === 'tax-settlement' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                {l.type === 'tax' ? '세금 적립' : l.type === 'tax-settlement' ? '세금 정산' : '사용'}
+              <span className={`px-2 py-0.5 rounded-lg text-xs ${l.type === 'tax' || l.type === 'tax-settlement' || l.type === 'student-payment' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                {l.type === 'tax' ? '세금 적립' : l.type === 'tax-settlement' ? '세금 정산' : l.type === 'student-payment' ? '학생 납부' : '사용'}
               </span>
               <span className="flex-1">{l.memo}</span>
-              <span className={`tabular-nums ${l.type === 'tax' || l.type === 'tax-settlement' ? 'text-emerald-600' : 'text-rose-500'}`}>
-                {l.type === 'tax' || l.type === 'tax-settlement' ? '+' : '−'}{fmt(l.amount)}
+              <span className={`tabular-nums ${l.type === 'tax' || l.type === 'tax-settlement' || l.type === 'student-payment' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                {l.type === 'tax' || l.type === 'tax-settlement' || l.type === 'student-payment' ? '+' : '−'}{fmt(l.amount)}
               </span>
               <span className="text-[11px] text-gray-300 w-16 text-right hidden sm:block">
                 {new Date(l.at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}

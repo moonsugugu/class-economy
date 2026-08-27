@@ -487,7 +487,7 @@ export function HeroPetVisual({ item, size = 56, className = '' }) {
 }
 
 function CharacterArtwork({ item }) {
-  const art = item.visual?.art;
+  const art = item.visual?.baseArt || item.visual?.art;
   if (!art) return <span className="hero-item-character-fallback">✦</span>;
   return <HeroCharacterArt className="hero-item-character-art" src={art} alt="" />;
 }
