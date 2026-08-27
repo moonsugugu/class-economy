@@ -101,7 +101,7 @@ function removeConnectedLightBackground(source) {
   });
 }
 
-export default function HeroCharacterArt({ src, alt = '', className = '' }) {
+export default function HeroCharacterArt({ src, alt = '', className = '', style }) {
   const [processedSrc, setProcessedSrc] = useState(() => processedArtCache.get(src) || null);
 
   useEffect(() => {
@@ -127,6 +127,7 @@ export default function HeroCharacterArt({ src, alt = '', className = '' }) {
       className={`${className} ${processedSrc ? '' : 'hero-character-art-processing'}`.trim()}
       src={processedSrc || src}
       alt={alt}
+      style={style}
     />
   );
 }
