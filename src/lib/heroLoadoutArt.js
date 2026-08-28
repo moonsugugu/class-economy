@@ -1,6 +1,6 @@
-// 전처리된 레이어는 슬롯별 안전 영역에 맞춰 정렬되고 투명 배경으로 저장됩니다.
-// 원본 생성 PNG를 그대로 겹치면 등급마다 캔버스 안 위치가 달라져 조합이 흔들립니다.
-const LOADOUT_ART = import.meta.glob('../assets/hero-loadout-composed/*/*/*.png', {
+// 완성형 원본의 전신 실루엣을 그대로 사용합니다. HeroCharacterArt가 생성
+// 이미지의 체크무늬 배경만 제거하므로 갑옷·망토·부츠 크기가 보존됩니다.
+const LOADOUT_ART = import.meta.glob('../assets/hero-loadout/*/*/*.png', {
   eager: true,
   import: 'default',
   query: '?url',
@@ -16,6 +16,6 @@ const normalizeRarity = (rarity) => (RARITIES.has(rarity) ? rarity : 'common');
 
 export function heroLoadoutArtFor(characterId, slot, rarity) {
   if (!SLOTS.has(slot)) return null;
-  const key = `../assets/hero-loadout-composed/${normalizeGender(characterId)}/${slot}/${normalizeRarity(rarity)}.png`;
+  const key = `../assets/hero-loadout/${normalizeGender(characterId)}/${slot}/${normalizeRarity(rarity)}.png`;
   return LOADOUT_ART[key] || null;
 }
