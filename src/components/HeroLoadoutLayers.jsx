@@ -4,10 +4,15 @@ import { HERO_LOADOUT_LAYER_ORDER, heroLoadoutArtFor } from '../lib/heroLoadoutA
 const LAYER_Z_INDEX = {
   shoes: 1,
   armor: 2,
-  gloves: 3,
-  weapon: 4,
+  weapon: 3,
+  gloves: 4,
   accessory: 5,
   helmet: 6,
+};
+
+const POSITIONED_LAYER_STYLES = {
+  hero_male: { transform: 'translate3d(10%, -2.5%, 0)' },
+  hero_female: { transform: 'translate3d(7%, -1.6%, 0)' },
 };
 
 export default function HeroLoadoutLayers({ characterId, equipmentItems }) {
@@ -22,13 +27,19 @@ export default function HeroLoadoutLayers({ characterId, equipmentItems }) {
         const src = heroLoadoutArtFor(characterId, slot, item.rarity);
         if (!src) return null;
 
+        const layerStyle = {
+          zIndex: LAYER_Z_INDEX[slot],
+          ...(slot === 'weapon' ? POSITIONED_LAYER_STYLES[characterId] : {}),
+          ...(slot === 'gloves' ? { filter: 'drop-shadow(0 5px 4px rgba(4, 7, 30, .72))' } : {}),
+        };
+
         return (
           <HeroCharacterArt
             key={`${slot}-${item.id}-${item.rarity || 'common'}`}
             className={`hero-loadout-layer hero-loadout-layer-${slot} hero-loadout-layer-grade-${item.rarity || 'common'}`}
             src={src}
             alt=""
-            style={{ zIndex: LAYER_Z_INDEX[slot] }}
+            style={layerStyle}
           />
         );
       })}
