@@ -1,5 +1,5 @@
-import maleHeroBaseArt from '../assets/hero-guardian-male-base.png';
-import femaleHeroBaseArt from '../assets/hero-guardian-female-base.png';
+import maleHeroBaseArt from '../assets/hero-guardian-male-base-cutout.png';
+import femaleHeroBaseArt from '../assets/hero-guardian-female-base-cutout.png';
 import neonFoxPetArt from '../assets/hero-pet-neon-fox.png';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));

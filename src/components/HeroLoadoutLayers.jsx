@@ -4,8 +4,8 @@ import { HERO_LOADOUT_LAYER_ORDER, heroLoadoutArtFor } from '../lib/heroLoadoutA
 const LAYER_Z_INDEX = {
   shoes: 1,
   armor: 2,
-  gloves: 3,
-  weapon: 4,
+  weapon: 3,
+  gloves: 4,
   accessory: 5,
   helmet: 6,
 };
@@ -14,7 +14,7 @@ export default function HeroLoadoutLayers({ characterId, equipmentItems }) {
   const equippedBySlot = new Map(equipmentItems);
 
   return (
-    <div className="hero-loadout-layers" aria-label="현재 장착 장비 외형">
+    <div className={`hero-loadout-layers hero-loadout-layers-${characterId}`} aria-label="현재 장착 장비 외형">
       {HERO_LOADOUT_LAYER_ORDER.map((slot) => {
         const item = equippedBySlot.get(slot);
         if (!item) return null;

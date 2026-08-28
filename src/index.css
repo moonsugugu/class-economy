@@ -1347,6 +1347,19 @@ input, select, textarea, button {
   filter: drop-shadow(0 0 5px rgba(236, 72, 153, .58)) drop-shadow(0 4px 4px rgba(4, 7, 30, .68));
 }
 
+/* 무기 손잡이가 기본 포즈의 왼손에 맞도록 남녀 포즈별 앵커를 적용합니다.
+   퍼센트 이동이라 카드 크기가 바뀌어도 손 위치와 함께 비례해 움직입니다. */
+.hero-loadout-layers-hero_male .hero-loadout-layer-weapon {
+  transform: translate3d(10%, -2.5%, 0);
+}
+
+.hero-loadout-layers-hero_female .hero-loadout-layer-weapon {
+  transform: translate3d(7%, -1.6%, 0);
+}
+
+/* 장갑이 손잡이 앞에 오도록 하여 실제로 쥔 느낌을 살립니다. */
+.hero-loadout-layer-gloves { filter: drop-shadow(0 5px 4px rgba(4, 7, 30, .72)); }
+
 /* 장착 패널도 같은 다크 카드 팔레트로 맞춰 화면 전체가 한 장면처럼 보이게 합니다. */
 .hero-loadout-panel {
   border-color: rgba(129, 140, 248, .38) !important;
