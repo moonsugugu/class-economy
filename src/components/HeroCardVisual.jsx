@@ -128,7 +128,7 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
         <div className="hero-card-art-wrap">
           <div className="hero-card-art-backdrop" aria-hidden="true" />
           <HeroCharacterArt className="hero-card-art" src={characterArt} alt={character.name || '용사'} />
-          <HeroLoadoutLayers characterId={hero.character} equipmentItems={equipmentItems} />
+          <HeroLoadoutLayers characterId={hero.character} equipmentItems={equipmentItems} baseArt={characterArt} />
         </div>
       ) : (
       <div className="hero-card-figure">

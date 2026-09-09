@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 const processedArtCache = new Map();
+const pendingArtCache = new Map();
 
 const isLightNeutral = (data, offset) => {
   const red = data[offset];
@@ -102,19 +103,29 @@ function removeConnectedLightBackground(source) {
 }
 
 export default function HeroCharacterArt({ src, alt = '', className = '', style }) {
-  const [processedSrc, setProcessedSrc] = useState(() => processedArtCache.get(src) || null);
+  const [processed, setProcessed] = useState(null);
+  // Never show the previous character/rarity while the new image is processing.
+  const processedSrc = processedArtCache.get(src) || (processed?.source === src ? processed.result : null);
 
   useEffect(() => {
     let cancelled = false;
     if (!src) return undefined;
     if (processedArtCache.has(src)) {
-      setProcessedSrc(processedArtCache.get(src));
+      setProcessed({ source: src, result: processedArtCache.get(src) });
       return undefined;
     }
 
-    removeConnectedLightBackground(src).then((result) => {
-      processedArtCache.set(src, result);
-      if (!cancelled) setProcessedSrc(result);
+    // Split gloves, boots and arm occlusion reuse the same large PNG.
+    // Share its processing job rather than flood-filling it for every piece.
+    if (!pendingArtCache.has(src)) {
+      pendingArtCache.set(src, removeConnectedLightBackground(src).then((result) => {
+        processedArtCache.set(src, result);
+        pendingArtCache.delete(src);
+        return result;
+      }));
+    }
+    pendingArtCache.get(src).then((result) => {
+      if (!cancelled) setProcessed({ source: src, result });
     });
     return () => {
       cancelled = true;

@@ -1338,6 +1338,16 @@ input, select, textarea, button {
   opacity: 1;
 }
 
+.hero-loadout-image-plane {
+  position: absolute;
+  height: 100%;
+  aspect-ratio: 2 / 3;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 .hero-loadout-layer-grade-common,
 .hero-loadout-layer-grade-rare,
 .hero-loadout-layer-grade-elite,
