@@ -8,7 +8,7 @@ import { SPACE_TABS, isSpaceUnlocked, spaceConfig } from '../../lib/spaces';
 import { HERO_ITEM_MAP, HERO_SLOTS, heroBattlePower, heroDisplayName, normalizeHero } from '../../lib/hero';
 import RoomScene from '../../three/RoomScene.jsx';
 import HeroCardVisual from '../../components/HeroCardVisual.jsx';
-import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
+import HeroLoadoutList from '../../components/HeroLoadoutList.jsx';
 
 const placedCountFor = (student, spaceId) => {
   const config = spaceConfig(spaceId);
@@ -64,8 +64,12 @@ export default function StudentShowcaseTab({ klass }) {
   const currentSpace = spaceConfig(space);
   const spaceUnlocked = selected ? isSpaceUnlocked(selected, space) : false;
   const roomMap = selected && spaceUnlocked ? normalizeRoom(selected[currentSpace.mapField]) : {};
+  // 학생 화면(RoomPage)과 같은 규칙: 함께 다니기로 고른 것 중 아직 보유한 친구·펫만 보여요.
   const companions = selected
-    ? (Array.isArray(selected.walking) ? selected.walking : []).map((id) => ITEM_MAP[id]).filter(Boolean).slice(0, 8)
+    ? (Array.isArray(selected.walking) ? selected.walking : [])
+      .map((id) => ITEM_MAP[id])
+      .filter((item) => item && (selected.inventory || []).includes(item.id))
+      .slice(0, 8)
     : [];
   const roomItemCount = Object.keys(roomMap).length;
   const unlockedSpaceCount = selected ? unlockedSpaceCountFor(selected) : 0;
@@ -175,19 +179,22 @@ export default function StudentShowcaseTab({ klass }) {
               </div>
               {!spaceUnlocked ? (
                 <div className="rounded-3xl bg-white p-10 text-center text-gray-400 shadow">아직 열리지 않은 공간이에요.</div>
-              ) : Object.keys(roomMap).length === 0 ? (
-                <div className="rounded-3xl bg-white p-10 text-center text-gray-400 shadow">이 공간은 아직 비어 있어요.</div>
               ) : (
-                <RoomScene
-                  key={`${selected.id}-${space}`}
-                  mode={space}
-                  avatar={selected.avatar || {}}
-                  roomMap={roomMap}
-                  wallId={selected.roomSkin?.wall}
-                  floorId={selected.roomSkin?.floor}
-                  companions={companions}
-                  height="52vh"
-                />
+                <>
+                  {roomItemCount === 0 && (
+                    <div className="rounded-2xl bg-white px-4 py-3 text-sm text-gray-500 shadow">이 공간에는 아직 놓은 물건이 없어요. 학생 캐릭터와 친구들만 보여요.</div>
+                  )}
+                  <RoomScene
+                    key={`${selected.id}-${space}`}
+                    mode={space}
+                    avatar={selected.avatar || {}}
+                    roomMap={roomMap}
+                    wallId={selected.roomSkin?.wall}
+                    floorId={selected.roomSkin?.floor}
+                    companions={companions}
+                    height="52vh"
+                  />
+                </>
               )}
             </section>
           )}
@@ -198,19 +205,21 @@ export default function StudentShowcaseTab({ klass }) {
                 <div>
                   <div className="teacher-hero-showcase-kicker">HERO GALLERY</div>
                   <h3 className="mt-1 text-2xl font-black">{selected.name}의 용사 프로필</h3>
-                  <p className="mt-1 text-sm text-indigo-100/75">기본 캐릭터 위에 현재 장착한 부위의 외형만 반영돼요.</p>
+                  <p className="mt-1 text-sm text-indigo-100/75">학생이 지금 장착한 장비가 그대로 입혀져 보여요. 칸마다 그 장비의 등급이 표시돼요.</p>
                 </div>
                 <div className="teacher-hero-stage-pill">
                   <span>STAGE</span>
                   <b>{hero?.character ? String(hero.clearedLevel).padStart(2, '0') : '—'}</b>
                 </div>
               </div>
-              <div className="grid items-center gap-5 md:grid-cols-[270px_minmax(0,1fr)]">
-                <div className="hero-showcase-portrait flex justify-center">
-                  {hero?.character ? <HeroCardVisual hero={hero} size={245} animated className="hero-showcase-card" /> : <div className="flex h-[245px] w-[245px] items-center justify-center rounded-3xl bg-white/10 text-6xl">❔</div>}
-                  {hero?.character && <div className="hero-showcase-portrait-note">장비 {Object.values(hero.equipment || {}).filter(Boolean).length}개 장착</div>}
+              <div className="teacher-hero-showcase-body">
+                <div className="hero-showcase-portrait">
+                  {hero?.character
+                    ? <HeroCardVisual hero={hero} size="min(340px, calc(100vw - 4.5rem))" animated className="hero-showcase-card" />
+                    : <div className="teacher-hero-empty-card">❔</div>}
+                  {hero?.character && <div className="hero-showcase-portrait-note">장비 {HERO_SLOTS.filter(([slot]) => hero.equipment?.[slot]).length}/6 · 펫 {hero.pet ? '있음' : '없음'}</div>}
                 </div>
-                <div className="text-white">
+                <div className="min-w-0 text-white">
                   <div className="text-xs font-bold tracking-[0.2em] text-cyan-200">HERO PROFILE</div>
                   <h3 className="mt-1 text-3xl font-black">{hero?.character ? heroDisplayName(hero) : `${selected.name}의 용사`}</h3>
                   <div className="mt-2 text-sm text-indigo-100">학생 {selected.name} · {hero?.character ? HERO_ITEM_MAP[hero.character]?.name : '아직 캐릭터를 구매하지 않았어요.'}</div>
@@ -219,19 +228,8 @@ export default function StudentShowcaseTab({ klass }) {
                     <span className="rounded-xl bg-white/15 px-3 py-2 text-sm">전투력 <b>{fmt(hero?.character ? heroBattlePower(hero) : 0)}</b></span>
                   </div>
                   {hero?.character && (
-                    <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {HERO_SLOTS.map(([slot, label]) => {
-                        const item = HERO_ITEM_MAP[hero.equipment[slot]];
-                        return (
-                          <div key={slot} className="flex min-w-0 items-center gap-2 rounded-2xl border border-white/15 bg-black/15 p-2">
-                            <HeroItemVisual item={item} size={48} showLevel={false} />
-                            <div className="min-w-0">
-                              <div className="text-[10px] text-indigo-200">{label}</div>
-                              <div className="truncate text-xs font-bold">{item?.name || '미장착'}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="mt-5">
+                      <HeroLoadoutList hero={hero} layout="grid" />
                     </div>
                   )}
                 </div>

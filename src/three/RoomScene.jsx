@@ -10,6 +10,7 @@ import {
   CLASS_FLOOR, CAFE_FLOOR, LIGHT_SPEC,
 } from '../lib/items';
 import { isWideSpace, spaceConfig } from '../lib/spaces';
+import { spaceBackdropStyle } from '../lib/spaceBackdrops';
 
 const WIDE_PALETTES = {
   room: { wall: '#c9b8ee', floors: ['#e4dcff', '#c3afe8'] },
@@ -105,15 +106,7 @@ function GardenShell({ cols = COLS, rows = ROWS, floorColors = GARDEN_FLOOR, wid
       <B p={[0, 0.42, cz(rows)]} s={[cols, 0.07, 0.05]} c={fence} />
       <B p={[cx(0), 0.42, 0]} s={[0.05, 0.07, rows]} c={fence} />
       <B p={[cx(cols), 0.42, 0]} s={[0.05, 0.07, rows]} c={fence} />
-      {/* 해 + 구름 */}
-      <Sp p={[-4, 5.2, -4]} rad={0.55} c="#fde047" e="#fde047" />
-      <group position={[2.5, 4.6, -3.5]}>
-        <Sp p={[0, 0, 0]} rad={0.4} sc={[1.6, 0.8, 0.9]} c="#ffffff" />
-        <Sp p={[0.5, 0.1, 0]} rad={0.3} c="#ffffff" />
-      </group>
-      <group position={[-2.8, 4.1, 2]}>
-        <Sp p={[0, 0, 0]} rad={0.3} sc={[1.7, 0.7, 0.9]} c="#ffffff" />
-      </group>
+      {/* 해·구름은 뒤에 까는 공간 배경 그림(spaceBackdrops)에 이미 있어서 3D로 따로 띄우지 않습니다. */}
       {wide && (
         <group position={[4.6, 0.05, 3.6]}>
           <Sp p={[0, 0.35, 0]} rad={0.32} sc={[0.8, 1.5, 0.8]} c="#7c5a3c" />
@@ -324,14 +317,8 @@ export default function RoomScene({
 
   return (
     <div
-      style={{ height }}
-      className={`rounded-3xl overflow-hidden border-4 touch-none ${
-        garden ? (wide ? 'border-teal-300 bg-gradient-to-b from-indigo-300 via-cyan-200 to-teal-200' : 'border-emerald-200 bg-gradient-to-b from-sky-300 via-sky-200 to-emerald-100')
-          : classroom ? (wide ? 'border-indigo-300 bg-gradient-to-b from-violet-200 via-indigo-100 to-sky-100' : 'border-sky-200 bg-gradient-to-b from-sky-100 to-amber-50')
-          : cafe ? (wide ? 'border-fuchsia-800 bg-gradient-to-b from-purple-300 via-pink-100 to-orange-100' : 'border-amber-700 bg-gradient-to-b from-orange-100 to-amber-50')
-          : wide ? 'border-violet-300 bg-gradient-to-b from-violet-200 via-fuchsia-100 to-cyan-100'
-          : 'border-amber-200 bg-gradient-to-b from-sky-100 to-amber-50'
-      }`}
+      style={{ height, ...spaceBackdropStyle(baseMode, wide) }}
+      className={`room-scene room-scene-${baseMode}${wide ? ' room-scene-wide' : ''} overflow-hidden touch-none`}
     >
       <Canvas
         shadows
