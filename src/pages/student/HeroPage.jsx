@@ -7,12 +7,12 @@ import { itemPrice } from '../../lib/pricing';
 import {
   HERO_ITEM_MAP, HERO_SLOTS, normalizeHero, heroBattlePower, heroBattleProfile,
   monsterForLevel, heroBattleChance, battleConfig, heroDateKey, battleDamage, bossCriticalChance, heroBattleWinReward,
-  criticalDamageBonus, bossCriticalMultiplier, formatHeroSpecialStats, heroExtraBattleCost, heroDisplayName,
+  criticalDamageBonus, bossCriticalMultiplier, heroExtraBattleCost, heroDisplayName,
   HERO_ENHANCEMENT_MAX_LEVEL, heroEnhancementCost, heroEnhancementSuccessRate, heroEnhancementFor,
-  heroEnhancementStats, heroItemPower,
 } from '../../lib/hero';
 import HeroCardVisual from '../../components/HeroCardVisual.jsx';
 import { HeroItemVisual } from '../../components/HeroItemVisual.jsx';
+import HeroLoadoutList from '../../components/HeroLoadoutList.jsx';
 import HeroBattleArena from '../../components/HeroBattleArena.jsx';
 import MonsterVisual from '../../components/MonsterVisual.jsx';
 import VictoryFireworks from '../../components/VictoryFireworks.jsx';
@@ -306,7 +306,7 @@ export default function HeroPage() {
             onClick={() => hero.character && setEnhancementItemId(hero.character)}
             title={hero.character ? '캐릭터를 눌러 강화' : undefined}
           >
-            {hero.character ? <HeroCardVisual hero={hero} size={300} /> : <div className="h-[300px] w-[300px] rounded-2xl bg-white/15 flex items-center justify-center text-7xl">❔</div>}
+            {hero.character ? <HeroCardVisual hero={hero} size="min(360px, calc(100vw - 5rem))" animated /> : <div className="flex h-[300px] w-[300px] items-center justify-center rounded-2xl bg-white/15 text-7xl">❔</div>}
           </div>
           {hero.character ? (
             <>
@@ -341,65 +341,8 @@ export default function HeroPage() {
             <h3 className="text-lg text-gray-600">🧰 장착 장비</h3>
             <span className="hero-loadout-count">{HERO_SLOTS.filter(([slot]) => hero.equipment[slot]).length}/6 슬롯</span>
           </div>
-          <div className="space-y-2">
-            {HERO_SLOTS.map(([slot, label]) => {
-              const item = HERO_ITEM_MAP[hero.equipment[slot]];
-              const itemEnhancement = item ? heroEnhancementFor(hero, item.id) : null;
-              const enhancementStats = item ? heroEnhancementStats(hero, item.id) : [];
-              const specialStats = formatHeroSpecialStats(item).map((stat) => stat
-                .replace('보스전 크리티컬 확률', '치명타 확률')
-                .replace('크리티컬 데미지', '치명타 피해'));
-              return (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => item && setEnhancementItemId(item.id)}
-                  disabled={!item}
-                  className={`hero-loadout-row flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5 text-left ${item ? 'border-indigo-100 bg-indigo-50/40 hover:border-indigo-300' : 'border-gray-100 bg-gray-50'}`}
-                >
-                  <span className="w-12 shrink-0 whitespace-nowrap text-[9px] text-gray-400">{label}</span>
-                  <HeroItemVisual item={item} size={44} showLevel={false} />
-                  <span className="min-w-0 flex-1 overflow-hidden text-gray-600">
-                    <span className="block truncate text-[10px] leading-tight">{item?.name || '미장착'}</span>
-                    {item && <span className="block text-[8px] font-semibold leading-tight text-indigo-500">{item.level}단계 장비 · +{itemEnhancement.level}강</span>}
-                    {specialStats.map((stat) => <span key={stat} title={stat} className="block break-words text-[8px] leading-tight tracking-[-0.04em] text-fuchsia-500">✨ {stat}</span>)}
-                    {enhancementStats.map((stat) => <span key={stat.key} className="block break-words text-[8px] leading-tight text-amber-600">✨ {stat.label} +{stat.value}</span>)}
-                  </span>
-                  <span className="w-11 shrink-0 text-right text-[9px] text-indigo-500">{item ? `+${heroItemPower(item, itemEnhancement)}` : ''}<small className="block text-[7px] leading-tight text-gray-400">전투력</small></span>
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => hero.pet && setEnhancementItemId(hero.pet)}
-              disabled={!hero.pet}
-              className={['hero-loadout-row hero-loadout-pet grid w-full min-w-0 grid-cols-[2.25rem_2.75rem_minmax(0,1fr)_6.5rem] items-center gap-2 overflow-hidden rounded-2xl border px-2 py-1.5 text-left', hero.pet ? 'border-fuchsia-200 bg-fuchsia-50 hover:border-fuchsia-300' : 'border-gray-100 bg-gray-50'].join(' ')}
-            >
-              {(() => {
-                const pet = HERO_ITEM_MAP[hero.pet];
-                const petEnhancement = pet ? heroEnhancementFor(hero, pet.id) : null;
-                const petEnhancementStats = pet ? heroEnhancementStats(hero, pet.id) : [];
-                return (
-                  <>
-              <span className="whitespace-nowrap text-[9px] text-gray-400">펫</span>
-              <HeroItemVisual item={pet} size={44} showLevel={false} />
-              <span className="min-w-0 overflow-hidden text-gray-600">
-                <span className="block truncate break-keep text-[10px] leading-tight">{pet?.name || '미장착'}</span>
-                {pet && <span className="block text-[8px] font-semibold leading-tight text-fuchsia-500">{pet.level}단계 펫 · +{petEnhancement.level}강</span>}
-                {petEnhancementStats.map((stat) => <span key={stat.key} className="block break-words text-[8px] leading-tight text-amber-600">✨ {stat.label} +{stat.value}</span>)}
-              </span>
-              <span className="min-w-0 text-right text-[8px] leading-tight text-fuchsia-600 [word-break:keep-all]">
-                {bossCriticalChance(hero) > 0 && <span className="block">치명타 확률 {bossCriticalChance(hero)}%</span>}
-                <small className="block text-[8px] text-gray-400">치명타 시 보스 피해 ×2</small>
-                {criticalDamageBonus(hero) > 0 && <small className="block text-[8px] text-fuchsia-400">치명타 피해 +{criticalDamageBonus(hero)}%</small>}
-                {pet && <small className="block text-[8px] text-indigo-500">전투력 +{heroItemPower(pet, petEnhancement)}</small>}
-              </span>
-                  </>
-                );
-              })()}
-            </button>
-          </div>
-          <p className="mt-3 text-center text-[11px] text-gray-400">장착 아이템을 누르면 강화 창이 열려요.</p>
+          <HeroLoadoutList hero={hero} onSelect={setEnhancementItemId} />
+          <p className="mt-3 text-center text-xs text-gray-400">장착한 장비를 누르면 강화 창이 열려요.</p>
           <Link to="/student/hero/shop?view=inventory" className="block text-center text-sm text-indigo-500 underline mt-1">내 장비 바꾸러 가기 →</Link>
         </div>
       </div>

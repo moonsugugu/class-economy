@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { doc, updateDoc, runTransaction, increment, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -15,6 +15,7 @@ import { TAX_LEDGER_ID, taxForPart } from '../../lib/taxes';
 import {
   SPACE_TABS, SPACE_UNLOCK_PRICE, spaceConfig, isSpaceUnlocked,
 } from '../../lib/spaces';
+import { spaceBackdropFor } from '../../lib/spaceBackdrops';
 
 const SPACES = SPACE_TABS.map(({ id, icon, label }) => [id, `${icon} ${label}`]);
 const SPACE_KEYS = SPACE_TABS.map(({ id }) => id);
@@ -35,6 +36,14 @@ const CATS = [
 ];
 
 const MAX_WALKING = 8; // 한 번에 데리고 다닐 수 있는 수
+
+// 공간 머리말에 보여 줄 한 줄 소개(기본 공간 기준, 넓은 공간도 같은 소개를 씁니다)
+const SPACE_DESC = {
+  room: '좋아하는 가구와 소품으로 나만의 방을 꾸며요.',
+  garden: '나무·꽃·놀이기구로 싱그러운 정원을 가꿔요.',
+  classroom: '책상과 칠판을 놓아 우리만의 교실을 만들어요.',
+  cafe: '테이블과 조명으로 아늑한 카페를 열어요.',
+};
 
 export default function RoomPage() {
   const ctx = useOutletContext();
@@ -81,6 +90,14 @@ function RoomInner({ klass, student }) {
     ? { cols: ROOM_COLS * 2, rows: ROOM_ROWS * 2 }
     : { cols: ROOM_COLS, rows: ROOM_ROWS };
   const skin = student.roomSkin || {};
+
+  // 인증샷에 쓸 공간 배경 이미지를 미리 불러 둡니다(같은 출처라 캔버스에 그려도 저장할 수 있어요).
+  const backdropRef = useRef(null);
+  useEffect(() => {
+    const image = new Image();
+    image.src = spaceBackdropFor(activeSpace.baseId);
+    backdropRef.current = image;
+  }, [activeSpace.baseId]);
 
   // 함께 다니는 친구·애완동물 (없으면 가진 것 전부)
   const walking = student.walking || [];
@@ -403,6 +420,19 @@ function RoomInner({ klass, student }) {
     const c = cv.getContext('2d');
     c.fillStyle = '#fdf6e9';
     c.fillRect(0, 0, cv.width, cv.height);
+    // 화면처럼 공간 일러스트 배경을 먼저 깔고(가득 채우기) 그 위에 3D 장면을 그립니다.
+    const backdrop = backdropRef.current;
+    if (backdrop?.complete && backdrop.naturalWidth) {
+      const scale = Math.max(src.width / backdrop.naturalWidth, src.height / backdrop.naturalHeight);
+      const w = backdrop.naturalWidth * scale;
+      const h = backdrop.naturalHeight * scale;
+      c.save();
+      c.beginPath();
+      c.rect(0, 70, src.width, src.height);
+      c.clip();
+      c.drawImage(backdrop, (src.width - w) / 2, 70 + (src.height - h) / 2, w, h);
+      c.restore();
+    }
     c.drawImage(src, 0, 70);
     const title = SPACES.find(([id]) => id === space)[1].replace(/^\S+\s/, '');
     c.fillStyle = '#4338ca';
@@ -433,34 +463,46 @@ function RoomInner({ klass, student }) {
   const spaceLabel = SPACES.find(([id]) => id === space)?.[1] || '🛋️ 내 방';
 
   return (
-    <div className="space-y-4">
-      {/* 상단 */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <h2 className="text-2xl text-purple-600">{spaceLabel}</h2>
-        <div className="flex min-w-0 max-w-full flex-1 flex-nowrap overflow-x-auto rounded-2xl bg-white shadow">
-          {SPACE_TABS.map((entry) => {
-            const unlocked = isSpaceUnlocked(student, entry.id);
-            const label = `${unlocked ? entry.icon : '🔒'} ${entry.label}`;
-            return (
+    <div className="room-page space-y-4">
+      {/* 상단: 지금 꾸미는 공간 소개 + 한눈에 보는 현황 */}
+      <section className={`room-hero room-hero-${activeSpace.baseId}${activeSpace.wide ? ' room-hero-wide' : ''}`}>
+        <div className="room-hero-main">
+          <span className="room-hero-kicker">{activeSpace.wide ? 'WIDE SPACE' : 'MY SPACE'}</span>
+          <h2 className="room-hero-title">{spaceLabel}</h2>
+          <p className="room-hero-desc">{SPACE_DESC[activeSpace.baseId]}{activeSpace.wide ? ' 넓은 공간이라 더 많이 놓을 수 있어요.' : ''}</p>
+        </div>
+        <div className="room-hero-stats">
+          <div className="room-hero-stat"><span>배치한 물건</span><b>{Object.keys(activeMap).length}</b></div>
+          <div className="room-hero-stat"><span>함께 다니는 친구</span><b>{companions.length}<em>/{MAX_WALKING}</em></b></div>
+          <div className="room-hero-stat"><span>열린 공간</span><b>{SPACE_TABS.filter((entry) => isSpaceUnlocked(student, entry.id)).length}<em>/{SPACE_TABS.length}</em></b></div>
+        </div>
+        <button type="button" onClick={screenshot} className="room-hero-shot">📸 인증샷</button>
+      </section>
+
+      <nav className="room-space-tabs" aria-label="공간 선택">
+        {SPACE_TABS.map((entry) => {
+          const unlocked = isSpaceUnlocked(student, entry.id);
+          const unlockPrice = itemPrice(entry.unlockPrice || SPACE_UNLOCK_PRICE, klass);
+          return (
             <button
               key={entry.id}
+              type="button"
               onClick={() => selectSpace(entry)}
               disabled={spaceBusy === entry.id}
-              title={entry.wide && !unlocked ? `${fmt(itemPrice(entry.unlockPrice || SPACE_UNLOCK_PRICE, klass))}${klass.currency}에 잠금 해제` : entry.label}
-              className={`shrink-0 whitespace-nowrap px-2 py-1 text-xs transition disabled:opacity-60 sm:px-2.5 ${space === entry.id ? 'bg-purple-500 text-white' : 'text-gray-500'}`}
+              title={entry.wide && !unlocked ? `${fmt(unlockPrice)}${klass.currency}에 잠금 해제` : entry.label}
+              aria-pressed={space === entry.id}
+              className={`room-space-tab${space === entry.id ? ' is-active' : ''}${unlocked ? '' : ' is-locked'}`}
             >
-              {label}
+              <span className="room-space-tab-icon" aria-hidden="true">{unlocked ? entry.icon : '🔒'}</span>
+              <span className="room-space-tab-label">{entry.label}</span>
+              {!unlocked && <small>{fmt(unlockPrice)}{klass.currency}</small>}
             </button>
-            );
-          })}
-        </div>
-        <button onClick={screenshot} className="ml-auto rounded-xl px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white shadow">
-          📸 인증샷
-        </button>
-      </div>
-      <div className="rounded-2xl border border-purple-100 bg-purple-50 px-4 py-2 text-xs text-purple-600">
+          );
+        })}
+      </nav>
+      <p className="room-price-note">
         🏷️ 공간 아이템 물가: {pricePolicyLabel(klass, klass.currency)} · 구매 후 환불은 실제 구매가의 50%예요.
-      </div>
+      </p>
 
       {msg && (
         <div className={`rounded-2xl px-4 py-3 ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
@@ -469,7 +511,7 @@ function RoomInner({ klass, student }) {
       )}
 
       {/* 3D 공간 */}
-      <div className="relative">
+      <div className="room-stage">
         <RoomScene
           key={space}
           mode={space}
@@ -485,28 +527,34 @@ function RoomInner({ klass, student }) {
           glRef={glRef}
         />
         {placing && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-purple-600/90 text-white rounded-2xl px-4 py-2 text-sm flex items-center gap-3">
-            '{ITEM_MAP[placing]?.name}' 놓을 곳을 클릭!
-            <button onClick={() => setPlacing(null)} className="bg-white/20 rounded-lg px-2">취소</button>
+          <div className="room-stage-hint" role="status">
+            <span>'{ITEM_MAP[placing]?.name}' 놓을 곳을 바닥에서 눌러 주세요</span>
+            <button type="button" onClick={() => setPlacing(null)}>취소</button>
           </div>
         )}
         {selectedItem && !placing && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-white/95 rounded-2xl shadow-lg px-4 py-2 flex items-center gap-2">
-            <span className="text-sm">{selectedItem.name}</span>
-            <button onClick={rotateSelected} className="rounded-lg px-3 py-1 bg-indigo-500 text-white text-sm">🔄 회전</button>
-            <button onClick={pickupSelected} className="rounded-lg px-3 py-1 bg-rose-500 text-white text-sm">📦 회수</button>
-            <button onClick={() => setSelected(null)} className="text-gray-400 px-1">✕</button>
+          <div className="room-stage-toolbar">
+            <span className="room-stage-toolbar-name">{selectedItem.name}</span>
+            <button type="button" onClick={rotateSelected} className="room-stage-btn room-stage-btn-rotate">🔄 회전</button>
+            <button type="button" onClick={pickupSelected} className="room-stage-btn room-stage-btn-pickup">📦 회수</button>
+            <button type="button" onClick={() => setSelected(null)} className="room-stage-btn-close" aria-label="선택 해제">✕</button>
           </div>
+        )}
+        {!placing && !selectedItem && (
+          <div className="room-stage-help" aria-hidden="true">드래그해서 돌려 보고, 바닥을 누르면 캐릭터가 걸어가요</div>
         )}
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-2">
+      <div className="room-tabs" role="tablist" aria-label="공간 꾸미기 메뉴">
         {[['inv', '📦 인벤토리'], ['avatar', '🐰 캐릭터'], ['shop', '🛍️ 상점']].map(([id, label]) => (
           <button
             key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
             onClick={() => { setTab(id); setPlacing(null); setSelected(null); }}
-            className={`px-4 py-2 rounded-2xl transition ${tab === id ? 'bg-purple-500 text-white shadow' : 'bg-white text-gray-500'}`}
+            className={`room-tab${tab === id ? ' is-active' : ''}`}
           >
             {label}
           </button>
@@ -515,49 +563,45 @@ function RoomInner({ klass, student }) {
 
       {/* 인벤토리 */}
       {tab === 'inv' && (
-        <div className="bg-white rounded-3xl shadow p-5 space-y-5">
+        <div className="room-panel">
           {/* 👫🐾 함께 다니는 친구·애완동물 */}
-          <div>
-            <h4 className="text-gray-500 mb-2">
-              👫🐾 친구 · 애완동물
-              <span className="text-xs text-gray-300 ml-2">
-                눌러서 함께 다니기 ON/OFF ({walking.length}/{MAX_WALKING})
-              </span>
-            </h4>
+          <section className="room-section">
+            <div className="room-section-head">
+              <h4>👫🐾 친구 · 애완동물</h4>
+              <span>눌러서 함께 다니기 켜고 끄기 · {walking.length}/{MAX_WALKING}</span>
+            </div>
             {[...owned('friend'), ...owned('pet')].length ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="room-tile-grid">
                 {[...owned('friend'), ...owned('pet')].map((item) => {
                   const on = walking.includes(item.id);
                   return (
                     <button
                       key={`${item.id}-${item.inventoryIndex}`}
+                      type="button"
                       onClick={() => toggleWalking(item)}
-                      className={`rounded-2xl border-2 p-2 text-center transition ${
-                        on ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 opacity-60 hover:opacity-100'
-                      }`}
-                      style={{ width: 92 }}
+                      aria-pressed={on}
+                      className={`room-tile${on ? ' is-on' : ' is-off'}`}
                     >
-                      <ItemThumb id={item.id} size={48} />
-                      <div className="text-[11px] mt-0.5 leading-tight">{item.name}</div>
-                      <div className={`text-[10px] ${on ? 'text-emerald-600' : 'text-gray-400'}`}>
-                        {on ? '🚶 함께 다니는 중' : '집에서 쉬는 중'}
-                      </div>
+                      <ItemThumb id={item.id} size={56} />
+                      <span className="room-tile-name">{item.name}</span>
+                      <span className="room-tile-badge">{on ? '🚶 함께 다니는 중' : '집에서 쉬는 중'}</span>
                     </button>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-gray-400 text-sm">
-                아직 친구가 없어요. 상점의 👫친구 · 🐾애완동물에서 데려오면 내 공간을 돌아다녀요!
-              </p>
+              <p className="room-empty">아직 친구가 없어요. 상점의 👫친구 · 🐾애완동물에서 데려오면 내 공간을 돌아다녀요!</p>
             )}
-          </div>
+          </section>
 
           {[['room', '🛋️ 가구·소품'], ['garden', '🌳 정원'], ['class', '🏫 교실'], ['cafe', '☕ 카페'], ['light', '💡 조명']].map(([slot, label]) => (
-            <div key={slot}>
-              <h4 className="text-gray-500 mb-2">{label} <span className="text-xs text-gray-300">누르고 바닥을 클릭하면 배치돼요</span></h4>
+            <section key={slot} className="room-section">
+              <div className="room-section-head">
+                <h4>{label}</h4>
+                <span>누른 다음 바닥을 누르면 배치돼요</span>
+              </div>
               {owned(slot).length ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="room-tile-grid">
                   {owned(slot).map((item) => {
                     const placedIn = SPACE_KEYS.find((sp) =>
                       Object.values(maps[sp]).some((p) => p.id === item.id));
@@ -567,65 +611,65 @@ function RoomInner({ klass, student }) {
                     return (
                       <button
                         key={`${item.id}-${item.inventoryIndex}`}
+                        type="button"
                         onClick={() => startPlacing(item)}
-                        className={`rounded-2xl border-2 p-2 text-center transition ${
-                          placing === item.id ? 'border-purple-500 bg-purple-50 scale-105'
-                            : placedIn ? 'border-emerald-200 bg-emerald-50/50' : 'border-gray-200 hover:border-purple-300'
-                        }`}
-                        style={{ width: 92 }}
+                        className={`room-tile${placing === item.id ? ' is-placing' : placedIn ? ' is-placed' : ''}`}
                       >
-                        <ItemThumb id={item.id} size={48} />
-                        <div className="text-[11px] mt-0.5 leading-tight">{item.name}</div>
-                        <div className="text-[10px] text-gray-400">
+                        <ItemThumb id={item.id} size={56} />
+                        <span className="room-tile-name">{item.name}</span>
+                        <span className="room-tile-badge">
                           {placedIn ? `${SPACES.find(([s]) => s === placedIn)[1].slice(0, 3)} · ${placedCount}/${ownedCount}` : `보유 ${ownedCount}개`}
-                        </div>
+                        </span>
                       </button>
                     );
                   })}
                 </div>
               ) : (
-                <p className="text-gray-400 text-sm">아직 없어요. 상점에서 사 보세요!</p>
+                <p className="room-empty">아직 없어요. 상점에서 사 보세요!</p>
               )}
-            </div>
+            </section>
           ))}
           {['wall', 'floor'].map((slot) => (
-            <div key={slot}>
-              <h4 className="text-gray-500 mb-2">{SLOT_LABEL[slot]} <span className="text-xs text-gray-300">내 방에 적용돼요</span></h4>
+            <section key={slot} className="room-section">
+              <div className="room-section-head">
+                <h4>{SLOT_LABEL[slot]}</h4>
+                <span>내 방에 적용돼요</span>
+              </div>
               {owned(slot).length ? (
                 <div className="flex flex-wrap gap-2">
                   {owned(slot).map((item) => (
                     <button
                       key={`${item.id}-${item.inventoryIndex}`}
+                      type="button"
                       onClick={() => applySkin(item)}
-                      className={`rounded-2xl border-2 px-3 py-2 flex items-center gap-2 transition ${
-                        skin[slot] === item.id ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-purple-300'
-                      }`}
+                      aria-pressed={skin[slot] === item.id}
+                      className={`room-skin-chip${skin[slot] === item.id ? ' is-active' : ''}`}
                     >
-                      <span className="w-6 h-6 rounded-lg border border-gray-200" style={{ background: item.colors.a }} />
-                      <span className="text-sm">{item.name}</span>
-                      {skin[slot] === item.id && <span className="text-purple-500 text-xs">적용 중</span>}
+                      <span className="room-skin-swatch" style={{ background: item.colors.b ? `linear-gradient(135deg, ${item.colors.a} 50%, ${item.colors.b} 50%)` : item.colors.a }} />
+                      <span>{item.name}</span>
+                      {skin[slot] === item.id && <em>적용 중</em>}
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-300 text-sm">상점에서 사면 방 분위기를 바꿀 수 있어요!</p>
+                <p className="room-empty">상점에서 사면 방 분위기를 바꿀 수 있어요!</p>
               )}
-            </div>
+            </section>
           ))}
-          <div className="border-t border-dashed border-gray-200 pt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <h4 className="text-gray-500">♻️ 아이템 환불</h4>
-              <span className="text-xs text-gray-400">모든 내 공간 아이템은 구매가의 50%로 환불할 수 있어요.</span>
+          <section className="room-section room-section-refund">
+            <div className="room-section-head">
+              <h4>♻️ 아이템 환불</h4>
+              <span>모든 내 공간 아이템은 구매가의 50%로 환불할 수 있어요.</span>
             </div>
             {inventoryItems.length ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {inventoryItems.map((item) => (
-                  <div key={`${item.id}-${item.inventoryIndex}`} className="rounded-2xl border border-gray-100 bg-gray-50 p-2 flex items-center gap-2">
-                    <ItemThumb id={item.id} size={38} />
+                  <div key={`${item.id}-${item.inventoryIndex}`} className="room-refund-card">
+                    <ItemThumb id={item.id} size={40} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-[11px] truncate">{item.name}</div>
-                      <div className="text-[10px] text-emerald-600">+{fmt(Math.floor(costOf(item) * 0.5))} {klass.currency}</div>
-                      <button onClick={() => refundItem(item)} disabled={Boolean(refundBusy)} className="text-[10px] text-rose-500 underline disabled:opacity-40">
+                      <div className="room-refund-name">{item.name}</div>
+                      <div className="room-refund-price">+{fmt(Math.floor(costOf(item) * 0.5))} {klass.currency}</div>
+                      <button type="button" onClick={() => refundItem(item)} disabled={Boolean(refundBusy)} className="room-refund-btn">
                         {refundBusy === `${item.id}:${item.inventoryIndex}` ? '처리 중...' : '환불하기'}
                       </button>
                     </div>
@@ -633,64 +677,65 @@ function RoomInner({ klass, student }) {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-300">아직 환불할 아이템이 없어요.</p>
+              <p className="room-empty">아직 환불할 아이템이 없어요.</p>
             )}
-          </div>
+          </section>
         </div>
       )}
 
       {/* 캐릭터 */}
       {tab === 'avatar' && (
-        <div className="bg-white rounded-3xl shadow p-5 space-y-5">
-          <div>
-            <h4 className="text-gray-500 mb-1">내 캐릭터 ({myChars.length}/{CHAR_ITEMS.length}종)</h4>
-            <p className="text-xs text-gray-400 mb-2">캐릭터는 상점에서 사야 쓸 수 있어요. 산 캐릭터는 언제든 바꿔 가며 놀 수 있어요!</p>
+        <div className="room-panel">
+          <section className="room-section">
+            <div className="room-section-head">
+              <h4>내 캐릭터 ({myChars.length}/{CHAR_ITEMS.length}종)</h4>
+              <span>상점에서 산 캐릭터는 언제든 바꿔 가며 놀 수 있어요.</span>
+            </div>
             {myChars.length ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="room-tile-grid">
                 {myChars.map((c) => (
                   <button
                     key={c.id}
+                    type="button"
                     onClick={() => equipChar(c.base)}
-                    className={`rounded-2xl border-2 p-2 transition ${
-                      avatar.base === c.base ? 'border-purple-500 bg-purple-50 scale-105' : 'border-gray-200 hover:border-purple-300'
-                    }`}
-                    style={{ width: 86 }}
+                    aria-pressed={avatar.base === c.base}
+                    className={`room-tile${avatar.base === c.base ? ' is-placing' : ''}`}
                   >
-                    <ItemThumb id={c.id} size={52} />
-                    <div className="text-[11px]">{c.name}</div>
+                    <ItemThumb id={c.id} size={60} />
+                    <span className="room-tile-name">{c.name}</span>
+                    {avatar.base === c.base && <span className="room-tile-badge">사용 중</span>}
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="bg-purple-50 rounded-2xl p-4 text-center text-purple-600 text-sm">
+              <div className="room-callout">
                 아직 캐릭터가 없어요! 🛍️ 상점 → 🐰 캐릭터에서 마음에 드는 친구를 데려오세요.
               </div>
             )}
-          </div>
+          </section>
           {['hat', 'face', 'acc'].map((slot) => (
-            <div key={slot}>
-              <h4 className="text-gray-500 mb-2">{SLOT_LABEL[slot]}</h4>
+            <section key={slot} className="room-section">
+              <div className="room-section-head"><h4>{SLOT_LABEL[slot]}</h4></div>
               {owned(slot).length ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="room-tile-grid room-tile-grid-sm">
                   {owned(slot).map((item) => (
                     <button
                       key={`${item.id}-${item.inventoryIndex}`}
+                      type="button"
                       onClick={() => equip(item)}
                       title={item.name}
-                      className={`rounded-2xl border-2 p-2 transition ${
-                        avatar[slot] === item.id ? 'border-purple-500 bg-purple-50 scale-105' : 'border-gray-200 hover:border-purple-300'
-                      }`}
-                      style={{ width: 78 }}
+                      aria-pressed={avatar[slot] === item.id}
+                      className={`room-tile${avatar[slot] === item.id ? ' is-placing' : ''}`}
                     >
-                      <ItemThumb id={item.id} size={44} />
-                      <div className="text-[10px] leading-tight">{item.name}</div>
+                      <ItemThumb id={item.id} size={48} />
+                      <span className="room-tile-name">{item.name}</span>
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-300">아직 없는 종류예요. 상점에서 사 보세요!</p>
+                <p className="room-empty">아직 없는 종류예요. 상점에서 사 보세요!</p>
               )}
-            </div>
+            </section>
           ))}
         </div>
       )}
@@ -716,12 +761,14 @@ function RoomInner({ klass, student }) {
       {/* 상점 */}
       {tab === 'shop' && (
         <div className="space-y-3">
-          <div className="flex gap-2 flex-wrap">
+          <div className="room-cat-chips">
             {CATS.map(([id, label]) => (
               <button
                 key={id}
+                type="button"
                 onClick={() => setShopCat(id)}
-                className={`px-3 py-1.5 rounded-xl text-sm transition ${shopCat === id ? 'bg-purple-500 text-white' : 'bg-white text-gray-500'}`}
+                aria-pressed={shopCat === id}
+                className={`room-cat-chip${shopCat === id ? ' is-active' : ''}`}
               >
                 {label}
               </button>
@@ -736,24 +783,25 @@ function RoomInner({ klass, student }) {
                 const total = price + tax;
                 const done = !need.length;
                 return (
-                  <div key={set.id} className={`bg-white rounded-3xl shadow p-5 ${done ? 'opacity-60' : ''}`}>
-                    <h4 className="text-lg">{set.name}</h4>
-                    <p className="text-xs text-gray-400 mb-2">{set.desc}</p>
+                  <div key={set.id} className={`room-shop-card room-set-card${done ? ' is-owned' : ''}`}>
+                    <h4 className="room-set-title">{set.name}</h4>
+                    <p className="room-set-desc">{set.desc}</p>
                     <div className="flex flex-wrap gap-1 mb-3">
                       {set.items.map((id) => ITEM_MAP[id] && (
-                        <div key={id} className="text-center" style={{ width: 54 }}>
-                          <ItemThumb id={id} size={40} />
-                          <div className="text-[9px] text-gray-400 leading-tight">{ITEM_MAP[id].name}</div>
+                        <div key={id} className="text-center" style={{ width: 58 }}>
+                          <ItemThumb id={id} size={42} />
+                          <div className="room-set-item-name">{ITEM_MAP[id].name}</div>
                         </div>
                       ))}
                     </div>
                     {done ? (
-                      <div className="text-emerald-500 text-center">세트 완성! ✓</div>
+                      <div className="room-owned-mark">세트 완성! ✓</div>
                     ) : (
                       <button
+                        type="button"
                         onClick={() => buySet(set)}
                         disabled={Boolean(purchaseBusy)}
-                        className={`w-full rounded-xl py-2 text-white ${student.cash >= total ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-300'}`}
+                        className={`room-buy-btn${student.cash >= total ? '' : ' is-short'}`}
                       >
                         {fmt(total)} {klass.currency}
                         {tax > 0 && <span className="text-xs opacity-80 ml-1">(세금 {fmt(tax)})</span>}
@@ -768,7 +816,7 @@ function RoomInner({ klass, student }) {
           ) : shopCat === 'char' ? (
             Object.entries(SPECIES_GROUP).map(([g, gLabel]) => (
               <div key={g}>
-                <h4 className="text-gray-500 mb-2">{gLabel}</h4>
+                <h4 className="room-shop-group">{gLabel}</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 mb-3">
                   {CHAR_ITEMS.filter((c) => c.group === g).map((c) => {
                     const has = inventory.includes(c.id);
@@ -776,30 +824,28 @@ function RoomInner({ klass, student }) {
                     const tax = taxForPart(price, klass, 'item').tax;
                     const total = price + tax;
                     return (
-                      <div key={c.id} className={`bg-white rounded-2xl shadow p-3 text-center ${has ? 'opacity-70' : ''}`}>
-                        <ItemThumb id={c.id} size={64} />
-                        <div className="text-sm leading-tight mt-1">{c.name}</div>
+                      <div key={c.id} className={`room-shop-card${has ? ' is-owned' : ''}`}>
+                        <ItemThumb id={c.id} size={68} />
+                        <div className="room-shop-name">{c.name}</div>
                         {has ? (
-                          <div className="flex gap-1 mt-1">
-                            <button onClick={() => setPreviewItem(c)} className="flex-1 rounded-xl py-1.5 text-[11px] bg-sky-100 text-sky-600">자세히 보기</button>
+                          <div className="flex gap-1 mt-2">
+                            <button type="button" onClick={() => setPreviewItem(c)} className="room-mini-btn room-mini-btn-info">자세히 보기</button>
                             <button
+                              type="button"
                               onClick={() => equipChar(c.base)}
-                              className={`flex-1 rounded-xl py-1.5 text-[11px] ${
-                                avatar.base === c.base ? 'bg-purple-100 text-purple-600' : 'bg-emerald-100 text-emerald-600'
-                              }`}
+                              className={`room-mini-btn ${avatar.base === c.base ? 'room-mini-btn-using' : 'room-mini-btn-switch'}`}
                             >
                               {avatar.base === c.base ? '사용 중 ✓' : '바꾸기'}
                             </button>
                           </div>
                         ) : (
-                          <div className="flex gap-1 mt-1">
-                            <button onClick={() => setPreviewItem(c)} className="flex-1 rounded-xl py-1.5 text-[11px] bg-sky-100 text-sky-600">자세히 보기</button>
+                          <div className="flex gap-1 mt-2">
+                            <button type="button" onClick={() => setPreviewItem(c)} className="room-mini-btn room-mini-btn-info">자세히 보기</button>
                             <button
+                              type="button"
                               onClick={() => buyItem(c)}
                               disabled={Boolean(purchaseBusy)}
-                              className={`flex-1 rounded-xl py-1.5 text-[11px] text-white ${
-                                student.cash >= total ? 'bg-purple-400 hover:bg-purple-500' : 'bg-gray-300'
-                              }`}
+                              className={`room-mini-btn room-mini-btn-buy${student.cash >= total ? '' : ' is-short'}`}
                             >
                               🔒 {fmt(total)}
                             </button>
@@ -821,19 +867,18 @@ function RoomInner({ klass, student }) {
                 const tax = taxForPart(price, klass, 'item').tax;
                 const total = price + tax;
                 return (
-                  <div key={item.id} className={`bg-white rounded-2xl shadow p-3 text-center ${has && !stackable ? 'opacity-60' : ''}`}>
-                    <ItemThumb id={item.id} size={56} />
-                    <div className="text-sm leading-tight mt-1">{item.name}</div>
-                    <div className="text-[10px] text-gray-400 mb-1.5">{SLOT_LABEL[item.slot]}</div>
+                  <div key={item.id} className={`room-shop-card${has && !stackable ? ' is-owned' : ''}`}>
+                    <ItemThumb id={item.id} size={60} />
+                    <div className="room-shop-name">{item.name}</div>
+                    <div className="room-shop-slot">{SLOT_LABEL[item.slot]}</div>
                     {has && !stackable ? (
-                      <div className="text-emerald-500 text-sm">보유 중 ✓</div>
+                      <div className="room-owned-mark">보유 중 ✓</div>
                     ) : (
                       <button
+                        type="button"
                         onClick={() => buyItem(item)}
                         disabled={Boolean(purchaseBusy)}
-                        className={`w-full rounded-xl py-1.5 text-sm text-white ${
-                          student.cash >= total ? 'bg-purple-400 hover:bg-purple-500' : 'bg-gray-300'
-                        }`}
+                        className={`room-buy-btn${student.cash >= total ? '' : ' is-short'}`}
                       >
                         {stackable && has ? `＋ 하나 더 구매 (${ownedCount}개 보유)` : `${fmt(total)} ${klass.currency}`}
                       </button>

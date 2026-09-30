@@ -1,6 +1,6 @@
-// 완성형 원본의 전신 실루엣을 그대로 사용합니다. HeroCharacterArt가 생성
-// 이미지의 체크무늬 배경만 제거하므로 갑옷·망토·부츠 크기가 보존됩니다.
-const LOADOUT_ART = import.meta.glob('../assets/hero-loadout/*/*/*.png', {
+// 장비 레이어는 기본 캐릭터(hero-guardian-*-base-cutout.webp)와 같은 2:3 화면 크기로 만든
+// 투명 이미지입니다. 위치·크기 보정 없이 기본 캐릭터와 같은 상자에 겹치기만 하면 몸에 맞습니다.
+const LOADOUT_ART = import.meta.glob('../assets/hero-loadout/*/*/*.webp', {
   eager: true,
   import: 'default',
   query: '?url',
@@ -16,6 +16,6 @@ const normalizeRarity = (rarity) => (RARITIES.has(rarity) ? rarity : 'common');
 
 export function heroLoadoutArtFor(characterId, slot, rarity) {
   if (!SLOTS.has(slot)) return null;
-  const key = `../assets/hero-loadout/${normalizeGender(characterId)}/${slot}/${normalizeRarity(rarity)}.png`;
+  const key = `../assets/hero-loadout/${normalizeGender(characterId)}/${slot}/${normalizeRarity(rarity)}.webp`;
   return LOADOUT_ART[key] || null;
 }

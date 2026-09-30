@@ -1,7 +1,6 @@
 import { HERO_GRADE_VISUALS, HERO_ITEM_MAP, HERO_RARITIES, normalizeHero } from '../lib/hero';
 import arenaBackground from '../assets/hero-card-arena.png';
 import { HeroPetVisual } from './HeroItemVisual.jsx';
-import HeroCharacterArt from './HeroCharacterArt.jsx';
 import HeroLoadoutLayers from './HeroLoadoutLayers.jsx';
 
 const FALLBACK_TONE = {
@@ -41,6 +40,7 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
   const equippedGradeKeys = equipmentItems
     .map(([, item]) => item?.rarity)
     .filter((rarity) => rarity && HERO_GRADE_VISUALS[rarity]);
+  const equippedCount = equipmentItems.filter(([, item]) => item).length;
   const mixedGrade = new Set(equippedGradeKeys).size > 1;
   const frameGradeKey = !mixedGrade && armor?.rarity && HERO_GRADE_VISUALS[armor.rarity]
     ? armor.rarity
@@ -127,8 +127,11 @@ export default function HeroCardVisual({ hero: rawHero, size = 180, animated = f
       {characterArt ? (
         <div className="hero-card-art-wrap">
           <div className="hero-card-art-backdrop" aria-hidden="true" />
-          <HeroCharacterArt className="hero-card-art" src={characterArt} alt={character.name || '용사'} />
-          <HeroLoadoutLayers characterId={hero.character} equipmentItems={equipmentItems} baseArt={characterArt} />
+          {/* 기본 캐릭터와 장비 레이어를 같은 상자에 쌓고, 그림자·색 보정은 묶음 전체에 한 번만 줍니다. */}
+          <div className="hero-figure-stack" role="img" aria-label={`${character.name || '용사'} · 장비 ${equippedCount}개 장착`}>
+            <img className="hero-figure-layer hero-figure-base" src={characterArt} alt="" draggable={false} decoding="async" />
+            <HeroLoadoutLayers characterId={hero.character} equipmentItems={equipmentItems} />
+          </div>
         </div>
       ) : (
       <div className="hero-card-figure">
